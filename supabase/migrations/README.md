@@ -1,13 +1,9 @@
 # Migrations
 
-This directory is reserved for Supabase SQL migrations.
+SQL migrations for the hosted Supabase project live in this directory.
 
-Milestone 1 does not add business tables. The intended multi-user model, `user_id` ownership, and row-level security rules are documented in `docs/data-model.md`.
+`20261018204000_companies_and_applications.sql` creates `companies` and `applications`, with row level security so each signed-in user can only read and write their own rows. An application cannot reference a company owned by someone else.
 
-When a later milestone adds a table:
+Apply pending files to the existing project with `supabase db push`. Do not run `supabase db reset` against the hosted database.
 
-1. Add a new timestamped `.sql` file here.
-2. Include `user_id uuid not null references auth.users (id) on delete cascade` on every user-owned table.
-3. Enable row level security in the same migration as the table.
-4. Add select, insert, update, and delete policies that allow a row only when `auth.uid() = user_id`.
-5. Do not grant the secret key to the browser, and do not add a policy that allows every authenticated user to read every row.
+See the README for the exact link and push commands.

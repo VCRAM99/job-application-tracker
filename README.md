@@ -109,11 +109,22 @@ Public: `/login`, `/signup`, `/forgot-password`, `/reset-password`, `/auth/confi
 
 Protected: `/dashboard`, `/companies`, `/applications`, `/networking`, `/tasks`, `/preparation`, `/settings`.
 
-Protected feature pages are placeholders.
+`/companies` and `/applications` store records for the signed-in user. `/dashboard`, `/networking`, `/tasks`, and `/preparation` are still placeholders.
 
 ## Data model
 
-No business tables are created in this milestone. The intended multi-user model and row-level security rules are in [docs/data-model.md](docs/data-model.md). SQL migrations belong in `supabase/migrations/` and should be applied later, when those tables are actually created.
+`companies` and `applications` are defined in [supabase/migrations/20261018204000_companies_and_applications.sql](supabase/migrations/20261018204000_companies_and_applications.sql). Column rules and row-level security are described in [docs/data-model.md](docs/data-model.md).
+
+The migration is not applied by deploying the Next.js app. Apply it to the existing hosted project from this repository. This does not reset or delete the database.
+
+1. Install nothing globally. From the repository root, the Supabase CLI runs through npx.
+2. Sign in: `npx supabase login`
+3. Link this repo to the existing project: `npx supabase link --project-ref dccbxmloaptulwjisitq`
+   When prompted, enter the database password from **Project Settings → Database** in the Supabase dashboard. Do not create a new project.
+4. Apply pending migrations: `npx supabase db push`
+5. Do not run `supabase db reset`, `supabase db push --db-url` against an unknown URL, or any command that drops schemas.
+
+`db push` only runs migration files that are not already recorded. If it asks for confirmation, read the listed migration name. The only expected new file is `20261018204000_companies_and_applications.sql`. Stop if it proposes to drop tables or reset the database.
 
 ## Deploying to Vercel
 
