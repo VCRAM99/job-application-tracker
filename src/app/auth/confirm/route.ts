@@ -2,6 +2,10 @@ import { type EmailOtpType } from "@supabase/supabase-js"
 import { type NextRequest, NextResponse } from "next/server"
 
 import { decideConfirm } from "@/lib/auth/confirm"
+import {
+  RECOVERY_COOKIE,
+  recoveryCookieOptions,
+} from "@/lib/auth/recovery-cookie"
 import { createClient } from "@/lib/supabase/server"
 
 function loginWithError(request: NextRequest) {
@@ -22,9 +26,9 @@ export async function GET(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = "/reset-password"
     url.search = ""
-    url.searchParams.set("token_hash", decision.tokenHash)
-    url.searchParams.set("type", "recovery")
-    return NextResponse.redirect(url)
+    const response = NextResponse.redirect(url)
+    response.cookies.set(RECOVERY_COOKIE, decision.tokenHash, recoveryCookieOptions())
+    return response
   }
 
   const supabase = await createClient()
@@ -38,6 +42,10 @@ export async function GET(request: NextRequest) {
     if (error) return loginWithError(request)
 
     return NextResponse.redirect(new URL(decision.next, request.url))
+  }
+
+  if (decision.next === "/reset-password" || decision.next.startsWith("/reset-password?")) {
+    return loginWithError(request)
   }
 
   const { error } = await supabase.auth.exchangeCodeForSession(decision.code)

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
+import { isConfirmedAccount } from "@/lib/auth/access"
 import { sessionGate } from "@/lib/auth/paths"
 import { getPublicEnv } from "@/lib/env"
 
@@ -49,8 +50,18 @@ export async function updateSession(request: NextRequest) {
   try {
     const { data } = await supabase.auth.getClaims()
     isAuthenticated = Boolean(data?.claims)
-  } catch (error) {
-    console.error("Unable to refresh the Supabase session.", error)
+
+    if (isAuthenticated) {
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      if (userError || !userData.user) {
+        isAuthenticated = false
+      } else if (!isConfirmedAccount(userData.user)) {
+        await supabase.auth.signOut()
+        isAuthenticated = false
+      }
+    }
+  } catch {
+    console.error("Unable to refresh the Supabase session.")
   }
 
   const gate = sessionGate(

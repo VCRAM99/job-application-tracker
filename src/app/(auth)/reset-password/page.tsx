@@ -1,35 +1,24 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { cookies } from "next/headers"
 
+import { isRecoveryProof } from "@/lib/auth/access"
 import { AuthFrame } from "@/components/auth/auth-frame"
 import { ResetPasswordForm } from "@/components/auth/reset-password-form"
 import { resetPassword } from "@/lib/auth/actions"
-import { getCurrentUser } from "@/lib/auth/session"
+import { RECOVERY_COOKIE } from "@/lib/auth/recovery-cookie"
 
 export const metadata: Metadata = { title: "Reset password" }
 export const instant = false
 
-type SearchParams = Promise<Record<string, string | string[] | undefined>>
+export default async function ResetPasswordPage() {
+  const tokenHash = (await cookies()).get(RECOVERY_COOKIE)?.value ?? ""
 
-function first(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value
-}
-
-export default async function ResetPasswordPage({
-  searchParams,
-}: {
-  searchParams: SearchParams
-}) {
-  const params = await searchParams
-  const tokenHash = first(params.token_hash) ?? null
-  const type = first(params.type) ?? null
-  const user = tokenHash ? null : await getCurrentUser()
-
-  if (!tokenHash && !user) {
+  if (!isRecoveryProof(tokenHash, "recovery")) {
     return (
       <AuthFrame
         title="Reset link expired"
-        description="This link is invalid or has already been used. Request a new password reset email."
+        description="This link is invalid or has already been used. Request a new password reset email. A signed-in session is not enough to reset a password here."
       >
         <Link href="/forgot-password" className="text-sm underline underline-offset-4">
           Request a new link
@@ -38,11 +27,5 @@ export default async function ResetPasswordPage({
     )
   }
 
-  return (
-    <ResetPasswordForm
-      updatePassword={resetPassword}
-      tokenHash={tokenHash}
-      type={type}
-    />
-  )
+  return <ResetPasswordForm updatePassword={resetPassword} />
 }

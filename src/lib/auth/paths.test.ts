@@ -52,6 +52,18 @@ describe("sessionGate", () => {
     })
   })
 
+  it("does not treat a signed-in session as a password reset", () => {
+    expect(sessionGate("/reset-password", new URLSearchParams(), true)).toEqual({
+      type: "continue",
+    })
+  })
+
+  it("keeps the reset page available without a session", () => {
+    expect(sessionGate("/reset-password", new URLSearchParams("type=signup"), false)).toEqual({
+      type: "continue",
+    })
+  })
+
   it("leaves the email confirmation callback alone", () => {
     expect(sessionGate("/auth/confirm", new URLSearchParams("token_hash=abc"), false)).toEqual({
       type: "continue",

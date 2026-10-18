@@ -1,17 +1,22 @@
 "use server"
 
+import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
-import { mapAuthError } from "@/lib/auth/errors"
+import { isConfirmedAccount, isRecoveryProof } from "@/lib/auth/access"
+import { mapAuthError, mapPasswordChangeError } from "@/lib/auth/errors"
 import type { AuthFormState } from "@/lib/auth/form-state"
 import { safeNextPath } from "@/lib/auth/paths"
 import {
   fieldErrorsFrom,
+  changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
   resetPasswordSchema,
   signupSchema,
 } from "@/lib/auth/schemas"
+import { RECOVERY_COOKIE } from "@/lib/auth/recovery-cookie"
+import { getCurrentUser } from "@/lib/auth/session"
 import { isDuplicateSignup } from "@/lib/auth/signup"
 import { getSiteUrl } from "@/lib/env"
 import { createClient } from "@/lib/supabase/server"
@@ -87,6 +92,15 @@ export async function signup(formData: FormData): Promise<AuthFormState> {
   }
 
   if (data.session) {
+    if (!isConfirmedAccount(data.user)) {
+      await supabase.auth.signOut()
+      return {
+        status: "success",
+        message:
+          "Check your email for a confirmation link. You can sign in after you verify the address.",
+        fieldErrors: {},
+      }
+    }
     redirect("/dashboard")
   }
 
@@ -136,45 +150,32 @@ export async function resetPassword(formData: FormData): Promise<AuthFormState> 
 
   if (!parsed.success) return invalidForm(parsed.error)
 
+  const cookieStore = await cookies()
+  const tokenHash = cookieStore.get(RECOVERY_COOKIE)?.value ?? ""
+
+  if (!isRecoveryProof(tokenHash, "recovery")) {
+    return {
+      status: "error",
+      message: mapAuthError({
+        message: "expired",
+        code: "otp_expired",
+      }),
+      fieldErrors: {},
+    }
+  }
+
   const supabase = await createClient()
-  const tokenHash = formValue(formData, "token_hash")
-  const type = formValue(formData, "type")
+  const { error: verifyError } = await supabase.auth.verifyOtp({
+    type: "recovery",
+    token_hash: tokenHash,
+  })
+  cookieStore.delete(RECOVERY_COOKIE)
 
-  if (tokenHash) {
-    if (type !== "recovery") {
-      return {
-        status: "error",
-        message: mapAuthError({
-          message: "expired",
-          code: "otp_expired",
-        }),
-        fieldErrors: {},
-      }
-    }
-
-    const { error } = await supabase.auth.verifyOtp({
-      type: "recovery",
-      token_hash: tokenHash,
-    })
-
-    if (error) {
-      return {
-        status: "error",
-        message: mapAuthError(error),
-        fieldErrors: {},
-      }
-    }
-  } else {
-    const { data, error } = await supabase.auth.getClaims()
-    if (error || !data?.claims) {
-      return {
-        status: "error",
-        message: mapAuthError({
-          message: "expired",
-          code: "otp_expired",
-        }),
-        fieldErrors: {},
-      }
+  if (verifyError) {
+    return {
+      status: "error",
+      message: mapAuthError(verifyError),
+      fieldErrors: {},
     }
   }
 
@@ -191,6 +192,39 @@ export async function resetPassword(formData: FormData): Promise<AuthFormState> 
   }
 
   redirect("/dashboard")
+}
+
+export async function changePassword(formData: FormData): Promise<AuthFormState> {
+  const parsed = changePasswordSchema.safeParse({
+    currentPassword: formValue(formData, "currentPassword"),
+    password: formValue(formData, "password"),
+    confirmPassword: formValue(formData, "confirmPassword"),
+  })
+
+  if (!parsed.success) return invalidForm(parsed.error)
+
+  const user = await getCurrentUser()
+  if (!user) redirect("/login")
+
+  const supabase = await createClient()
+  const { error } = await supabase.auth.updateUser({
+    password: parsed.data.password,
+    current_password: parsed.data.currentPassword,
+  })
+
+  if (error) {
+    return {
+      status: "error",
+      message: mapPasswordChangeError(error),
+      fieldErrors: {},
+    }
+  }
+
+  return {
+    status: "success",
+    message: "Password updated.",
+    fieldErrors: {},
+  }
 }
 
 export async function signOut() {

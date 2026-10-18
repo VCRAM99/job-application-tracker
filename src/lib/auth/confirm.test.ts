@@ -36,6 +36,13 @@ describe("decideConfirm", () => {
     expect(decideConfirm(new URLSearchParams())).toEqual({ kind: "expired" })
   })
 
+  it("does not treat a signup token as password recovery", () => {
+    const decision = decideConfirm(
+      new URLSearchParams("token_hash=abc&type=signup&next=/reset-password"),
+    )
+    expect(decision.kind).toBe("verify-email")
+  })
+
   it("exchanges a PKCE code when no token hash is present", () => {
     expect(decideConfirm(new URLSearchParams("code=auth-code&next=/reset-password"))).toEqual({
       kind: "exchange-code",

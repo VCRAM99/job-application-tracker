@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 
+import { ChangePasswordForm } from "@/components/auth/change-password-form"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import {
@@ -9,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { signOut } from "@/lib/auth/actions"
+import { changePassword, signOut } from "@/lib/auth/actions"
 import { requireUser } from "@/lib/auth/session"
 
 export const metadata: Metadata = { title: "Settings" }
@@ -43,6 +44,18 @@ export default async function SettingsPage() {
               Sign out
             </Button>
           </form>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Password</CardTitle>
+          <CardDescription>
+            Changing the password for a signed-in account requires the current
+            password. Email recovery uses a separate link.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChangePasswordForm updatePassword={changePassword} />
         </CardContent>
       </Card>
       <Card>

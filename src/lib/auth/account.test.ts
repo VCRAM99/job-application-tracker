@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { mapAuthError } from "@/lib/auth/errors"
+import { mapAuthError, mapPasswordChangeError } from "@/lib/auth/errors"
 import { isDuplicateSignup } from "@/lib/auth/signup"
 
 describe("mapAuthError", () => {
@@ -19,6 +19,17 @@ describe("mapAuthError", () => {
     expect(mapAuthError({ message: "email rate limit exceeded", status: 429 })).toMatch(
       /Too many attempts/,
     )
+  })
+})
+
+describe("mapPasswordChangeError", () => {
+  it("does not describe a wrong current password as a failed login", () => {
+    expect(
+      mapPasswordChangeError({
+        message: "Invalid login credentials",
+        code: "invalid_credentials",
+      }),
+    ).toBe("Current password is incorrect.")
   })
 })
 

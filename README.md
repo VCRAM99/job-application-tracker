@@ -90,7 +90,7 @@ The app confirms email and recovery links at `/auth/confirm` using `token_hash`.
 
 `{{ .SiteURL }}` must be the app origin (`http://localhost:3000` or your production domain), not the Supabase project URL.
 
-Recovery links are not consumed when the email is opened. The new password form verifies the token on submit, so a mail scanner that only prefetches the link does not invalidate it.
+Recovery links are not consumed when the email is opened. `/auth/confirm` stores the recovery token in a short-lived HTTP-only cookie and redirects to `/reset-password` without the token in the address. The form verifies that cookie on submit, so a mail scanner that only prefetches the link does not invalidate it, and a normal signed-in session cannot use this page.
 
 The default Supabase mailer is rate limited (about two messages per hour). Configure custom SMTP before you rely on this in production.
 
@@ -99,7 +99,7 @@ The default Supabase mailer is rate limited (about two messages per hour). Confi
 - **Sign up** creates the user and asks them to confirm their email. If Supabase reports an existing account, the form says so. If email confirmation is turned off in the dashboard, Supabase returns a session and the app sends the user to the dashboard.
 - **Sign in** rejects invalid credentials and unverified addresses with a specific message.
 - **Forgot password** always shows the same success message when Supabase accepts the request, so the form does not reveal whether the email is registered. Rate-limit errors are shown.
-- **Reset password** at `/reset-password` accepts the recovery token, or an existing session created by a code exchange. Missing or expired links show an error and a way to request a new email.
+- **Reset password** at `/reset-password` accepts only a recovery `token_hash` with `type=recovery`. A normal signed-in session cannot set a password on that page. Missing or expired links show an error and a way to request a new email. Signed-in password changes are on **Settings** and require the current password.
 - **Sign out** clears the Supabase session cookie.
 - Sessions stay in HTTP-only cookies. `src/proxy.ts` refreshes them and redirects unauthenticated visitors away from protected routes. Protected layouts also call `getClaims()` on the server. Hiding a link is not treated as authorization.
 

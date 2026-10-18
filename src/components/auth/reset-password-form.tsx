@@ -11,12 +11,8 @@ import { fieldErrorsFrom, resetPasswordSchema } from "@/lib/auth/schemas"
 
 export function ResetPasswordForm({
   updatePassword,
-  tokenHash,
-  type,
 }: {
   updatePassword: (formData: FormData) => Promise<AuthFormState>
-  tokenHash: string | null
-  type: string | null
 }) {
   const [state, formAction, pending] = useActionState(
     async (_previous: AuthFormState, formData: FormData) => {
@@ -45,8 +41,6 @@ export function ResetPasswordForm({
     >
       <form action={formAction} className="space-y-4" noValidate>
         <FormStatus state={state} />
-        {tokenHash ? <input type="hidden" name="token_hash" value={tokenHash} /> : null}
-        {type ? <input type="hidden" name="type" value={type} /> : null}
         <Field name="password" label="New password" error={state.fieldErrors.password}>
           <Input
             id="password"

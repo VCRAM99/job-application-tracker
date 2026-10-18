@@ -64,3 +64,18 @@ export function mapAuthError(error: AuthErrorInput): string {
 
   return "Something went wrong. Try again."
 }
+
+export function mapPasswordChangeError(error: AuthErrorInput): string {
+  const code = error.code ?? ""
+  const message = error.message.toLowerCase()
+
+  if (
+    code === "invalid_credentials" ||
+    message.includes("invalid login credentials") ||
+    message.includes("current password")
+  ) {
+    return "Current password is incorrect."
+  }
+
+  return mapAuthError(error)
+}

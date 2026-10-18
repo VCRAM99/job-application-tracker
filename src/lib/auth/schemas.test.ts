@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest"
 
-import { loginSchema, resetPasswordSchema, signupSchema } from "@/lib/auth/schemas"
+import {
+  changePasswordSchema,
+  loginSchema,
+  resetPasswordSchema,
+  signupSchema,
+} from "@/lib/auth/schemas"
 
 describe("auth schemas", () => {
   it("accepts a valid login", () => {
@@ -28,6 +33,31 @@ describe("auth schemas", () => {
         true,
       )
     }
+  })
+
+  it("requires the current password before an authenticated change", () => {
+    expect(
+      changePasswordSchema.safeParse({
+        currentPassword: "",
+        password: "password1",
+        confirmPassword: "password1",
+      }).success,
+    ).toBe(false)
+
+    const same = changePasswordSchema.safeParse({
+      currentPassword: "password1",
+      password: "password1",
+      confirmPassword: "password1",
+    })
+    expect(same.success).toBe(false)
+
+    expect(
+      changePasswordSchema.safeParse({
+        currentPassword: "password1",
+        password: "password2",
+        confirmPassword: "password2",
+      }).success,
+    ).toBe(true)
   })
 
   it("requires a letter and a number on reset", () => {
