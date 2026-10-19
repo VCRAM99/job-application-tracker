@@ -25,7 +25,7 @@ export function ImportPanel({ kind }: { kind: ImportKind }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="rounded-xl border p-4">
+      <section className="surface p-4">
         <h2 className="text-sm font-medium">Template</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           Download a blank {title.toLowerCase()} template. The header names must match exactly.
@@ -65,7 +65,7 @@ export function ImportPanel({ kind }: { kind: ImportKind }) {
           <p className="text-sm text-destructive" role="alert">{state.message}</p>
         ) : null}
         {state.result ? (
-          <p className="rounded-xl border px-3 py-3 text-sm" role="status">
+          <p className="surface px-3 py-3 text-sm" role="status">
             Imported {state.result.inserted}. Skipped {state.result.skipped} duplicate
             {state.result.skipped === 1 ? "" : "s"}.
             {state.result.companiesCreated > 0
@@ -98,8 +98,8 @@ function Review({ review }: { review: NonNullable<ImportState["review"]> }) {
           : `${review.ready} ready to import, ${review.skipped} duplicates will be skipped${review.companiesToCreate > 0 ? `, ${review.companiesToCreate} new companies` : ""}.`}
       </p>
       {review.errors.length > 0 ? (
-        <div className="overflow-x-auto rounded-xl border">
-          <table className="w-full min-w-[640px] text-left text-sm">
+        <div className="overflow-x-auto surface">
+          <table className="data-table w-full min-w-[640px] text-left text-sm">
             <caption className="sr-only">Import errors</caption>
             <thead className="border-b bg-muted/40 text-xs tracking-wide text-muted-foreground uppercase">
               <tr>
@@ -119,8 +119,8 @@ function Review({ review }: { review: NonNullable<ImportState["review"]> }) {
         </div>
       ) : null}
       {review.decisions.length > 0 ? (
-        <div className="overflow-x-auto rounded-xl border">
-          <table className="w-full min-w-[640px] text-left text-sm">
+        <div className="overflow-x-auto surface">
+          <table className="data-table w-full min-w-[640px] text-left text-sm">
             <caption className="sr-only">Import preview</caption>
             <thead className="border-b bg-muted/40 text-xs tracking-wide text-muted-foreground uppercase">
               <tr>
@@ -165,7 +165,7 @@ function AcceptedValues({ kind }: { kind: ImportKind }) {
         ["Salary Currency", "three uppercase letters, such as USD", "USD"],
       ]
   return (
-    <section className="rounded-xl border p-4">
+    <section className="surface p-4">
       <h2 className="text-sm font-medium">Accepted values</h2>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
         Empty optional cells use the default. Any other value is an error, and one error blocks the whole file.

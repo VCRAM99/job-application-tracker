@@ -17,9 +17,6 @@ export function AuthFrame({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <p className="text-sm font-medium tracking-tight text-muted-foreground">
-          Job Tracker
-        </p>
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         <p className="text-sm leading-6 text-muted-foreground">{description}</p>
       </div>

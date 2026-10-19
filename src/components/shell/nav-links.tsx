@@ -50,13 +50,13 @@ export function NavLinks({
             aria-current={active ? "page" : undefined}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-2 rounded-md px-2.5 py-2 text-sm text-sidebar-foreground",
+              "flex min-h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm text-sidebar-foreground transition-colors",
               active
-                ? "bg-sidebar-accent font-medium"
+                ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                 : "hover:bg-sidebar-accent/70",
             )}
           >
-            <Icon className="size-4 shrink-0" aria-hidden="true" />
+            <Icon className="size-4 shrink-0 stroke-[1.75]" aria-hidden="true" />
             {item.label}
           </Link>
         )

@@ -9,3 +9,7 @@ export const NAV_ITEMS = [
 ] as const
 
 export type NavHref = (typeof NAV_ITEMS)[number]["href"]
+
+export function sectionKey(pathname: string): string {
+  return pathname.split("/").filter(Boolean)[0] ?? "home"
+}

@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { NativeSelect } from "@/components/records/fields"
+import { NativeSelect, PriorityPill, StatusPill } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -124,8 +124,8 @@ export function CompanyTable({
     })
 
   return (
-    <div className="overflow-x-auto rounded-xl border">
-      <table className="w-full min-w-[760px] text-left text-sm">
+    <div className="surface overflow-x-auto">
+      <table className="data-table w-full min-w-[760px] text-left text-sm">
         <caption className="sr-only">Companies</caption>
         <thead className="border-b bg-muted/40 text-xs tracking-wide text-muted-foreground uppercase">
           <tr>
@@ -154,7 +154,9 @@ export function CompanyTable({
                   {company.name}
                 </Link>
               </td>
-              <td className="px-3 py-2">{PRIORITY_LABELS[company.priorityTier]}</td>
+              <td className="px-3 py-2">
+                <PriorityPill tier={company.priorityTier} label={PRIORITY_LABELS[company.priorityTier]} />
+              </td>
               <td className="px-3 py-2">{COMPANY_SIZE_LABELS[company.size]}</td>
               <td className="px-3 py-2">{RESEARCH_STATUS_LABELS[company.researchStatus]}</td>
               <td className="px-3 py-2">{company.location ?? "—"}</td>
@@ -262,8 +264,8 @@ export function ApplicationTable({
     })
 
   return (
-    <div className="overflow-x-auto rounded-xl border">
-      <table className="w-full min-w-[860px] text-left text-sm">
+    <div className="surface overflow-x-auto">
+      <table className="data-table w-full min-w-[860px] text-left text-sm">
         <caption className="sr-only">Applications</caption>
         <thead className="border-b bg-muted/40 text-xs tracking-wide text-muted-foreground uppercase">
           <tr>
@@ -298,7 +300,9 @@ export function ApplicationTable({
                   {application.companyName}
                 </Link>
               </td>
-              <td className="px-3 py-2">{APPLICATION_STATUS_LABELS[application.status]}</td>
+              <td className="px-3 py-2">
+                <StatusPill status={application.status} label={APPLICATION_STATUS_LABELS[application.status]} />
+              </td>
               <td className="px-3 py-2">{application.source ?? "—"}</td>
               <td className="px-3 py-2">{application.appliedAt ?? "—"}</td>
               <td className={`px-3 py-2 ${dueClass(application.nextFollowUpDate, today) ?? ""}`}>

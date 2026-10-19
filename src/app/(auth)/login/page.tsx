@@ -4,7 +4,10 @@ import { LoginForm } from "@/components/auth/login-form"
 import { login } from "@/lib/auth/actions"
 import { safeNextPath } from "@/lib/auth/paths"
 
-export const metadata: Metadata = { title: "Sign in" }
+export const metadata: Metadata = {
+  title: "Sign In",
+  description: "Sign in to your Job Tracker account.",
+}
 export const instant = false
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>

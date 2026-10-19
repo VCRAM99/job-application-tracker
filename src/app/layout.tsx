@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 
 import { ThemeProvider } from "@/components/theme-provider"
+import { PRODUCT_NAME, titleTemplate } from "@/lib/branding"
 
 import "./globals.css"
 
@@ -17,10 +18,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Job Application Tracker",
-    template: "%s · Job Application Tracker",
+    default: PRODUCT_NAME,
+    template: titleTemplate,
   },
-  description: "Track companies, applications, networking, and interview preparation.",
+  description: "A private workspace for companies, applications, networking, and interview preparation.",
+  applicationName: PRODUCT_NAME,
 }
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

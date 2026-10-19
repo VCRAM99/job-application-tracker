@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Label } from "@/components/ui/label"
 import { cn } from "cn"
+import type { ApplicationStatus, PriorityTier } from "@/lib/records/constants"
 import type { RecordFormState } from "@/lib/records/form-state"
 
 export function PageHeader({
@@ -16,9 +17,9 @@ export function PageHeader({
 }) {
   return (
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
+      <div className="min-w-0 space-y-1.5">
+        <h1 className="text-2xl font-semibold tracking-tight text-balance">{title}</h1>
+        <p className="max-w-2xl text-sm leading-6 text-pretty text-muted-foreground">{description}</p>
       </div>
       {action}
     </header>
@@ -83,7 +84,7 @@ export function RecordState({
 }) {
   return (
     <div
-      className="rounded-xl border px-4 py-8"
+      className="surface px-4 py-10"
       role={tone === "error" ? "alert" : "status"}
     >
       <h2 className="text-base font-medium">{title}</h2>
@@ -95,7 +96,7 @@ export function RecordState({
 
 export function DetailList({ items }: { items: Array<{ label: string; value: ReactNode }> }) {
   return (
-    <dl className="grid gap-4 sm:grid-cols-2">
+    <dl className="surface grid gap-4 p-4 sm:grid-cols-2">
       {items.map((item) => (
         <div key={item.label} className="space-y-1">
           <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -106,4 +107,23 @@ export function DetailList({ items }: { items: Array<{ label: string; value: Rea
       ))}
     </dl>
   )
+}
+
+export function StatusPill({ status, label }: { status: ApplicationStatus; label: string }) {
+  const tone =
+    status === "offer"
+      ? "pill-offer"
+      : status === "recruiter_screen" || status === "technical_interview" || status === "final_interview"
+        ? "pill-interview"
+        : status === "applied"
+          ? "pill-active"
+          : status === "rejected" || status === "withdrawn"
+            ? "pill-overdue"
+            : ""
+  return <span className={`pill ${tone}`}>{label}</span>
+}
+
+export function PriorityPill({ tier, label }: { tier: PriorityTier; label: string }) {
+  const tone = tier === "A" ? "pill-offer" : tier === "B" ? "pill-active" : ""
+  return <span className={`pill ${tone}`}>{label}</span>
 }

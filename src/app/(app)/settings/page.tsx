@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 
 import { ChangePasswordForm } from "@/components/auth/change-password-form"
+import { DeveloperNote } from "@/components/settings/developer-note"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,8 +24,7 @@ export default async function SettingsPage() {
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-          Account details for the signed-in user. Application data settings will
-          be added later.
+          Account, password, and appearance for this signed-in session.
         </p>
       </header>
       <Card>
@@ -66,6 +66,15 @@ export default async function SettingsPage() {
         <CardContent className="flex items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">Switch between dark and light.</p>
           <ThemeToggle />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>More about the developer</CardTitle>
+          <CardDescription>The person who built this workspace.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <DeveloperNote />
         </CardContent>
       </Card>
     </div>

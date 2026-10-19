@@ -1,9 +1,14 @@
+import type { Metadata } from "next"
 import { Suspense } from "react"
 
 import { AppShell } from "@/components/shell/app-shell"
 import { requireUser } from "@/lib/auth/session"
 
 export const instant = false
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+}
 
 export default function ProtectedLayout({
   children,

@@ -46,9 +46,9 @@ export default async function DashboardPage() {
         <dl className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <Stat label="Companies" value={metrics.companyCount} />
           <Stat label="Applications" value={metrics.applicationCount} />
-          <Stat label="Active applications" value={metrics.activeApplications} />
-          <Stat label="Interviews" value={metrics.interviews} />
-          <Stat label="Offers" value={metrics.offers} />
+          <Stat label="Active applications" value={metrics.activeApplications} tone="text-[var(--status-active)]" />
+          <Stat label="Interviews" value={metrics.interviews} tone="text-[var(--status-interview)]" />
+          <Stat label="Offers" value={metrics.offers} tone="text-[var(--status-offer)]" />
           <Stat label="Submitted, last 7 days" value={metrics.submittedLast7Days} />
         </dl>
       )}
@@ -113,10 +113,10 @@ export default async function DashboardPage() {
               <p className="text-sm text-muted-foreground">No preparation items yet.</p>
             ) : (
               <dl className="grid grid-cols-2 gap-3 text-sm">
-                <div><dt className="text-muted-foreground">Not started</dt><dd>{metrics.preparation.notStarted}</dd></div>
-                <div><dt className="text-muted-foreground">In progress</dt><dd>{metrics.preparation.inProgress}</dd></div>
-                <div><dt className="text-muted-foreground">Completed</dt><dd>{metrics.preparation.completed}</dd></div>
-                <div><dt className="text-muted-foreground">Total</dt><dd>{metrics.preparation.total}</dd></div>
+                <div><dt className="text-muted-foreground">Not started</dt><dd className="text-lg font-medium tabular-nums">{metrics.preparation.notStarted}</dd></div>
+                <div><dt className="text-muted-foreground">In progress</dt><dd className="text-lg font-medium tabular-nums text-[var(--status-interview)]">{metrics.preparation.inProgress}</dd></div>
+                <div><dt className="text-muted-foreground">Completed</dt><dd className="text-lg font-medium tabular-nums text-[var(--status-done)]">{metrics.preparation.completed}</dd></div>
+                <div><dt className="text-muted-foreground">Total</dt><dd className="text-lg font-medium tabular-nums">{metrics.preparation.total}</dd></div>
               </dl>
             )
           ) : (
@@ -128,19 +128,19 @@ export default async function DashboardPage() {
   )
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value, tone }: { label: string; value: number; tone?: string }) {
   return (
-    <div className="rounded-xl border px-3 py-3">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-2xl font-semibold tabular-nums">{value}</dd>
+    <div className="surface px-4 py-3">
+      <dt className="text-xs tracking-wide text-muted-foreground uppercase">{label}</dt>
+      <dd className={`mt-1 text-3xl font-semibold tracking-tight tabular-nums ${tone ?? ""}`}>{value}</dd>
     </div>
   )
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border p-4">
-      <h2 className="text-sm font-medium">{title}</h2>
+    <section className="surface p-4">
+      <h2 className="text-sm font-medium tracking-tight">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>
   )

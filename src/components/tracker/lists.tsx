@@ -71,8 +71,8 @@ export function ContactFilters({ query }: { query: ContactListQuery }) {
 
 export function ContactTable({ contacts, today }: { contacts: ContactRecord[]; today: string }) {
   return (
-    <div className="overflow-x-auto rounded-xl border">
-      <table className="w-full min-w-[760px] text-left text-sm">
+    <div className="surface overflow-x-auto">
+      <table className="data-table w-full min-w-[720px] text-left text-sm">
         <caption className="sr-only">Contacts</caption>
         <thead className="border-b bg-muted/40 text-xs tracking-wide text-muted-foreground uppercase">
           <tr>
@@ -151,8 +151,8 @@ export function TaskFilters({ query }: { query: TaskListQuery }) {
 
 export function TaskTable({ tasks, today }: { tasks: TaskRecord[]; today: string }) {
   return (
-    <div className="overflow-x-auto rounded-xl border">
-      <table className="w-full min-w-[760px] text-left text-sm">
+    <div className="surface overflow-x-auto">
+      <table className="data-table w-full min-w-[720px] text-left text-sm">
         <caption className="sr-only">Tasks, sorted by due date</caption>
         <thead className="border-b bg-muted/40 text-xs tracking-wide text-muted-foreground uppercase">
           <tr>
@@ -235,8 +235,8 @@ export function PreparationFilters({ query }: { query: PreparationListQuery }) {
 
 export function PreparationTable({ items }: { items: PreparationRecord[] }) {
   return (
-    <div className="overflow-x-auto rounded-xl border">
-      <table className="w-full min-w-[680px] text-left text-sm">
+    <div className="surface overflow-x-auto">
+      <table className="data-table w-full min-w-[680px] text-left text-sm">
         <caption className="sr-only">Preparation items</caption>
         <thead className="border-b bg-muted/40 text-xs tracking-wide text-muted-foreground uppercase">
           <tr>
