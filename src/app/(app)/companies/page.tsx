@@ -35,7 +35,10 @@ export default async function CompaniesPage({
         title="Companies"
         description="Research targets, priority, and the applications tied to each company."
         action={
-          <Button nativeButton={false} render={<Link href="/companies/new" />}>Add company</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" nativeButton={false} render={<Link href="/companies/import" />}>Import / export</Button>
+            <Button nativeButton={false} render={<Link href="/companies/new" />}>Add company</Button>
+          </div>
         }
       />
       {result.ok ? (

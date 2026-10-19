@@ -1,8 +1,6 @@
 # Job Application Tracker
 
-A dark-first job search workspace. This milestone is the application foundation: a responsive shell, placeholder sections, and email/password authentication with Supabase.
-
-Business features such as company records, applications, networking, tasks, preparation, and CSV/XLSX import are not implemented yet.
+A dark-first job search workspace with email/password authentication, companies, applications, networking, tasks, preparation, a dashboard, and CSV/XLSX import plus CSV export.
 
 ## Requirements
 
@@ -115,7 +113,7 @@ Protected: `/dashboard`, `/companies`, `/applications`, `/networking`, `/tasks`,
 
 `companies` and `applications` are defined in [supabase/migrations/20261018204000_companies_and_applications.sql](supabase/migrations/20261018204000_companies_and_applications.sql). Contacts, tasks, and preparation items are defined in [supabase/migrations/20261019160000_networking_tasks_preparation.sql](supabase/migrations/20261019160000_networking_tasks_preparation.sql). Column rules, metric definitions, and row-level security are described in [docs/data-model.md](docs/data-model.md).
 
-The migration is not applied by deploying the Next.js app. Apply it to the existing hosted project from this repository. This does not reset or delete the database.
+Migrations are not applied by deploying the Next.js app. Apply them to the existing hosted project from this repository. This does not reset or delete the database.
 
 1. Install nothing globally. From the repository root, the Supabase CLI runs through npx.
 2. Sign in: `npx supabase login`
@@ -124,7 +122,7 @@ The migration is not applied by deploying the Next.js app. Apply it to the exist
 4. Apply pending migrations: `npx supabase db push`
 5. Do not run `supabase db reset`, `supabase db push --db-url` against an unknown URL, or any command that drops schemas.
 
-`db push` only runs migration files that are not already recorded. If it asks for confirmation, read the listed migration name. After the companies migration is already applied, the only new file should be `20261019160000_networking_tasks_preparation.sql`. Stop if it proposes to drop tables or reset the database.
+`db push` only runs migration files that are not already recorded. If it asks for confirmation, read the listed migration name. After the earlier migrations are applied, the new file is `20261019204500_import_companies_and_applications.sql`. Stop if it proposes to drop tables or reset the database.
 
 Preview the pending SQL before applying it:
 

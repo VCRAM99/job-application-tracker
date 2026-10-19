@@ -75,5 +75,7 @@ describe("sessionGate", () => {
       expect(isProtectedPath(item.href)).toBe(true)
       expect(isPublicPath(item.href)).toBe(false)
     }
+    expect(isProtectedPath("/companies/import")).toBe(true)
+    expect(isProtectedPath("/applications/import")).toBe(true)
   })
 })

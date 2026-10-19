@@ -38,7 +38,12 @@ export default async function ApplicationsPage({
       <PageHeader
         title="Applications"
         description="Track each role from Saved through Offer, including the company it belongs to."
-        action={<Button nativeButton={false} render={<Link href="/applications/new" />}>Add application</Button>}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" nativeButton={false} render={<Link href="/applications/import" />}>Import / export</Button>
+            <Button nativeButton={false} render={<Link href="/applications/new" />}>Add application</Button>
+          </div>
+        }
       />
       {result.ok && companies.ok ? (
         <>

@@ -107,6 +107,28 @@ RLS is enabled on every user-owned table. `anon` has no privileges. `authenticat
 
 Index every `user_id` column, and index foreign keys that the app filters on.
 
-## Imports
+## Imports and exports
 
-CSV and XLSX import are not implemented. When they are, they must set `user_id` from the verified session, never from a column in the file.
+Companies and applications can be imported from the official CSV or XLSX templates and exported as CSV. Header names must match exactly, in any order. There is no column-name guessing. Dates use `YYYY-MM-DD`. Empty optional cells are accepted. Templates contain the header row only, and an XLSX template has one worksheet. `user_id` is never read from the file.
+
+Company headers: Company Name (required), Size, Location, Industry, Research Status, Priority Tier, Reference, Website URL, Notes, Follow-up Date.
+
+Application headers: Company Name (required), Job Title (required), Job URL, Source, Location, Work Arrangement, Employment Type, Salary Min, Salary Max, Salary Currency, Status, Applied Date, Next Follow-up Date, Notes.
+
+Accepted stored values, with the default used when the cell is empty:
+
+- Size: `small/startup`, `medium`, `large`, `unknown` (default `unknown`)
+- Research Status: `not_started`, `researching`, `ready_to_apply`, `active`, `paused`, `closed` (default `not_started`)
+- Priority Tier: `A`, `B`, `C`, `unset` (default `unset`)
+- Work Arrangement: `remote`, `hybrid`, `onsite`, `unknown` (default `unknown`)
+- Employment Type: `full_time`, `part_time`, `contract`, `internship`, `unknown` (default `unknown`)
+- Status: `saved`, `applied`, `recruiter_screen`, `technical_interview`, `final_interview`, `offer`, `rejected`, `withdrawn` (default `saved`)
+- Salary Currency: three letters, stored uppercase (default `USD`)
+
+Salary amounts are nonnegative with up to two decimal places, and Salary Min cannot exceed Salary Max. Website and job URLs must start with `http://` or `https://`.
+
+Duplicate company names are compared case-insensitively after collapsing whitespace, including repeats inside the file. Existing companies are skipped and are not overwritten. Duplicate applications match company, job title, and job URL with the trailing slash removed. An empty URL does not match a URL that is present. An application whose company name is new creates that company. Invalid rows block the entire file.
+
+`public.import_companies` and `public.import_applications` in `20261019204500_import_companies_and_applications.sql` run as `security invoker` with an empty `search_path`. They require `auth.uid()`, take a per-user advisory lock, and insert without a `user_id` column so the existing trigger assigns the signed-in user. Row-level security still applies. `anon` cannot execute them. A constraint failure rolls the whole call back. The functions do not use the service role.
+
+Exports use the same headers. Cells that start with `=`, `+`, `-`, or `@` are prefixed with a single quote so a spreadsheet does not treat them as formulas. That prefix is part of the exported text.
