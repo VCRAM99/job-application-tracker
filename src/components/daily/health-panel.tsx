@@ -126,8 +126,18 @@ export function HealthPanel({
             <button className="rounded-lg border px-3 py-1 text-sm" type="submit">Add sleep</button>
           </form>
           {sleep.map((item) => (
-            <div key={item.id} className="flex items-center justify-between text-sm">
+            <div key={item.id} className="flex items-center justify-between gap-2 text-sm">
               <span>{formatSleep(item.amount)}</span>
+              <details>
+                <summary className="cursor-pointer">Edit</summary>
+                <form action={saveSleep} className="mt-2 flex flex-wrap gap-2">
+                  <input type="hidden" name="id" value={item.id} />
+                  <input type="hidden" name="date" value={date} />
+                  <input name="hours" inputMode="numeric" defaultValue={Math.floor(item.amount / 60)} required className="w-20 rounded-lg border bg-transparent px-2 py-1" />
+                  <input name="minutes" inputMode="numeric" defaultValue={item.amount % 60} required className="w-20 rounded-lg border bg-transparent px-2 py-1" />
+                  <button className="rounded-lg border px-3 py-1" type="submit">Save</button>
+                </form>
+              </details>
               <DeleteRecordButton action={deleteOwned} id={item.id} label="Delete" title="Delete this sleep entry?" description="This removes the recorded sleep." fields={{ table: "sleep_entries" }} />
             </div>
           ))}
@@ -141,8 +151,17 @@ export function HealthPanel({
             <button className="rounded-lg border px-3 py-1 text-sm" type="submit">Add steps</button>
           </form>
           {steps.map((item) => (
-            <div key={item.id} className="flex items-center justify-between text-sm">
+            <div key={item.id} className="flex items-center justify-between gap-2 text-sm">
               <span>{item.amount} steps</span>
+              <details>
+                <summary className="cursor-pointer">Edit</summary>
+                <form action={saveSteps} className="mt-2 flex gap-2">
+                  <input type="hidden" name="id" value={item.id} />
+                  <input type="hidden" name="date" value={date} />
+                  <input name="steps" inputMode="numeric" defaultValue={item.amount} required className="w-28 rounded-lg border bg-transparent px-2 py-1" />
+                  <button className="rounded-lg border px-3 py-1" type="submit">Save</button>
+                </form>
+              </details>
               <DeleteRecordButton action={deleteOwned} id={item.id} label="Delete" title="Delete this step entry?" description="This removes the recorded steps." fields={{ table: "step_entries" }} />
             </div>
           ))}
@@ -159,8 +178,18 @@ export function HealthPanel({
             <summary className="cursor-pointer text-sm">Weight history</summary>
             <ul className="mt-2 space-y-1 text-sm">
               {weight.map((item) => (
-                <li key={item.id} className="flex items-center justify-between gap-2">
+                <li key={item.id} className="flex flex-wrap items-center justify-between gap-2">
                   <span>{item.measuredOn} · {kgToDisplay(item.weightKg, unit)} {unit}</span>
+                  <details>
+                    <summary className="cursor-pointer">Edit</summary>
+                    <form action={saveWeight} className="mt-2 flex gap-2">
+                      <input type="hidden" name="id" value={item.id} />
+                      <input type="hidden" name="date" value={item.measuredOn} />
+                      <input type="hidden" name="unit" value={unit} />
+                      <input name="weight" inputMode="decimal" defaultValue={kgToDisplay(item.weightKg, unit)} required className="w-28 rounded-lg border bg-transparent px-2 py-1" />
+                      <button className="rounded-lg border px-3 py-1" type="submit">Save</button>
+                    </form>
+                  </details>
                   <DeleteRecordButton action={deleteOwned} id={item.id} label="Delete" title="Delete this weight?" description="This removes the measurement." fields={{ table: "weight_entries" }} />
                 </li>
               ))}
@@ -171,7 +200,7 @@ export function HealthPanel({
       <details className="surface p-4">
         <summary className="cursor-pointer text-sm font-medium">Health insights</summary>
         <div className="mt-4">
-          <HealthChart today={today} {...chart} />
+          <HealthChart today={today} weightUnit={unit} {...chart} />
         </div>
       </details>
     </section>

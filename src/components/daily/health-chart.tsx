@@ -5,7 +5,7 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 
 import { datesInRange } from "@/lib/daily/calendar"
 import { addCalendarDays } from "@/lib/records/logic"
-import { normalizeSeries, pointsByDate } from "@/lib/daily/health"
+import { kgToDisplay, normalizeSeries, pointsByDate, type WeightUnit } from "@/lib/daily/health"
 
 const SERIES = [
   { key: "calories", label: "Calories", color: "var(--status-active)", unit: "kcal" },
@@ -26,6 +26,7 @@ export function HealthChart({
   sleep,
   steps,
   weight,
+  weightUnit = "kg",
 }: {
   today: string
   calories: Row[]
@@ -34,6 +35,7 @@ export function HealthChart({
   sleep: Row[]
   steps: Row[]
   weight: Row[]
+  weightUnit?: WeightUnit
 }) {
   const [range, setRange] = useState<7 | 30 | 90>(30)
   const [visible, setVisible] = useState<Record<string, boolean>>({
@@ -123,9 +125,12 @@ export function HealthChart({
                     <p className="font-medium">{row.fullDate}</p>
                     {SERIES.filter((series) => visible[series.key]).map((series) => {
                       const value = row[`${series.key}Raw` as keyof typeof row]
+                      const shown = series.key === "weight" && typeof value === "number"
+                        ? `${kgToDisplay(value, weightUnit)} ${weightUnit}`
+                        : value == null ? "No entry" : `${value} ${series.unit}`
                       return (
                         <p key={series.key}>
-                          {series.label}: {value == null ? "No entry" : `${value} ${series.unit}`}
+                          {series.label}: {shown}
                         </p>
                       )
                     })}
