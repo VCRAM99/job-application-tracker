@@ -57,18 +57,19 @@ Do not create a `NEXT_PUBLIC_` variable for the secret key. This milestone does 
    - Set the minimum password length to **8** so it matches the form rules (a letter and a number are also required by the app).
    - Leave Google and other social providers disabled.
 4. Open **Authentication → URL Configuration**.
-   - Site URL for local work: `http://localhost:3000`
+   - Site URL for production mail: `https://jobtracker.varunsr.com`
+   - Keep localhost in the redirect allow list for local work.
    - Add redirect URLs:
      - `http://localhost:3000/**`
-     - `https://YOUR_PRODUCTION_DOMAIN/**`
-   - Also allow these exact paths if your project does not accept wildcards:
+     - `https://jobtracker.varunsr.com/**`
+   - Also allow these exact paths if the project does not accept wildcards:
      - `http://localhost:3000/auth/confirm`
      - `http://localhost:3000/reset-password`
      - `http://localhost:3000/dashboard`
-     - `https://YOUR_PRODUCTION_DOMAIN/auth/confirm`
-     - `https://YOUR_PRODUCTION_DOMAIN/reset-password`
-     - `https://YOUR_PRODUCTION_DOMAIN/dashboard`
-5. On Vercel, set the same three environment variables. Set `NEXT_PUBLIC_SITE_URL` to the canonical production origin, for example `https://YOUR_PRODUCTION_DOMAIN`. Also set the Supabase Site URL to that origin when you are testing production emails. You can keep both localhost and production URLs in the redirect allow list at the same time.
+     - `https://jobtracker.varunsr.com/auth/confirm`
+     - `https://jobtracker.varunsr.com/reset-password`
+     - `https://jobtracker.varunsr.com/dashboard`
+5. On Vercel, set the same three environment variables. Production `NEXT_PUBLIC_SITE_URL` must be exactly `https://jobtracker.varunsr.com`. Local `.env.local` keeps `http://localhost:3000`. The app rejects any other origin when `VERCEL_ENV` is `production`. Keep both localhost and production URLs in the Supabase redirect allow list.
 
 ### Email templates
 
@@ -86,11 +87,28 @@ The app confirms email and recovery links at `/auth/confirm` using `token_hash`.
 <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/reset-password">Reset your password</a>
 ```
 
-`{{ .SiteURL }}` must be the app origin (`http://localhost:3000` or your production domain), not the Supabase project URL.
+`{{ .SiteURL }}` must be the app origin (`http://localhost:3000` locally, `https://jobtracker.varunsr.com` in production), not the Supabase project URL. Those links match `/auth/confirm`: `type=signup` is verified immediately, and `type=recovery` is stored and not verified until the reset form is submitted.
 
 Recovery links are not consumed when the email is opened. `/auth/confirm` stores the recovery token in a short-lived HTTP-only cookie and redirects to `/reset-password` without the token in the address. The form verifies that cookie on submit, so a mail scanner that only prefetches the link does not invalidate it, and a normal signed-in session cannot use this page.
 
-The default Supabase mailer is rate limited (about two messages per hour). Configure custom SMTP before you rely on this in production.
+### Custom SMTP with Resend
+
+The hosted Supabase mailer is rate limited (about two messages per hour). Production mail should use Resend. Do not put the Resend API key in this repository or in a `NEXT_PUBLIC_` variable.
+
+1. Create a Resend account at [resend.com](https://resend.com).
+2. In Resend, open **Domains** and add `varunsr.com`.
+3. Resend shows the DNS records for that domain. Add those records at the DNS host for `varunsr.com` exactly as Resend displays them. They normally include a domain-verification TXT record, DKIM records, and an SPF TXT record. Do not invent the values. Wait until Resend marks the domain verified. Verifying the root domain covers `jobtracker.varunsr.com`.
+4. In Resend, create an API key that can send from `varunsr.com`. Store it in a password manager. It is the SMTP password.
+5. In Supabase, open **Authentication → Emails → SMTP Settings** and enable custom SMTP:
+   - Sender email: `noreply@varunsr.com`
+   - Sender name: `Job Tracker`
+   - Host: `smtp.resend.com`
+   - Port: `465`
+   - Username: `resend`
+   - Password: the Resend API key
+6. Set the Supabase Site URL to `https://jobtracker.varunsr.com` when testing production mail. Leave the localhost redirect URLs in the allow list.
+7. Raise the Supabase email rate limit above the built-in cap after SMTP is enabled.
+8. Test with a real inbox you control. Sign up with a new address and confirm the message links to `https://jobtracker.varunsr.com/auth/confirm?token_hash=...&type=signup&next=/dashboard`. Then use **Forgot password** and confirm the link uses `type=recovery` and `next=/reset-password`. This repository has not verified delivery to a real inbox.
 
 ### What the auth flows do
 
@@ -122,7 +140,7 @@ Migrations are not applied by deploying the Next.js app. Apply them to the exist
 4. Apply pending migrations: `npx supabase db push`
 5. Do not run `supabase db reset`, `supabase db push --db-url` against an unknown URL, or any command that drops schemas.
 
-`db push` only runs migration files that are not already recorded. If it asks for confirmation, read the listed migration name. After the earlier migrations are applied, the new file is `20261019204500_import_companies_and_applications.sql`. Stop if it proposes to drop tables or reset the database.
+`db push` only runs migration files that are not already recorded. If it asks for confirmation, read the listed migration name. The hosted project should already include `20261018204000_companies_and_applications.sql`, `20261019160000_networking_tasks_preparation.sql`, and `20261019204500_import_companies_and_applications.sql`. A dry run that says the remote database is up to date is the expected result. Stop if it proposes to drop tables or reset the database.
 
 Preview the pending SQL before applying it:
 
@@ -138,7 +156,28 @@ npx supabase db push
 
 ## Deploying to Vercel
 
-1. Import the Git repository.
-2. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `NEXT_PUBLIC_SITE_URL`.
-3. Add the production origin to the Supabase redirect allow list and, when sending production mail, set it as the Site URL.
-4. Deploy. The app uses the Next.js App Router and does not require a service-role key for this milestone.
+1. Import the Git repository and set the production domain to `https://jobtracker.varunsr.com`.
+2. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `NEXT_PUBLIC_SITE_URL`. The site URL must be `https://jobtracker.varunsr.com`. Do not set a service-role or secret key.
+3. Add that origin to the Supabase redirect allow list. Use it as the Site URL when sending production mail.
+4. Deploy. Vercel serves the custom domain over HTTPS and sends HSTS. The app also sends `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy`, and a production content security policy.
+
+## CSV and XLSX
+
+Companies and applications use the official templates from **Import / export**. Header names must match exactly. Dates are `YYYY-MM-DD`. Accepted values and duplicate rules are in [docs/data-model.md](docs/data-model.md). Exports are CSV only and prefix a cell that starts with `=`, `+`, `-`, or `@` so a spreadsheet does not treat it as a formula.
+
+## Security
+
+- Email confirmation is required before private pages or data are available. An unverified password sign-in is signed out.
+- Password recovery uses an HTTP-only cookie. The reset token is not left in the address after `/auth/confirm`, and it is not written to application logs.
+- Redirects accept only same-site paths.
+- Every user-owned table has row level security on `auth.uid() = user_id`. Composite foreign keys block cross-user company and application links. Import functions are `security invoker` and are executable only by `authenticated`.
+- The app does not use the Supabase service role. A secret key in `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` prevents the client from starting.
+- Deleting a company also deletes its applications. The confirmation dialog shows how many. Other deletes ask for confirmation and report a failure instead of pretending the row was removed.
+
+## Known limitations
+
+- Custom SMTP is not configured by this repository. Signup and recovery mail still depend on the Supabase mailer until the Resend steps above are completed and tested from a real inbox.
+- `npm audit` reports high findings in `braces` / `fast-glob` through ESLint and the shadcn CLI, and a moderate `uuid` finding through ExcelJS. The suggested fixes are major downgrades (`shadcn@1.0.0`, `exceljs@3.4.0`) and were not applied. The glob issue is build tooling, not a request handler. ExcelJS calls `uuid` v4 for conditional-formatting ids, which this app does not write; the advisory covers v3, v5, and v6 when a caller supplies a buffer. A hostile spreadsheet can still make ExcelJS use memory while parsing, up to the 1 MB upload limit.
+- A value that starts with `=`, `+`, `-`, or `@` gains a leading apostrophe on CSV export.
+- If two of your companies share a normalized name, an imported application attaches to the oldest.
+- This release does not add a database migration.

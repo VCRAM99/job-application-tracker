@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { isConfirmedAccount, isRecoveryProof } from "@/lib/auth/access"
+import { isConfirmedAccount, isRecoveryProof, unconfirmedLoginMessage } from "@/lib/auth/access"
 
 describe("isRecoveryProof", () => {
   it("accepts only a recovery token hash", () => {
@@ -21,5 +21,10 @@ describe("isConfirmedAccount", () => {
   it("accepts an account with a confirmation timestamp", () => {
     expect(isConfirmedAccount({ email_confirmed_at: "2026-10-18T00:00:00Z" })).toBe(true)
     expect(isConfirmedAccount({ confirmed_at: "2026-10-18T00:00:00Z" })).toBe(true)
+  })
+
+  it("blocks an unconfirmed password login before the session is kept", () => {
+    expect(unconfirmedLoginMessage({ email_confirmed_at: null })).toMatch(/Confirm your email/)
+    expect(unconfirmedLoginMessage({ email_confirmed_at: "2026-10-18T00:00:00Z" })).toBeNull()
   })
 })

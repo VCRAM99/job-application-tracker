@@ -18,7 +18,7 @@ import {
   safeRecordPath,
   type RecordFormState,
 } from "@/lib/records/form-state"
-import { recordErrorMessage, statusChangeDecision } from "@/lib/records/logic"
+import { assertDeleted, recordErrorMessage, statusChangeDecision } from "@/lib/records/logic"
 import { createClient } from "@/lib/supabase/server"
 
 function companyPayload(userId: string, values: CompanyFormValues) {
@@ -210,7 +210,8 @@ export async function deleteCompany(formData: FormData): Promise<void> {
   if (!isUuid(id)) redirect("/companies")
 
   const supabase = await createClient()
-  await supabase.from("companies").delete().eq("user_id", user.id).eq("id", id)
+  const { error } = await supabase.from("companies").delete().eq("user_id", user.id).eq("id", id)
+  assertDeleted(error)
   revalidatePath("/companies")
   revalidatePath("/dashboard")
   revalidatePath("/applications")
@@ -385,7 +386,8 @@ export async function deleteApplication(formData: FormData): Promise<void> {
   if (!isUuid(id)) redirect("/applications")
 
   const supabase = await createClient()
-  await supabase.from("applications").delete().eq("user_id", user.id).eq("id", id)
+  const { error } = await supabase.from("applications").delete().eq("user_id", user.id).eq("id", id)
+  assertDeleted(error)
   revalidatePath("/applications")
   revalidatePath("/companies")
   revalidatePath("/dashboard")

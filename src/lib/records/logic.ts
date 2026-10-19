@@ -10,6 +10,16 @@ export function statusChangeDecision(input: {
   return { ok: true }
 }
 
+export function assertDeleted(error: { message?: string } | null): void {
+  if (error) throw new Error("The record could not be deleted.")
+}
+
+export function companyDeletionWarning(applicationCount: number): string {
+  const count = Number.isFinite(applicationCount) ? Math.max(0, Math.trunc(applicationCount)) : 0
+  const applications = count === 1 ? "1 application" : `${count} applications`
+  return `This permanently deletes the company and ${applications}. Contacts and tasks stay, with those links cleared. This cannot be undone.`
+}
+
 export function todayDate(now = new Date()): string {
   const month = String(now.getMonth() + 1).padStart(2, "0")
   const day = String(now.getDate()).padStart(2, "0")

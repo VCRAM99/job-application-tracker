@@ -58,12 +58,43 @@ export function getPublicEnv(): PublicEnv {
   })
 }
 
+export const PRODUCTION_ORIGIN = "https://jobtracker.varunsr.com"
+
+export function normalizeSiteOrigin(value: string): string {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    throw new Error("NEXT_PUBLIC_SITE_URL must be an http or https origin.")
+  }
+
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error("NEXT_PUBLIC_SITE_URL must be an http or https origin.")
+  }
+  if (url.username || url.password || url.search || url.hash || url.pathname !== "/") {
+    throw new Error("NEXT_PUBLIC_SITE_URL must be an origin without a path, query, or credentials.")
+  }
+
+  return url.origin
+}
+
 export function getSiteUrl(
   env: PublicEnv = getPublicEnv(),
   vercelUrl = process.env.VERCEL_URL,
+  vercelEnv = process.env.VERCEL_ENV,
 ): string {
+  if (vercelEnv === "production") {
+    const origin = env.NEXT_PUBLIC_SITE_URL
+      ? normalizeSiteOrigin(env.NEXT_PUBLIC_SITE_URL)
+      : ""
+    if (origin !== PRODUCTION_ORIGIN) {
+      throw new Error(`Set NEXT_PUBLIC_SITE_URL to ${PRODUCTION_ORIGIN} for production.`)
+    }
+    return origin
+  }
+
   if (env.NEXT_PUBLIC_SITE_URL) {
-    return env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "")
+    return normalizeSiteOrigin(env.NEXT_PUBLIC_SITE_URL)
   }
 
   if (vercelUrl) {

@@ -21,6 +21,8 @@ import {
   type CompanyRecord,
 } from "@/lib/records/query"
 import {
+  assertDeleted,
+  companyDeletionWarning,
   countByCompany,
   formatSalary,
   isMissingTable,
@@ -316,5 +318,11 @@ describe("ownership", () => {
     expect(isMissingTable({ code: "PGRST205", message: "schema cache" })).toBe(true)
     expect(recordErrorMessage({ code: "42501" })).toMatch(/not available on your account/i)
     expect(formatSalary(10, null, "USD")).toBe("USD 10+")
+    expect(companyDeletionWarning(2)).toMatch(/2 applications/)
+    expect(companyDeletionWarning(1)).toMatch(/1 application/)
+    expect(() => assertDeleted({ message: "duplicate key value violates applications_company_owner_fkey" })).toThrow(
+      /^The record could not be deleted\.$/,
+    )
+    expect(() => assertDeleted(null)).not.toThrow()
   })
 })

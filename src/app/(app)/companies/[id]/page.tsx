@@ -17,7 +17,7 @@ import {
   isWorkArrangement,
 } from "@/lib/records/constants"
 import { getCompany, listApplications } from "@/lib/records/data"
-import { formatSalary } from "@/lib/records/logic"
+import { companyDeletionWarning, formatSalary } from "@/lib/records/logic"
 import { isFollowUpDue } from "@/lib/records/query"
 
 export const metadata: Metadata = { title: "Company" }
@@ -79,7 +79,7 @@ export default async function CompanyDetailPage({
               id={company.id}
               label="Delete company"
               title={`Delete ${company.name}?`}
-              description="This deletes the company and its applications. Contacts and tasks stay, with those links cleared. This cannot be undone."
+              description={companyDeletionWarning(company.applicationCount)}
             />
           </div>
         }

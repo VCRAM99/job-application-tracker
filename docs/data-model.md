@@ -50,7 +50,7 @@ The Supabase secret / service-role key bypasses RLS. This app does not use it.
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
 
-`company_id` references `companies(id)`. `(user_id, company_id)` references `companies(user_id, id)`, so an application cannot point at another user's company. Deleting a company deletes its applications.
+`company_id` references `companies(id)`. `(user_id, company_id)` references `companies(user_id, id)`, so an application cannot point at another user's company. Deleting a company deletes its applications. The company page states that count in the confirmation dialog before the delete runs. Contacts and tasks keep their rows and lose the company or application link.
 
 Any application can move to any status in that list, including from Rejected or Withdrawn. `applied_at` stays optional.
 

@@ -3,6 +3,7 @@
 import { Menu } from "lucide-react"
 import { useState } from "react"
 
+import { signOut } from "@/lib/auth/actions"
 import { NavLinks } from "@/components/shell/nav-links"
 import { Button } from "@/components/ui/button"
 import {
@@ -30,6 +31,11 @@ export function MobileNav() {
         <div className="px-3 py-3">
           <NavLinks onNavigate={() => setOpen(false)} />
         </div>
+        <form action={signOut} className="mt-auto border-t p-3">
+          <Button type="submit" variant="outline" className="w-full">
+            Sign out
+          </Button>
+        </form>
       </SheetContent>
     </Sheet>
   )

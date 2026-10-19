@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 
 import { requireUser } from "@/lib/auth/session"
 import { isUuid, formText, type RecordFormState } from "@/lib/records/form-state"
-import { completedAtForStatus, recordErrorMessage, referenceDecision, todayDate } from "@/lib/records/logic"
+import { assertDeleted, completedAtForStatus, recordErrorMessage, referenceDecision, todayDate } from "@/lib/records/logic"
 import {
   contactFormSchema,
   fieldErrorsFrom,
@@ -207,7 +207,8 @@ export async function deleteContact(formData: FormData): Promise<void> {
   const id = formText(formData, "id")
   if (isUuid(id)) {
     const supabase = await createClient()
-    await supabase.from("contacts").delete().eq("user_id", user.id).eq("id", id)
+    const { error } = await supabase.from("contacts").delete().eq("user_id", user.id).eq("id", id)
+    assertDeleted(error)
   }
   refresh()
   redirect("/networking")
@@ -300,7 +301,8 @@ export async function deleteTask(formData: FormData): Promise<void> {
   const id = formText(formData, "id")
   if (isUuid(id)) {
     const supabase = await createClient()
-    await supabase.from("tasks").delete().eq("user_id", user.id).eq("id", id)
+    const { error } = await supabase.from("tasks").delete().eq("user_id", user.id).eq("id", id)
+    assertDeleted(error)
   }
   refresh()
   redirect("/tasks")
@@ -375,7 +377,8 @@ export async function deletePreparation(formData: FormData): Promise<void> {
   const id = formText(formData, "id")
   if (isUuid(id)) {
     const supabase = await createClient()
-    await supabase.from("preparation_items").delete().eq("user_id", user.id).eq("id", id)
+    const { error } = await supabase.from("preparation_items").delete().eq("user_id", user.id).eq("id", id)
+    assertDeleted(error)
   }
   refresh()
   redirect("/preparation")

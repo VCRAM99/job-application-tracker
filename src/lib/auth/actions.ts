@@ -3,7 +3,7 @@
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
-import { isConfirmedAccount, isRecoveryProof } from "@/lib/auth/access"
+import { isConfirmedAccount, isRecoveryProof, unconfirmedLoginMessage } from "@/lib/auth/access"
 import { mapAuthError, mapPasswordChangeError } from "@/lib/auth/errors"
 import type { AuthFormState } from "@/lib/auth/form-state"
 import { safeNextPath } from "@/lib/auth/paths"
@@ -43,12 +43,22 @@ export async function login(formData: FormData): Promise<AuthFormState> {
   if (!parsed.success) return invalidForm(parsed.error)
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.signInWithPassword(parsed.data)
+  const { data, error } = await supabase.auth.signInWithPassword(parsed.data)
 
   if (error) {
     return {
       status: "error",
       message: mapAuthError(error),
+      fieldErrors: {},
+    }
+  }
+
+  const unconfirmed = unconfirmedLoginMessage(data.user)
+  if (unconfirmed) {
+    await supabase.auth.signOut()
+    return {
+      status: "error",
+      message: unconfirmed,
       fieldErrors: {},
     }
   }
