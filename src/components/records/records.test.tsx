@@ -28,13 +28,13 @@ describe("record forms and states", () => {
     expect(action).not.toHaveBeenCalled()
   })
 
-  it("shows an applied-date error before creating an application", async () => {
+  it("submits an Offer without an applied date", async () => {
     const user = userEvent.setup()
     const action = vi.fn().mockResolvedValue(initialRecordFormState)
     render(
       <ApplicationForm
         action={action}
-        values={{ ...emptyApplicationForm, companyMode: "new", status: "applied" }}
+        values={{ ...emptyApplicationForm, companyMode: "new", status: "saved" }}
         companies={[]}
         submitLabel="Create application"
         cancelHref="/applications"
@@ -43,11 +43,10 @@ describe("record forms and states", () => {
 
     fireEvent.change(screen.getByLabelText("Job title"), { target: { value: "Engineer" } })
     fireEvent.change(screen.getByLabelText("New company name"), { target: { value: "Acme" } })
-    await user.selectOptions(screen.getByLabelText("Status"), "applied")
+    await user.selectOptions(screen.getByLabelText("Status"), "offer")
     await user.click(screen.getByRole("button", { name: "Create application" }))
 
-    expect(await screen.findByText(/applied date is required/i)).toBeTruthy()
-    expect(action).not.toHaveBeenCalled()
+    expect(action).toHaveBeenCalled()
   })
 
   it("asks for confirmation before deleting", async () => {

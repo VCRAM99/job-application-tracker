@@ -109,11 +109,11 @@ Public: `/login`, `/signup`, `/forgot-password`, `/reset-password`, `/auth/confi
 
 Protected: `/dashboard`, `/companies`, `/applications`, `/networking`, `/tasks`, `/preparation`, `/settings`.
 
-`/companies` and `/applications` store records for the signed-in user. `/dashboard`, `/networking`, `/tasks`, and `/preparation` are still placeholders.
+`/companies`, `/applications`, `/networking`, `/tasks`, `/preparation`, and `/dashboard` use the signed-in user's records. `/settings` holds the account.
 
 ## Data model
 
-`companies` and `applications` are defined in [supabase/migrations/20261018204000_companies_and_applications.sql](supabase/migrations/20261018204000_companies_and_applications.sql). Column rules and row-level security are described in [docs/data-model.md](docs/data-model.md).
+`companies` and `applications` are defined in [supabase/migrations/20261018204000_companies_and_applications.sql](supabase/migrations/20261018204000_companies_and_applications.sql). Contacts, tasks, and preparation items are defined in [supabase/migrations/20261019160000_networking_tasks_preparation.sql](supabase/migrations/20261019160000_networking_tasks_preparation.sql). Column rules, metric definitions, and row-level security are described in [docs/data-model.md](docs/data-model.md).
 
 The migration is not applied by deploying the Next.js app. Apply it to the existing hosted project from this repository. This does not reset or delete the database.
 
@@ -124,7 +124,19 @@ The migration is not applied by deploying the Next.js app. Apply it to the exist
 4. Apply pending migrations: `npx supabase db push`
 5. Do not run `supabase db reset`, `supabase db push --db-url` against an unknown URL, or any command that drops schemas.
 
-`db push` only runs migration files that are not already recorded. If it asks for confirmation, read the listed migration name. The only expected new file is `20261018204000_companies_and_applications.sql`. Stop if it proposes to drop tables or reset the database.
+`db push` only runs migration files that are not already recorded. If it asks for confirmation, read the listed migration name. After the companies migration is already applied, the only new file should be `20261019160000_networking_tasks_preparation.sql`. Stop if it proposes to drop tables or reset the database.
+
+Preview the pending SQL before applying it:
+
+```bash
+npx supabase db push --dry-run
+```
+
+Then apply it:
+
+```bash
+npx supabase db push
+```
 
 ## Deploying to Vercel
 

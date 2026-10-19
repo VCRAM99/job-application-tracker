@@ -2,12 +2,7 @@ import { readFileSync } from "node:fs"
 
 import { describe, expect, it } from "vitest"
 
-import {
-  APPLICATION_STATUSES,
-  canTransitionStatus,
-  requiresAppliedDate,
-  transitionError,
-} from "@/lib/records/constants"
+import { APPLICATION_STATUSES, canTransitionStatus } from "@/lib/records/constants"
 import { safeRecordPath } from "@/lib/records/form-state"
 import { applicationMatchesCompany, recordsShareOwner } from "@/lib/records/ownership"
 import {
@@ -165,8 +160,8 @@ describe("company and application validation", () => {
     }
   })
 
-  it("requires an applied date after Saved and a company selection", () => {
-    const result = applicationFormSchema.safeParse({
+  it("allows a status change without an applied date and still requires a company", () => {
+    const missingCompany = applicationFormSchema.safeParse({
       jobTitle: "Engineer",
       jobUrl: "",
       source: "",
@@ -176,7 +171,7 @@ describe("company and application validation", () => {
       salaryMin: "",
       salaryMax: "",
       salaryCurrency: "USD",
-      status: "applied",
+      status: "offer",
       appliedAt: "",
       nextFollowUpDate: "",
       notes: "",
@@ -184,50 +179,46 @@ describe("company and application validation", () => {
       companyId: "not-a-uuid",
       newCompanyName: "",
     })
+    const savedWithoutDate = applicationFormSchema.safeParse({
+      jobTitle: "Engineer",
+      jobUrl: "",
+      source: "",
+      location: "",
+      workArrangement: "onsite",
+      employmentType: "contract",
+      salaryMin: "",
+      salaryMax: "",
+      salaryCurrency: "USD",
+      status: "offer",
+      appliedAt: "",
+      nextFollowUpDate: "",
+      notes: "",
+      companyMode: "new",
+      companyId: "",
+      newCompanyName: "Acme",
+    })
 
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      const errors = fieldErrorsFrom(result.error)
-      expect(errors.appliedAt).toMatch(/applied date/i)
+    expect(missingCompany.success).toBe(false)
+    if (!missingCompany.success) {
+      const errors = fieldErrorsFrom(missingCompany.error)
+      expect(errors.appliedAt).toBeUndefined()
       expect(errors.companyId).toBe("Choose a company.")
     }
+    expect(savedWithoutDate.success).toBe(true)
   })
 })
 
 describe("application status transitions", () => {
-  it("allows one step, a closed outcome, and reopening to Saved or Applied", () => {
-    expect(canTransitionStatus("saved", "applied")).toBe(true)
-    expect(canTransitionStatus("applied", "saved")).toBe(true)
-    expect(canTransitionStatus("saved", "offer")).toBe(false)
-    expect(canTransitionStatus("technical_interview", "rejected")).toBe(true)
-    expect(canTransitionStatus("offer", "withdrawn")).toBe(true)
-    expect(canTransitionStatus("rejected", "applied")).toBe(true)
-    expect(canTransitionStatus("withdrawn", "recruiter_screen")).toBe(false)
-    expect(transitionError("saved", "offer")).toMatch(/one stage/i)
-    expect(requiresAppliedDate("saved")).toBe(false)
-    expect(requiresAppliedDate("applied")).toBe(true)
-    expect(APPLICATION_STATUSES).toEqual([
-      "saved",
-      "applied",
-      "recruiter_screen",
-      "technical_interview",
-      "final_interview",
-      "offer",
-      "rejected",
-      "withdrawn",
-    ])
-  })
-
-  it("blocks a status change that leaves Saved without an applied date", () => {
-    expect(
-      statusChangeDecision({ from: "saved", to: "applied", appliedAt: null }),
-    ).toEqual({ ok: false, message: "Add an applied date before leaving Saved." })
-    expect(statusChangeDecision({ from: "saved", to: "applied", appliedAt: "2026-10-18" })).toEqual({
-      ok: true,
-    })
-    expect(statusChangeDecision({ from: "applied", to: "offer", appliedAt: "2026-10-18" }).ok).toBe(
-      false,
-    )
+  it("allows every valid status from every current status", () => {
+    for (const from of APPLICATION_STATUSES) {
+      for (const to of APPLICATION_STATUSES) {
+        expect(canTransitionStatus(from, to)).toBe(true)
+        expect(statusChangeDecision({ from, to })).toEqual({ ok: true })
+      }
+    }
+    expect(statusChangeDecision({ from: "rejected", to: "not-a-status" as never }).ok).toBe(false)
+    expect(statusChangeDecision({ from: "withdrawn", to: "final_interview" })).toEqual({ ok: true })
+    expect(statusChangeDecision({ from: "saved", to: "offer" })).toEqual({ ok: true })
   })
 })
 

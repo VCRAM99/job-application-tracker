@@ -159,6 +159,7 @@ export async function createCompany(
   }
 
   revalidatePath("/companies")
+  revalidatePath("/dashboard")
   redirect(`/companies/${data.id}`)
 }
 
@@ -198,6 +199,7 @@ export async function updateCompany(
   }
 
   revalidatePath("/companies")
+  revalidatePath("/dashboard")
   revalidatePath(`/companies/${id}`)
   redirect(`/companies/${id}`)
 }
@@ -210,6 +212,7 @@ export async function deleteCompany(formData: FormData): Promise<void> {
   const supabase = await createClient()
   await supabase.from("companies").delete().eq("user_id", user.id).eq("id", id)
   revalidatePath("/companies")
+  revalidatePath("/dashboard")
   revalidatePath("/applications")
   redirect("/companies")
 }
@@ -247,6 +250,7 @@ export async function createApplication(
 
   revalidatePath("/applications")
   revalidatePath("/companies")
+  revalidatePath("/dashboard")
   redirect(`/applications/${data.id}`)
 }
 
@@ -287,7 +291,6 @@ export async function updateApplication(
   const decision = statusChangeDecision({
     from: existing.data.status,
     to: parsed.data.status,
-    appliedAt: parsed.data.appliedAt,
   })
   if (!decision.ok) {
     return {
@@ -322,6 +325,7 @@ export async function updateApplication(
   revalidatePath("/applications")
   revalidatePath(`/applications/${id}`)
   revalidatePath("/companies")
+  revalidatePath("/dashboard")
   redirect(`/applications/${id}`)
 }
 
@@ -339,7 +343,7 @@ export async function updateApplicationStatus(
   const supabase = await createClient()
   const existing = await supabase
     .from("applications")
-    .select("status, applied_at")
+    .select("status")
     .eq("user_id", user.id)
     .eq("id", id)
     .maybeSingle()
@@ -354,7 +358,6 @@ export async function updateApplicationStatus(
   const decision = statusChangeDecision({
     from: existing.data.status,
     to: nextStatus,
-    appliedAt: existing.data.applied_at,
   })
   if (!decision.ok) {
     return { status: "error", message: decision.message, fieldErrors: {} }
@@ -372,6 +375,7 @@ export async function updateApplicationStatus(
 
   revalidatePath("/applications")
   revalidatePath(`/applications/${id}`)
+  revalidatePath("/dashboard")
   return initialRecordFormState
 }
 
@@ -384,5 +388,6 @@ export async function deleteApplication(formData: FormData): Promise<void> {
   await supabase.from("applications").delete().eq("user_id", user.id).eq("id", id)
   revalidatePath("/applications")
   revalidatePath("/companies")
+  revalidatePath("/dashboard")
   redirect(safeRecordPath(formText(formData, "returnTo"), "/applications"))
 }

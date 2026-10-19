@@ -1,17 +1,66 @@
-import type { ApplicationStatus } from "@/lib/records/constants"
-import { requiresAppliedDate, transitionError } from "@/lib/records/constants"
+import { isApplicationStatus, type ApplicationStatus } from "@/lib/records/constants"
 
 export function statusChangeDecision(input: {
   from: ApplicationStatus
   to: ApplicationStatus
-  appliedAt: string | null
 }): { ok: true } | { ok: false; message: string } {
-  const message = transitionError(input.from, input.to)
-  if (message) return { ok: false, message }
-  if (requiresAppliedDate(input.to) && !input.appliedAt) {
-    return { ok: false, message: "Add an applied date before leaving Saved." }
+  if (!isApplicationStatus(input.from) || !isApplicationStatus(input.to)) {
+    return { ok: false, message: "Choose a valid status." }
   }
   return { ok: true }
+}
+
+export function todayDate(now = new Date()): string {
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+  return `${now.getFullYear()}-${month}-${day}`
+}
+
+export function addCalendarDays(isoDate: string, days: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
+  if (!match) return isoDate
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+export function completedAtForStatus(
+  status: "done" | "completed" | string,
+  today: string,
+): string | null {
+  return status === "done" || status === "completed" ? today : null
+}
+
+export function referenceDecision(input: {
+  companyId: string | null
+  applicationId: string | null
+  companyOwned: boolean
+  applicationCompanyId: string | null
+}):
+  | { ok: true; companyId: string | null; applicationId: string | null }
+  | { ok: false; field: "companyId" | "applicationId"; message: string } {
+  if (input.companyId && !input.companyOwned) {
+    return { ok: false, field: "companyId", message: "Choose one of your companies." }
+  }
+  if (input.applicationId && !input.applicationCompanyId) {
+    return { ok: false, field: "applicationId", message: "Choose one of your applications." }
+  }
+  if (
+    input.companyId &&
+    input.applicationCompanyId &&
+    input.companyId !== input.applicationCompanyId
+  ) {
+    return {
+      ok: false,
+      field: "applicationId",
+      message: "That application belongs to a different company.",
+    }
+  }
+  return {
+    ok: true,
+    companyId: input.applicationCompanyId ?? input.companyId,
+    applicationId: input.applicationId,
+  }
 }
 
 export function countByCompany(companyIds: string[]): Map<string, number> {

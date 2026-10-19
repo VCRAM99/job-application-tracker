@@ -6,8 +6,13 @@ import {
   EMPLOYMENT_TYPES,
   PRIORITY_TIERS,
   RESEARCH_STATUSES,
+  OUTREACH_STATUSES,
+  PREPARATION_CATEGORIES,
+  PREPARATION_STATUSES,
+  RELATIONSHIP_TYPES,
+  TASK_PRIORITIES,
+  TASK_STATUSES,
   WORK_ARRANGEMENTS,
-  requiresAppliedDate,
 } from "@/lib/records/constants"
 
 const optionalText = (max: number) =>
@@ -82,10 +87,6 @@ export const applicationFieldsSchema = z
       message: "Maximum salary must be at least the minimum.",
     },
   )
-  .refine((value) => !requiresAppliedDate(value.status) || value.appliedAt !== null, {
-    path: ["appliedAt"],
-    message: "Applied date is required once the application leaves Saved.",
-  })
 
 export const applicationFormSchema = applicationFieldsSchema.safeExtend({
   companyMode: z.enum(["existing", "new"]),
@@ -103,8 +104,66 @@ export const applicationFormSchema = applicationFieldsSchema.safeExtend({
   { path: ["newCompanyName"], message: "Company name is required." },
 )
 
+const optionalEmail = z
+  .string()
+  .trim()
+  .max(200, "Use 200 characters or fewer.")
+  .refine(
+    (value) => value === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+    "Enter a valid email address.",
+  )
+  .transform((value) => (value.length > 0 ? value : null))
+
+const optionalId = z
+  .string()
+  .trim()
+  .refine(
+    (value) =>
+      value === "" ||
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value),
+    "Choose a valid record.",
+  )
+  .transform((value) => (value.length > 0 ? value : null))
+
+export const contactFormSchema = z.object({
+  name: z.string().trim().min(1, "Name is required.").max(200, "Use 200 characters or fewer."),
+  roleTitle: optionalText(200),
+  organization: optionalText(200),
+  email: optionalEmail,
+  linkedinUrl: optionalUrl,
+  companyId: optionalId,
+  applicationId: optionalId,
+  relationshipType: z.enum(RELATIONSHIP_TYPES),
+  outreachStatus: z.enum(OUTREACH_STATUSES),
+  lastContactedAt: optionalDate,
+  nextFollowUpDate: optionalDate,
+  notes: optionalText(10000),
+})
+
+export const taskFormSchema = z.object({
+  title: z.string().trim().min(1, "Title is required.").max(200, "Use 200 characters or fewer."),
+  description: optionalText(10000),
+  status: z.enum(TASK_STATUSES),
+  priority: z.enum(TASK_PRIORITIES),
+  dueDate: optionalDate,
+  companyId: optionalId,
+  applicationId: optionalId,
+})
+
+export const preparationFormSchema = z.object({
+  title: z.string().trim().min(1, "Title is required.").max(200, "Use 200 characters or fewer."),
+  category: z.enum(PREPARATION_CATEGORIES),
+  status: z.enum(PREPARATION_STATUSES),
+  targetDate: optionalDate,
+  resourceUrl: optionalUrl,
+  notes: optionalText(10000),
+})
+
 export type CompanyFormValues = z.infer<typeof companyFormSchema>
 export type ApplicationFormValues = z.infer<typeof applicationFormSchema>
+export type ContactFormValues = z.infer<typeof contactFormSchema>
+export type TaskFormValues = z.infer<typeof taskFormSchema>
+export type PreparationFormValues = z.infer<typeof preparationFormSchema>
 
 export function fieldErrorsFrom(error: z.ZodError): Record<string, string> {
   const fieldErrors: Record<string, string> = {}

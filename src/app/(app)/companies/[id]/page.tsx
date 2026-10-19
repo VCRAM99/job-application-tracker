@@ -79,7 +79,7 @@ export default async function CompanyDetailPage({
               id={company.id}
               label="Delete company"
               title={`Delete ${company.name}?`}
-              description="This also deletes every application linked to this company. This cannot be undone."
+              description="This deletes the company and its applications. Contacts and tasks stay, with those links cleared. This cannot be undone."
             />
           </div>
         }

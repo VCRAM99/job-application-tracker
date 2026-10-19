@@ -122,42 +122,134 @@ export function statusRank(status: ApplicationStatus): number {
   return APPLICATION_STATUSES.indexOf(status)
 }
 
-export function requiresAppliedDate(status: ApplicationStatus): boolean {
-  return status !== "saved"
-}
-
-const ACTIVE_PIPELINE: ApplicationStatus[] = [
-  "saved",
+export const ACTIVE_APPLICATION_STATUSES = [
   "applied",
   "recruiter_screen",
   "technical_interview",
   "final_interview",
-  "offer",
-]
+] as const satisfies readonly ApplicationStatus[]
+
+export const INTERVIEW_STATUSES = [
+  "recruiter_screen",
+  "technical_interview",
+  "final_interview",
+] as const satisfies readonly ApplicationStatus[]
+
+export const RELATIONSHIP_TYPES = [
+  "recruiter",
+  "hiring_manager",
+  "employee",
+  "founder",
+  "referral",
+  "other",
+] as const
+export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number]
+
+export const OUTREACH_STATUSES = [
+  "not_contacted",
+  "connection_sent",
+  "contacted",
+  "replied",
+  "follow_up_needed",
+  "closed",
+] as const
+export type OutreachStatus = (typeof OUTREACH_STATUSES)[number]
+
+export const TASK_STATUSES = ["todo", "in_progress", "done"] as const
+export type TaskStatus = (typeof TASK_STATUSES)[number]
+
+export const TASK_PRIORITIES = ["low", "medium", "high"] as const
+export type TaskPriority = (typeof TASK_PRIORITIES)[number]
+
+export const PREPARATION_CATEGORIES = [
+  "certification",
+  "coding",
+  "system_design",
+  "behavioral",
+  "other",
+] as const
+export type PreparationCategory = (typeof PREPARATION_CATEGORIES)[number]
+
+export const PREPARATION_STATUSES = ["not_started", "in_progress", "completed"] as const
+export type PreparationStatus = (typeof PREPARATION_STATUSES)[number]
+
+export const RELATIONSHIP_LABELS: Record<RelationshipType, string> = {
+  recruiter: "Recruiter",
+  hiring_manager: "Hiring Manager",
+  employee: "Employee",
+  founder: "Founder",
+  referral: "Referral",
+  other: "Other",
+}
+
+export const OUTREACH_LABELS: Record<OutreachStatus, string> = {
+  not_contacted: "Not Contacted",
+  connection_sent: "Connection Sent",
+  contacted: "Contacted",
+  replied: "Replied",
+  follow_up_needed: "Follow-up Needed",
+  closed: "Closed",
+}
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  todo: "To Do",
+  in_progress: "In Progress",
+  done: "Done",
+}
+
+export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+}
+
+export const TASK_PRIORITY_RANK: Record<TaskPriority, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+}
+
+export const PREPARATION_CATEGORY_LABELS: Record<PreparationCategory, string> = {
+  certification: "Certification",
+  coding: "Coding",
+  system_design: "System Design",
+  behavioral: "Behavioral",
+  other: "Other",
+}
+
+export const PREPARATION_STATUS_LABELS: Record<PreparationStatus, string> = {
+  not_started: "Not Started",
+  in_progress: "In Progress",
+  completed: "Completed",
+}
+
+export function isRelationshipType(value: string): value is RelationshipType {
+  return (RELATIONSHIP_TYPES as readonly string[]).includes(value)
+}
+
+export function isOutreachStatus(value: string): value is OutreachStatus {
+  return (OUTREACH_STATUSES as readonly string[]).includes(value)
+}
+
+export function isTaskStatus(value: string): value is TaskStatus {
+  return (TASK_STATUSES as readonly string[]).includes(value)
+}
+
+export function isTaskPriority(value: string): value is TaskPriority {
+  return (TASK_PRIORITIES as readonly string[]).includes(value)
+}
+
+export function isPreparationCategory(value: string): value is PreparationCategory {
+  return (PREPARATION_CATEGORIES as readonly string[]).includes(value)
+}
+
+export function isPreparationStatus(value: string): value is PreparationStatus {
+  return (PREPARATION_STATUSES as readonly string[]).includes(value)
+}
 
 export function canTransitionStatus(
   from: ApplicationStatus,
   to: ApplicationStatus,
 ): boolean {
-  if (!isApplicationStatus(from) || !isApplicationStatus(to)) return false
-  if (from === to) return true
-  if (to === "rejected" || to === "withdrawn") return true
-  if (from === "rejected" || from === "withdrawn") {
-    return to === "saved" || to === "applied"
-  }
-
-  const fromIndex = ACTIVE_PIPELINE.indexOf(from)
-  const toIndex = ACTIVE_PIPELINE.indexOf(to)
-  return fromIndex !== -1 && toIndex !== -1 && Math.abs(fromIndex - toIndex) === 1
-}
-
-export function transitionError(
-  from: ApplicationStatus,
-  to: ApplicationStatus,
-): string | null {
-  if (canTransitionStatus(from, to)) return null
-  if (from === "rejected" || from === "withdrawn") {
-    return "Reopen a closed application as Saved or Applied."
-  }
-  return "Move one stage at a time, or mark the application Rejected or Withdrawn."
+  return isApplicationStatus(from) && isApplicationStatus(to)
 }
