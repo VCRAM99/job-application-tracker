@@ -1,3 +1,5 @@
+import { LoadingSpinner } from "@/components/shell/loading-spinner"
+
 export default function LoadingNetworking() {
-  return <p className="text-sm text-muted-foreground" role="status">Loading contacts…</p>
+  return <LoadingSpinner label="Loading contacts…" />
 }

@@ -1,3 +1,5 @@
+import { LoadingSpinner } from "@/components/shell/loading-spinner"
+
 export default function LoadingPreparation() {
-  return <p className="text-sm text-muted-foreground" role="status">Loading preparation…</p>
+  return <LoadingSpinner label="Loading preparation…" />
 }

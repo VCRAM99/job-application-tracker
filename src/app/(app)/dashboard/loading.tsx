@@ -1,3 +1,5 @@
+import { LoadingSpinner } from "@/components/shell/loading-spinner"
+
 export default function LoadingDashboard() {
-  return <p className="text-sm text-muted-foreground" role="status">Loading dashboard…</p>
+  return <LoadingSpinner label="Loading dashboard…" />
 }

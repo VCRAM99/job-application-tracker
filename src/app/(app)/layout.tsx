@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { Suspense } from "react"
 
 import { AppShell } from "@/components/shell/app-shell"
+import { LoadingSpinner } from "@/components/shell/loading-spinner"
 import { requireUser } from "@/lib/auth/session"
 
 export const instant = false
@@ -16,7 +17,7 @@ export default function ProtectedLayout({
   children: React.ReactNode
 }) {
   return (
-    <Suspense fallback={<p className="px-4 py-6 text-sm text-muted-foreground" role="status">Loading…</p>}>
+    <Suspense fallback={<LoadingSpinner label="Loading…" />}>
       <ProtectedContent>{children}</ProtectedContent>
     </Suspense>
   )

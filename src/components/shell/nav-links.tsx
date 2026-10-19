@@ -5,6 +5,7 @@ import {
   BookOpen,
   Briefcase,
   Building2,
+  CalendarCheck,
   CheckSquare,
   LayoutDashboard,
   Settings,
@@ -23,6 +24,7 @@ const ICONS: Record<NavHref, LucideIcon> = {
   "/applications": Briefcase,
   "/networking": Users,
   "/tasks": CheckSquare,
+  "/daily-tasks": CalendarCheck,
   "/preparation": BookOpen,
   "/settings": Settings,
 }

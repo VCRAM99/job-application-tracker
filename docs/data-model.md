@@ -86,6 +86,14 @@ A task is overdue when it is not done and `due_date` is before today. Deleting a
 - `completed_at date` is set only when status is `completed`
 - `resource_url`, `notes`
 
+## Daily tasks and health
+
+`user_preferences` stores one optional IANA timezone and `health_tracking_enabled`, which defaults to false. The browser sends the detected timezone once; later travel does not overwrite it. Local dates are `YYYY-MM-DD` strings for that timezone. The app does not treat UTC midnight as the user's day boundary.
+
+`recurring_tasks` stores the title, optional description, Monday-first weekdays (`1`–`7`), optional start and end dates, and `active` or `paused`. `recurring_task_completions` stores one row per task and local date. Editing the schedule does not delete those rows. Weekly insights recount using the current weekdays and date range, so a day that is no longer scheduled is left out of both the completed and scheduled counts. Pause hides a task from today and future checklists only.
+
+Health tables (`health_goals`, `food_entries`, `water_entries`, `sleep_entries`, `step_entries`, `weight_entries`) belong to the same user. Weight is stored as kilograms. Turning health tracking off hides the interface and leaves the rows in place. There is no service-role access and no cross-user foreign key.
+
 ## Dashboard metrics
 
 - Companies: count of company rows.

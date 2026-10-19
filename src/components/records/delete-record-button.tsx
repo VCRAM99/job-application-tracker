@@ -21,6 +21,7 @@ export function DeleteRecordButton({
   description,
   label,
   returnTo,
+  fields,
 }: {
   action: (formData: FormData) => Promise<void>
   id: string
@@ -28,6 +29,7 @@ export function DeleteRecordButton({
   description: string
   label: string
   returnTo?: string
+  fields?: Record<string, string>
 }) {
   const [pending, setPending] = useState(false)
 
@@ -49,6 +51,7 @@ export function DeleteRecordButton({
           >
             <input type="hidden" name="id" value={id} />
             {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
+            {fields ? Object.entries(fields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />) : null}
             <Button type="submit" variant="destructive" disabled={pending}>
               {pending ? "Deleting…" : label}
             </Button>

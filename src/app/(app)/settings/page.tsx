@@ -11,6 +11,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { setHealthTracking } from "@/lib/daily/actions"
+import { getDailyPreference } from "@/lib/daily/data"
 import { changePassword, signOut } from "@/lib/auth/actions"
 import { requireUser } from "@/lib/auth/session"
 
@@ -18,6 +20,8 @@ export const metadata: Metadata = { title: "Settings" }
 
 export default async function SettingsPage() {
   const user = await requireUser()
+  const preference = await getDailyPreference()
+  const healthOn = preference.ok && preference.data.healthTrackingEnabled
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
@@ -66,6 +70,28 @@ export default async function SettingsPage() {
         <CardContent className="flex items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">Switch between dark and light.</p>
           <ThemeToggle />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Health Tracking (Beta)</CardTitle>
+          <CardDescription>
+            Optional personal health notes on Daily Tasks. Off by default. Turning this off hides the section and keeps saved entries private to this account.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {preference.ok ? (
+            <form action={setHealthTracking}>
+              <input type="hidden" name="enabled" value={healthOn ? "false" : "true"} />
+              <Button type="submit" variant="outline">
+                {healthOn ? "Turn off" : "Turn on"}
+              </Button>
+            </form>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Health tracking is not available until the daily tasks migration is applied.
+            </p>
+          )}
         </CardContent>
       </Card>
       <Card>

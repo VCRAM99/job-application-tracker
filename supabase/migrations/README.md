@@ -8,6 +8,8 @@ SQL migrations for the hosted Supabase project live in this directory.
 
 `20261019204500_import_companies_and_applications.sql` adds `import_companies` and `import_applications`. Both run as `security invoker`, require `auth.uid()`, lock one user's import at a time, and rely on row-level security. They do not change existing rows.
 
+`20261019220000_daily_tasks_and_health.sql` adds preferences, recurring tasks, completions, health goals, and health entries. Health tracking defaults to off. Completions are unique per task and local date. It does not change existing job-search rows. Preview with `npx supabase db push --dry-run`, then apply with `npx supabase db push`.
+
 Apply pending files to the existing project with `supabase db push`. Do not run `supabase db reset` against the hosted database. The production hardening release does not add a migration.
 
 See the README for the exact link and push commands.

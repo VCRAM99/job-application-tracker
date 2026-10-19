@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
 
+import { LoadingSpinner } from "@/components/shell/loading-spinner"
 import { getCurrentUser } from "@/lib/auth/session"
 
 export const instant = false
@@ -8,11 +9,7 @@ export const instant = false
 export default function HomePage() {
   return (
     <Suspense
-      fallback={
-        <p className="px-4 py-6 text-sm text-muted-foreground" role="status">
-          Loading…
-        </p>
-      }
+      fallback={<LoadingSpinner label="Loading…" />}
     >
       <HomeRedirect />
     </Suspense>

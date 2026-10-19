@@ -1,7 +1,5 @@
+import { LoadingSpinner } from "@/components/shell/loading-spinner"
+
 export default function AuthLoading() {
-  return (
-    <p className="text-sm text-muted-foreground" role="status">
-      Loading…
-    </p>
-  )
+  return <LoadingSpinner label="Loading…" />
 }
