@@ -8,12 +8,12 @@ import { addCalendarDays } from "@/lib/records/logic"
 import { kgToDisplay, normalizeSeries, pointsByDate, type WeightUnit } from "@/lib/daily/health"
 
 const SERIES = [
-  { key: "calories", label: "Calories", color: "var(--status-active)", unit: "kcal" },
-  { key: "protein", label: "Protein", color: "var(--status-interview)", unit: "g" },
-  { key: "water", label: "Water", color: "oklch(0.62 0.08 230)", unit: "mL" },
-  { key: "sleep", label: "Sleep", color: "var(--status-done)", unit: "min" },
-  { key: "steps", label: "Steps", color: "var(--foreground)", unit: "steps" },
-  { key: "weight", label: "Weight", color: "var(--status-overdue)", unit: "kg" },
+  { key: "calories", label: "Calories", color: "var(--metric-calories)", unit: "kcal" },
+  { key: "protein", label: "Protein", color: "var(--metric-protein)", unit: "g" },
+  { key: "water", label: "Water", color: "var(--metric-water)", unit: "mL" },
+  { key: "sleep", label: "Sleep", color: "var(--metric-sleep)", unit: "min" },
+  { key: "steps", label: "Steps", color: "var(--metric-steps)", unit: "steps" },
+  { key: "weight", label: "Weight", color: "var(--metric-weight)", unit: "kg" },
 ] as const
 
 type Row = { date: string; value: number }
@@ -46,7 +46,7 @@ export function HealthChart({
     steps: true,
     weight: true,
   })
-  const reduced = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  const reduced = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
   const dates = datesInRange(addCalendarDays(today, -(range - 1)), today)
   const raw = {
     calories: pointsByDate(dates, calories),
@@ -88,7 +88,8 @@ export function HealthChart({
           <button
             key={days}
             type="button"
-            className={`rounded-full border px-3 py-1 text-xs ${range === days ? "bg-foreground text-background" : ""}`}
+            className={`pressable pressable-quiet rounded-full border px-3 py-1 text-xs ${range === days ? "bg-foreground text-background" : ""}`}
+            aria-pressed={range === days}
             onClick={() => setRange(days)}
           >
             {days} days
@@ -103,13 +104,19 @@ export function HealthChart({
               checked={visible[series.key]}
               onChange={() => setVisible((current) => ({ ...current, [series.key]: !current[series.key] }))}
             />
-            <span style={{ color: series.color }}>{series.label}</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-2 rounded-full" style={{ background: series.color }} aria-hidden="true" />
+              {series.label}
+            </span>
           </label>
         ))}
       </div>
       <p className="text-xs text-muted-foreground">
-        Lines are scaled from 0 to 100 within this range so different units can share one chart. Tooltips show the recorded values. Missing days are gaps, and weight is only plotted on days you measured it.
+        Relative trends (normalized 0–100). Tooltips show the recorded values and units. Missing days are gaps, and weight is only plotted on days you measured it.
       </p>
+      {data.every((row) => SERIES.every((series) => row[series.key] == null)) ? (
+        <p className="text-sm text-muted-foreground">No health entries in this range.</p>
+      ) : null}
       <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data}>

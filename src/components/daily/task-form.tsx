@@ -1,3 +1,4 @@
+import { SubmitButton } from "@/components/daily/controls"
 import { WEEKDAY_LABELS } from "@/lib/daily/calendar"
 import { deleteRecurringTask, saveRecurringTask, setRecurringStatus } from "@/lib/daily/actions"
 import { DeleteRecordButton } from "@/components/records/delete-record-button"
@@ -21,10 +22,10 @@ export function RecurringTaskForm({
       {task ? <input type="hidden" name="id" value={task.id} /> : null}
       <input type="hidden" name="status" value={task?.status ?? "active"} />
       <label className="text-sm">Title
-        <input name="title" required defaultValue={task?.title ?? ""} className="mt-1 w-full rounded-lg border bg-transparent px-2 py-1" />
+        <input name="title" required defaultValue={task?.title ?? ""} className="field-control mt-1" />
       </label>
       <label className="text-sm">Description
-        <textarea name="description" defaultValue={task?.description ?? ""} className="mt-1 w-full rounded-lg border bg-transparent px-2 py-1" rows={3} />
+        <textarea name="description" defaultValue={task?.description ?? ""} className="field-control mt-1 h-24 py-2" rows={3} />
       </label>
       <fieldset className="space-y-2">
         <legend className="text-sm">Repeats</legend>
@@ -39,13 +40,13 @@ export function RecurringTaskForm({
       </fieldset>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm">Start date
-          <input type="date" name="startDate" defaultValue={task?.startDate ?? ""} className="mt-1 w-full rounded-lg border bg-transparent px-2 py-1" />
+          <input type="date" name="startDate" defaultValue={task?.startDate ?? ""} className="field-control mt-1" />
         </label>
         <label className="text-sm">End date
-          <input type="date" name="endDate" defaultValue={task?.endDate ?? ""} className="mt-1 w-full rounded-lg border bg-transparent px-2 py-1" />
+          <input type="date" name="endDate" defaultValue={task?.endDate ?? ""} className="field-control mt-1" />
         </label>
       </div>
-      <button className="h-8 rounded-lg bg-primary px-3 text-sm text-primary-foreground" type="submit">{task ? "Save task" : "Create task"}</button>
+      <SubmitButton variant="primary" pendingLabel="Saving…">{task ? "Save task" : "Create task"}</SubmitButton>
       {task ? (
         <div className="flex flex-wrap gap-2">
           <DeleteRecordButton action={deleteRecurringTask} id={task.id} label="Delete task" title={`Delete ${task.title}?`} description="Completion history for this habit is deleted with it. Other records stay." />
@@ -55,7 +56,7 @@ export function RecurringTaskForm({
     {task ? (
       <form action={setRecurringStatus}>
         <input type="hidden" name="id" value={task.id} />
-        <button className="h-8 rounded-lg border px-3 text-sm" type="submit" name="status" value={task.status === "paused" ? "active" : "paused"}>
+        <button className="pressable pressable-quiet h-9 rounded-lg border px-3 text-sm" type="submit" name="status" value={task.status === "paused" ? "active" : "paused"}>
           {task.status === "paused" ? "Resume" : "Pause"}
         </button>
       </form>

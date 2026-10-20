@@ -16,11 +16,6 @@ function refresh() {
   revalidatePath("/settings")
 }
 
-function numberOrRedirect(value: number | null | string): number | null {
-  if (typeof value === "string") redirect("/daily-tasks?error=invalid")
-  return value
-}
-
 function message(error: { code?: string; message?: string } | null): string {
   if (isMissingTable(error)) return "Daily tasks are not available yet. Apply the latest migration, then reload."
   return recordErrorMessage(error)
@@ -131,33 +126,46 @@ export async function toggleCompletion(formData: FormData) {
   refresh()
 }
 
-export async function saveHealthGoals(formData: FormData) {
+export type ActionFeedback = { ok: boolean; message: string }
+
+function goalNumber(value: number | null | string): { ok: true; value: number | null } | { ok: false; message: string } {
+  if (typeof value === "string") return { ok: false, message: value }
+  return { ok: true, value }
+}
+
+export async function saveHealthGoals(formData: FormData): Promise<ActionFeedback> {
   const user = await requireUser()
   const unit = formData.get("weightUnit") === "lb" ? "lb" : "kg"
-  const calorie = numberOrRedirect(optionalNonnegative(String(formData.get("calorieTarget") ?? ""), "calorie target", 20000))
-  const protein = numberOrRedirect(optionalNonnegative(String(formData.get("proteinTarget") ?? ""), "protein target", 1000))
-  const waterGoal = numberOrRedirect(optionalNonnegative(String(formData.get("waterGoalMl") ?? ""), "water goal", 20000))
-  const increment = numberOrRedirect(optionalNonnegative(String(formData.get("waterIncrementMl") ?? "250"), "water increment", 5000))
-  const sleep = numberOrRedirect(optionalNonnegative(String(formData.get("sleepTargetMinutes") ?? ""), "sleep target", 1440))
-  const steps = numberOrRedirect(optionalNonnegative(String(formData.get("stepTarget") ?? ""), "step target", 200000))
+  const calorie = goalNumber(optionalNonnegative(String(formData.get("calorieTarget") ?? ""), "calorie target", 20000))
+  const protein = goalNumber(optionalNonnegative(String(formData.get("proteinTarget") ?? ""), "protein target", 1000))
+  const waterGoal = goalNumber(optionalNonnegative(String(formData.get("waterGoalMl") ?? ""), "water goal", 20000))
+  const increment = goalNumber(optionalNonnegative(String(formData.get("waterIncrementMl") ?? "250"), "water increment", 5000))
+  const sleep = goalNumber(optionalNonnegative(String(formData.get("sleepTargetMinutes") ?? ""), "sleep target", 1440))
+  const steps = goalNumber(optionalNonnegative(String(formData.get("stepTarget") ?? ""), "step target", 200000))
+  const invalid = [calorie, protein, waterGoal, increment, sleep, steps].find((item) => !item.ok)
+  if (invalid && !invalid.ok) return invalid
+  if (!calorie.ok || !protein.ok || !waterGoal.ok || !increment.ok || !sleep.ok || !steps.ok) {
+    return { ok: false, message: "Check the targets and try again." }
+  }
   const supabase = await createClient()
   const payload = {
     user_id: user.id,
-    calorie_target: calorie,
-    protein_target: protein,
-    water_goal_ml: waterGoal,
-    water_increment_ml: increment != null && increment > 0 ? Math.round(increment) : 250,
-    sleep_target_minutes: sleep,
-    step_target: steps,
+    calorie_target: calorie.value,
+    protein_target: protein.value,
+    water_goal_ml: waterGoal.value,
+    water_increment_ml: increment.value != null && increment.value > 0 ? Math.round(increment.value) : 250,
+    sleep_target_minutes: sleep.value,
+    step_target: steps.value,
     weight_unit: unit,
   }
   const existing = await supabase.from("health_goals").select("id").eq("user_id", user.id).maybeSingle()
-  if (existing.data) {
-    await supabase.from("health_goals").update(payload).eq("user_id", user.id)
-  } else {
-    await supabase.from("health_goals").insert(payload)
-  }
+  if (existing.error) return { ok: false, message: message(existing.error) }
+  const result = existing.data
+    ? await supabase.from("health_goals").update(payload).eq("user_id", user.id)
+    : await supabase.from("health_goals").insert(payload)
+  if (result.error) return { ok: false, message: message(result.error) }
   refresh()
+  return { ok: true, message: "Targets saved." }
 }
 
 export async function saveFood(formData: FormData) {
@@ -203,16 +211,27 @@ async function dayWater(userId: string, date: string): Promise<number> {
   return waterTotal((data ?? []).map((row) => row.amount_ml as number))
 }
 
-export async function addWater(formData: FormData) {
+export async function addWater(formData: FormData): Promise<ActionFeedback> {
   const user = await requireUser()
   const date = String(formData.get("date") ?? "")
   const amount = Number(formData.get("amount") ?? 0)
-  if (!isIsoDate(date) || !Number.isInteger(amount) || amount === 0) return
+  if (!isIsoDate(date) || !Number.isInteger(amount) || amount === 0) {
+    return { ok: false, message: "Enter a whole number of milliliters." }
+  }
   const current = await dayWater(user.id, date)
-  if (!canAddWater(current, amount)) return
+  if (!canAddWater(current, amount)) return { ok: false, message: "That would make the daily total negative." }
   const supabase = await createClient()
-  await supabase.from("water_entries").insert({ user_id: user.id, local_date: date, amount_ml: amount })
+  const { error } = await supabase.from("water_entries").insert({ user_id: user.id, local_date: date, amount_ml: amount })
+  if (error) return { ok: false, message: message(error) }
   refresh()
+  return { ok: true, message: "Water saved." }
+}
+
+export async function addWaterAmount(date: string, amount: number): Promise<ActionFeedback> {
+  const formData = new FormData()
+  formData.set("date", date)
+  formData.set("amount", String(amount))
+  return addWater(formData)
 }
 
 export async function saveSleep(formData: FormData) {

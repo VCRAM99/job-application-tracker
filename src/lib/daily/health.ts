@@ -24,6 +24,66 @@ export function canAddWater(current: number, amount: number): boolean {
   return amount !== 0 && current + amount >= 0
 }
 
+export type WaterLedger = { server: number; extra: number }
+
+export function displayedWater(ledger: WaterLedger): number {
+  return Math.max(0, ledger.server + ledger.extra)
+}
+
+export function queueWater(ledger: WaterLedger, amount: number): WaterLedger | null {
+  if (!canAddWater(displayedWater(ledger), amount)) return null
+  return { ...ledger, extra: ledger.extra + amount }
+}
+
+export function rollbackWater(ledger: WaterLedger, amount: number): WaterLedger {
+  return { ...ledger, extra: ledger.extra - amount }
+}
+
+/** Drop optimistic water once the server total moves, without letting a stale total erase newer clicks. */
+export function reconcileWaterExtra(extra: number, serverDelta: number): number {
+  if (serverDelta >= 0) return Math.max(0, extra - serverDelta)
+  return extra - serverDelta
+}
+
+export function progressRatio(current: number, target: number | null): number | null {
+  if (target == null || target <= 0) return null
+  return Math.max(0, current / target)
+}
+
+export type ProgressBand = "none" | "low" | "mid" | "met"
+
+export function progressBand(ratio: number | null): ProgressBand {
+  if (ratio == null) return "none"
+  if (ratio < 0.4) return "low"
+  if (ratio < 1) return "mid"
+  return "met"
+}
+
+export function progressBandFor(
+  metric: "calories" | "protein" | "water" | "sleep" | "steps" | "weight",
+  current: number,
+  target: number | null,
+): ProgressBand {
+  if (metric === "weight") return "none"
+  return progressBand(progressRatio(current, target))
+}
+
+export function formatCount(value: number): string {
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value)
+}
+
+export function createMutationQueue() {
+  let tail = Promise.resolve()
+  return function enqueue(task: () => Promise<void>) {
+    const run = tail.then(task, task)
+    tail = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    return run
+  }
+}
+
 export function sleepMinutes(hours: number, minutes: number): number | null {
   if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null
   if (hours < 0 || hours > 24 || minutes < 0 || minutes > 59) return null

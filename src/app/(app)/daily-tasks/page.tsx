@@ -1,12 +1,16 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { cookies } from "next/headers"
 
 import { Checklist } from "@/components/daily/checklist"
+import { Disclosure } from "@/components/daily/disclosure"
 import { HealthPanel } from "@/components/daily/health-panel"
 import { TimezoneSync } from "@/components/daily/timezone-sync"
 import { PageHeader, RecordState } from "@/components/records/fields"
+import { DeleteRecordButton } from "@/components/records/delete-record-button"
 import { Button } from "@/components/ui/button"
-import { SCHEDULE_CHANGE_NOTE, isIsoDate, isScheduledOn, lastCompletedWeek, localDateInTimeZone, weekContaining, weeklyInsights } from "@/lib/daily/calendar"
+import { SCHEDULE_CHANGE_NOTE, WEEKDAY_LABELS, isIsoDate, isScheduledOn, lastCompletedWeek, localDateInTimeZone, weekContaining, weeklyInsights } from "@/lib/daily/calendar"
+import { deleteRecurringTask, setRecurringStatus } from "@/lib/daily/actions"
 import { getDailyPreference, getHealthBundle, listCompletions, listRecurringTasks } from "@/lib/daily/data"
 import { addCalendarDays } from "@/lib/records/logic"
 
@@ -14,6 +18,17 @@ export const metadata: Metadata = { title: "Daily Tasks" }
 
 function first(value: string | string[] | undefined): string {
   return Array.isArray(value) ? value[0] ?? "" : value ?? ""
+}
+
+function formatDay(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number)
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(year, month - 1, day)))
 }
 
 export default async function DailyTasksPage({
@@ -42,23 +57,29 @@ export default async function DailyTasksPage({
   const requestedWeek = first(params.week)
   const week = isIsoDate(requestedWeek) ? weekContaining(requestedWeek) : lastCompletedWeek(today)
   const tasks = await listRecurringTasks()
-  const completions = tasks.ok ? await listCompletions(addCalendarDays(week.start, -1), addCalendarDays(week.end, 1)) : null
+  const completionStart = date < week.start ? date : week.start
+  const completionEnd = date > week.end ? date : week.end
+  const completions = tasks.ok ? await listCompletions(completionStart, completionEnd) : null
   const scheduled = tasks.ok
     ? tasks.data
-        .filter((task) => isScheduledOn({ ...task, status: task.status }, date, today))
+        .filter((task) => isScheduledOn(task, date, today))
         .map((task) => ({
           ...task,
           completed: completions?.ok ? completions.data.some((row) => row.taskId === task.id && row.localDate === date) : false,
         }))
     : []
   const insights = tasks.ok && completions?.ok ? weeklyInsights(tasks.data, completions.data, week) : []
+  const insightCompleted = insights.reduce((total, item) => total + item.completed, 0)
+  const insightScheduled = insights.reduce((total, item) => total + item.scheduled, 0)
   const healthFrom = addCalendarDays(today, -89)
   const healthStart = date < healthFrom ? date : healthFrom
   const healthEnd = date > today ? date : today
   const health = preference.data.healthTrackingEnabled ? await getHealthBundle(healthStart, healthEnd) : null
+  const healthOpen = (await cookies()).get("daily_health_open")?.value !== "0"
+  const weekQuery = requestedWeek ? `&week=${week.start}` : ""
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
       <TimezoneSync timezone={preference.data.timezone} />
       <PageHeader
         title="Daily Tasks"
@@ -69,52 +90,102 @@ export default async function DailyTasksPage({
         <RecordState tone="error" title="Daily tasks could not be loaded" description="Apply the daily tasks migration, then reload." />
       ) : (
         <>
-          <p className="text-sm text-muted-foreground">Timezone: {preference.data.timezone ?? "Detecting this browser…"} · Today is {today}.</p>
-          <form className="flex flex-wrap items-end gap-3" method="get">
-            <label className="text-sm">Date
-              <input className="mt-1 block rounded-lg border bg-transparent px-2 py-1" type="date" name="date" defaultValue={date} />
-            </label>
-            <button className="h-8 rounded-lg border px-3 text-sm" type="submit">Show date</button>
-          </form>
-          <details className="surface p-4" open>
-            <summary className="cursor-pointer text-sm font-medium">Weekly insights · {week.start} to {week.end}</summary>
-            <p className="mt-2 text-sm text-muted-foreground">{SCHEDULE_CHANGE_NOTE}</p>
-            <div className="mt-3 flex gap-3 text-sm">
-              <Link href={`/daily-tasks?date=${date}&week=${addCalendarDays(week.start, -7)}`}>Previous week</Link>
-              <Link href={`/daily-tasks?date=${date}&week=${addCalendarDays(week.start, 7)}`}>Next week</Link>
+          <section className="space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Selected date</p>
+                <p className="mt-1 text-lg font-medium tracking-tight">{formatDay(date)}</p>
+                <p className="text-sm text-muted-foreground">
+                  {preference.data.timezone ?? "Detecting this browser…"}
+                  {date === today ? " · Today" : ""}
+                </p>
+              </div>
+              <form className="flex flex-wrap items-center gap-2" method="get">
+                {requestedWeek ? <input type="hidden" name="week" value={week.start} /> : null}
+                <Link className="pressable pressable-quiet inline-flex h-9 items-center rounded-lg border px-3 text-sm" href={`/daily-tasks?date=${addCalendarDays(date, -1)}${weekQuery}`}>Previous day</Link>
+                <label className="sr-only" htmlFor="daily-date">Date</label>
+                <input id="daily-date" className="field-control w-auto" type="date" name="date" defaultValue={date} />
+                <button className="pressable pressable-quiet h-9 rounded-lg border px-3 text-sm" type="submit">Show date</button>
+                <Link className="pressable pressable-quiet inline-flex h-9 items-center rounded-lg border px-3 text-sm" href={`/daily-tasks?date=${addCalendarDays(date, 1)}${weekQuery}`}>Next day</Link>
+              </form>
             </div>
-            {insights.length === 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">No recurring tasks were scheduled during this week.</p>
+          </section>
+          <section className="space-y-3">
+            <h2 className="text-sm font-medium">Checklist</h2>
+            <Checklist date={date} items={scheduled} />
+          </section>
+          <Disclosure title="Manage recurring tasks" summary={tasks.data.length === 1 ? "1 task" : `${tasks.data.length} tasks`}>
+            {tasks.data.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No recurring tasks yet. Add a habit and choose the weekdays it should appear.</p>
             ) : (
-              <ul className="mt-3 space-y-1 text-sm">
-                {insights.map((item) => (
-                  <li key={item.taskId} className="flex justify-between gap-3">
-                    <span className="min-w-0 break-words">{item.title}</span>
-                    <span className="tabular-nums">{item.completed}/{item.scheduled}</span>
+              <ul className="space-y-2">
+                {tasks.data.map((task) => (
+                  <li key={task.id} className="flex flex-col gap-3 rounded-xl border px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium break-words">{task.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {task.weekdays.map((day) => WEEKDAY_LABELS[day - 1]).join(" · ")}
+                        {" · "}
+                        {task.status === "paused" ? "Paused" : "Active"}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Link className="pressable pressable-quiet inline-flex h-9 items-center rounded-lg border px-3 text-sm" href={`/daily-tasks/${task.id}/edit`}>Edit</Link>
+                      <form action={setRecurringStatus}>
+                        <input type="hidden" name="id" value={task.id} />
+                        <button className="pressable pressable-quiet h-9 rounded-lg border px-3 text-sm" type="submit" name="status" value={task.status === "paused" ? "active" : "paused"}>
+                          {task.status === "paused" ? "Resume" : "Pause"}
+                        </button>
+                      </form>
+                      <DeleteRecordButton action={deleteRecurringTask} id={task.id} label="Delete" title={`Delete ${task.title}?`} description="Completion history for this habit is deleted with it." />
+                    </div>
                   </li>
                 ))}
               </ul>
             )}
-          </details>
-          <Checklist date={date} items={scheduled} />
-          {tasks.data.length > 0 ? (
-            <ul className="space-y-2 text-sm">
-              {tasks.data.map((task) => (
-                <li key={task.id} className="flex flex-wrap items-center justify-between gap-2">
-                  <span>{task.title} · {task.status}</span>
-                  <Link className="underline-offset-4 hover:underline" href={`/daily-tasks/${task.id}/edit`}>Edit</Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <RecordState title="No daily tasks yet" description="Add a habit and choose the weekdays it should appear." />
-          )}
+          </Disclosure>
+          <Disclosure
+            title="Weekly Insights"
+            summary={`${week.start} – ${week.end}${insights.length ? ` · ${insightCompleted}/${insightScheduled}` : " · Nothing scheduled"}`}
+          >
+            <p className="text-sm text-muted-foreground">{SCHEDULE_CHANGE_NOTE}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link className="pressable pressable-quiet inline-flex h-9 items-center rounded-lg border px-3 text-sm" href={`/daily-tasks?date=${date}&week=${addCalendarDays(week.start, -7)}`}>Previous week</Link>
+              <Link className="pressable pressable-quiet inline-flex h-9 items-center rounded-lg border px-3 text-sm" href={`/daily-tasks?date=${date}&week=${addCalendarDays(week.start, 7)}`}>Next week</Link>
+            </div>
+            {insights.length === 0 ? (
+              <p className="mt-4 text-sm text-muted-foreground">No recurring tasks were scheduled during this week.</p>
+            ) : (
+              <ul className="mt-4 space-y-3">
+                {insights.map((item) => (
+                  <li key={item.taskId}>
+                    <div className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="min-w-0 break-words">{item.title}</span>
+                      <span className="tabular-nums">{item.completed}/{item.scheduled}</span>
+                    </div>
+                    <div
+                      className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
+                      role="meter"
+                      aria-label={`${item.title} completed`}
+                      aria-valuemin={0}
+                      aria-valuemax={item.scheduled}
+                      aria-valuenow={item.completed}
+                      aria-valuetext={`${item.completed} of ${item.scheduled} scheduled days`}
+                    >
+                      <div className="h-full rounded-full bg-foreground/70" style={{ width: `${item.scheduled === 0 ? 0 : (item.completed / item.scheduled) * 100}%` }} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Disclosure>
         </>
       )}
       {health && health.ok ? (
         <HealthPanel
           date={date}
           today={today}
+          defaultOpen={healthOpen}
           goals={health.data.goals}
           food={health.data.food.filter((row) => row.local_date === date).map((row) => ({
             id: row.id,

@@ -10,12 +10,21 @@ import {
 } from "@/lib/daily/calendar"
 import {
   canAddWater,
+  createMutationQueue,
   displayToKg,
+  displayedWater,
   kgToDisplay,
   normalizeSeries,
   pointsByDate,
+  progressBand,
+  progressBandFor,
+  progressRatio,
+  queueWater,
+  reconcileWaterExtra,
+  rollbackWater,
   sleepMinutes,
   waterTotal,
+  type WaterLedger,
 } from "@/lib/daily/health"
 
 const task = {
@@ -93,6 +102,71 @@ describe("health calculations", () => {
       { date: "2026-10-18", value: null },
       { date: "2026-10-19", value: 80 },
     ])
+  })
+})
+
+describe("progress thresholds", () => {
+  it("uses muted bands only when a target exists", () => {
+    expect(progressRatio(10, null)).toBeNull()
+    expect(progressBand(null)).toBe("none")
+    expect(progressBand(progressRatio(39, 100))).toBe("low")
+    expect(progressBand(progressRatio(40, 100))).toBe("mid")
+    expect(progressBand(progressRatio(99, 100))).toBe("mid")
+    expect(progressBand(progressRatio(100, 100))).toBe("met")
+    expect(progressBand(progressRatio(140, 100))).toBe("met")
+    expect(progressRatio(-20, 100)).toBe(0)
+  })
+
+  it("keeps weight out of goal colors", () => {
+    expect(progressBandFor("weight", 80, 70)).toBe("none")
+    expect(progressBandFor("water", 3500, 3500)).toBe("met")
+    expect(progressBandFor("steps", 1000, null)).toBe("none")
+  })
+})
+
+describe("water optimistic ledger", () => {
+  it("keeps every rapid increment until the server catches up", () => {
+    let ledger: WaterLedger = { server: 0, extra: 0 }
+    for (let click = 0; click < 4; click += 1) {
+      const next = queueWater(ledger, 250)
+      expect(next).not.toBeNull()
+      ledger = next ?? ledger
+    }
+    expect(displayedWater(ledger)).toBe(1000)
+    ledger = { server: 500, extra: reconcileWaterExtra(ledger.extra, 500) }
+    expect(displayedWater(ledger)).toBe(1000)
+    ledger = { server: 1000, extra: reconcileWaterExtra(ledger.extra, 500) }
+    expect(ledger.extra).toBe(0)
+    expect(displayedWater(ledger)).toBe(1000)
+  })
+
+  it("rolls back only the failed increment", () => {
+    let ledger: WaterLedger = { server: 250, extra: 0 }
+    ledger = queueWater(ledger, 250) ?? ledger
+    ledger = queueWater(ledger, 250) ?? ledger
+    ledger = rollbackWater(ledger, 250)
+    expect(displayedWater(ledger)).toBe(500)
+    expect(queueWater({ server: 0, extra: 0 }, -250)).toBeNull()
+  })
+
+  it("runs mutations one at a time", async () => {
+    const enqueue = createMutationQueue()
+    const order: number[] = []
+    let releaseFirst: (() => void) | undefined
+    const first = enqueue(async () => {
+      order.push(1)
+      await new Promise<void>((resolve) => {
+        releaseFirst = resolve
+      })
+    })
+    const second = enqueue(async () => {
+      order.push(2)
+    })
+    await Promise.resolve()
+    expect(order).toEqual([1])
+    releaseFirst?.()
+    await Promise.all([first, second])
+    expect(order).toEqual([1, 2])
   })
 })
 

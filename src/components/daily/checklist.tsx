@@ -22,8 +22,8 @@ export function Checklist({
             <input type="hidden" name="completed" value={item.completed ? "false" : "true"} />
             <button
               type="submit"
-              className={`flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
-                item.completed ? "border-emerald-700/30 bg-emerald-500/10" : "hover:bg-muted/50"
+              className={`pressable flex min-h-11 w-full items-start gap-3 rounded-xl border px-3 py-3 text-left ${
+                item.completed ? "border-emerald-700/30 bg-emerald-500/10" : "pressable-quiet"
               }`}
             >
               <span

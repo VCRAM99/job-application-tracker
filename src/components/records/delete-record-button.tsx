@@ -1,5 +1,6 @@
 "use client"
 
+import { cn } from "cn"
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -22,6 +23,7 @@ export function DeleteRecordButton({
   label,
   returnTo,
   fields,
+  className,
 }: {
   action: (formData: FormData) => Promise<void>
   id: string
@@ -30,12 +32,13 @@ export function DeleteRecordButton({
   label: string
   returnTo?: string
   fields?: Record<string, string>
+  className?: string
 }) {
   const [pending, setPending] = useState(false)
 
   return (
     <Dialog>
-      <DialogTrigger render={<Button variant="destructive" />}>{label}</DialogTrigger>
+      <DialogTrigger render={<Button variant="destructive" size="sm" className={cn("pressable", className)} />}>{label}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -52,7 +55,7 @@ export function DeleteRecordButton({
             <input type="hidden" name="id" value={id} />
             {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
             {fields ? Object.entries(fields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />) : null}
-            <Button type="submit" variant="destructive" disabled={pending}>
+            <Button type="submit" variant="destructive" className="pressable" disabled={pending}>
               {pending ? "Deleting…" : label}
             </Button>
           </form>
