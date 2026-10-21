@@ -7,6 +7,7 @@ import {
   Building2,
   CalendarCheck,
   CheckSquare,
+  IdCard,
   LayoutDashboard,
   Settings,
   Users,
@@ -18,6 +19,8 @@ import { usePathname } from "next/navigation"
 import type { NavHref } from "@/lib/navigation"
 import { NAV_ITEMS } from "@/lib/navigation"
 
+type NavItem = (typeof NAV_ITEMS)[number]
+
 const ICONS: Record<NavHref, LucideIcon> = {
   "/dashboard": LayoutDashboard,
   "/companies": Building2,
@@ -26,13 +29,16 @@ const ICONS: Record<NavHref, LucideIcon> = {
   "/tasks": CheckSquare,
   "/daily-tasks": CalendarCheck,
   "/preparation": BookOpen,
+  "/career": IdCard,
   "/settings": Settings,
 }
 
 export function NavLinks({
+  items = NAV_ITEMS,
   onNavigate,
   className,
 }: {
+  items?: readonly NavItem[]
   onNavigate?: () => void
   className?: string
 }) {
@@ -40,7 +46,7 @@ export function NavLinks({
 
   return (
     <nav aria-label="Primary" className={cn("flex flex-col gap-1", className)}>
-      {NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const Icon = ICONS[item.href]
         const active =
           pathname === item.href || pathname.startsWith(`${item.href}/`)
