@@ -52,7 +52,7 @@ export function JobSearchForm({
 
   return (
     <div className="space-y-4">
-      <form method="get" className="grid gap-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10 sm:grid-cols-2 lg:grid-cols-4">
+      <form id="job-search" method="get" className="grid gap-4 rounded-xl bg-card p-4 ring-1 ring-foreground/10 sm:grid-cols-2 lg:grid-cols-4">
         <input type="hidden" name="applied" value="1" />
         <label className="space-y-1 text-sm sm:col-span-2">
           <span className="font-medium">Role, company, or keyword</span>
@@ -162,7 +162,7 @@ export function JobSearchForm({
         </div>
         <div className="flex flex-wrap gap-2 sm:col-span-2 lg:col-span-4">
           <Button type="submit">Search</Button>
-          <Button type="submit" variant="outline" formAction={saveAction} disabled={pending}>
+          <Button type="submit" variant="outline" form="job-preferences" disabled={pending}>
             {pending ? "Saving…" : "Save preferences"}
           </Button>
         </div>
@@ -172,6 +172,24 @@ export function JobSearchForm({
           </p>
         ) : null}
       </form>
+      <form
+        id="job-preferences"
+        action={saveAction}
+        className="hidden"
+        onSubmit={(event) => {
+          const search = document.getElementById("job-search")
+          if (!(search instanceof HTMLFormElement)) return
+          for (const field of event.currentTarget.querySelectorAll("[data-copied-search]")) field.remove()
+          for (const [key, value] of new FormData(search).entries()) {
+            const input = document.createElement("input")
+            input.type = "hidden"
+            input.name = key
+            input.value = String(value)
+            input.dataset.copiedSearch = "true"
+            event.currentTarget.append(input)
+          }
+        }}
+      />
       <form action={saveNamedAction} className="flex flex-col gap-2 sm:flex-row sm:items-end">
         <label className="flex-1 space-y-1 text-sm">
           <span className="font-medium">Save this search</span>

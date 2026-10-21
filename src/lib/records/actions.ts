@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 
 import { requireUser } from "@/lib/auth/session"
 import { linkedApplicationId, loadTrackerPosting } from "@/lib/jobs/data"
-import { companyChoiceIsExplicit, findDuplicateApplication, planCompany } from "@/lib/jobs/prefill"
+import { companyChoiceIsExplicit, planCompany } from "@/lib/jobs/prefill"
 import { isApplicationStatus } from "@/lib/records/constants"
 import type { CompanyFormValues, ApplicationFormValues } from "@/lib/records/schemas"
 import {
@@ -269,20 +269,21 @@ export async function createApplication(
       }
     }
     if (values.jobUrl) {
-      const existing = await supabase
-        .from("applications")
-        .select("id, job_title, job_url")
-        .eq("user_id", user.id)
-        .limit(200)
-      const duplicate = findDuplicateApplication(
-        (existing.data ?? []).map((row) => ({
-          id: String(row.id),
-          jobTitle: String(row.job_title),
-          jobUrl: row.job_url ? String(row.job_url) : null,
-        })),
-        { jobTitle: values.jobTitle, jobUrl: values.jobUrl },
-      )
-      if (duplicate) {
+      const duplicate = await supabase.rpc("find_application_duplicate", {
+        p_title: values.jobTitle,
+        p_url: values.jobUrl,
+      })
+      if (duplicate.error) {
+        return {
+          status: "error",
+          message:
+            duplicate.error.code === "PGRST202"
+              ? "Recommended jobs are not available yet. Apply the latest migration, then reload."
+              : recordErrorMessage(duplicate.error),
+          fieldErrors: {},
+        }
+      }
+      if (duplicate.data) {
         return {
           status: "error",
           message: "You already have an application with this title and URL.",
@@ -305,15 +306,33 @@ export async function createApplication(
     if (company.created) {
       await supabase.from("companies").delete().eq("user_id", user.id).eq("id", company.companyId)
     }
+    if (error?.code === "23505" && /applications_user_match_key_idx/.test(error.message ?? "")) {
+      return {
+        status: "error",
+        message: "You already have an application with this title and URL.",
+        fieldErrors: {},
+      }
+    }
     return { status: "error", message: recordErrorMessage(error), fieldErrors: {} }
   }
 
   if (tracked) {
-    await supabase.from("application_postings").insert({
+    const link = await supabase.from("application_postings").insert({
       user_id: user.id,
       application_id: data.id,
       posting_id: postingId,
     })
+    if (link.error) {
+      await supabase.from("applications").delete().eq("user_id", user.id).eq("id", data.id)
+      if (company.created) {
+        await supabase.from("companies").delete().eq("user_id", user.id).eq("id", company.companyId)
+      }
+      if (link.error.code === "23505") {
+        const winner = await linkedApplicationId(postingId)
+        if (winner) redirect(`/applications/${winner}`)
+      }
+      return { status: "error", message: recordErrorMessage(link.error), fieldErrors: {} }
+    }
   }
 
   revalidatePath("/applications")

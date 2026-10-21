@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { jobOperationProof, type JobOperation } from "@/lib/jobs/proof"
 import { scorePosting } from "@/lib/jobs/score"
+import { normalizeJobUrl } from "@/lib/jobs/text"
 
 const migrationsDir = path.join(process.cwd(), "supabase/migrations")
 const SECRET = "job-tracker-test-catalog-secret-32b"
@@ -322,5 +323,60 @@ describe("recommended jobs database", () => {
         ]),
       ),
     ).rejects.toThrow()
+  })
+
+  it("finds a duplicate application for the owner only and rejects a concurrent copy", async () => {
+    const normalized = await db.query<{ normalize_job_url: string }>(
+      "select public.normalize_job_url('https://Jobs.Example/roles/1/#apply') as normalize_job_url",
+    )
+    expect(normalized.rows[0]?.normalize_job_url).toBe(normalizeJobUrl("https://Jobs.Example/roles/1/#apply"))
+
+    const company = await asUser(ada, () =>
+      db.query<{ id: string }>("insert into public.companies (name) values ('Northwind') returning id"),
+    )
+    await asUser(ada, () =>
+      db.query(
+        `insert into public.applications (company_id, job_title, job_url, status)
+         values ($1, 'Backend Engineer', 'https://jobs.example/roles/1/', 'saved')`,
+        [company.rows[0]?.id],
+      ),
+    )
+    const own = await asUser(ada, () =>
+      db.query<{ find_application_duplicate: string }>(
+        "select public.find_application_duplicate(' backend engineer ', 'https://jobs.example/roles/1')",
+      ),
+    )
+    const other = await asUser(grace, () =>
+      db.query<{ find_application_duplicate: string | null }>(
+        "select public.find_application_duplicate('Backend Engineer', 'https://jobs.example/roles/1')",
+      ),
+    )
+    expect(own.rows[0]?.find_application_duplicate).toBeTruthy()
+    expect(other.rows[0]?.find_application_duplicate).toBeNull()
+    await expect(
+      asUser(ada, () =>
+        db.query(
+          `insert into public.applications (company_id, job_title, job_url, status)
+           values ($1, 'Backend Engineer', 'https://jobs.example/roles/1', 'saved')`,
+          [company.rows[0]?.id],
+        ),
+      ),
+    ).rejects.toThrow(/duplicate key|applications_user_match_key_idx/)
+    const graceCompany = await asUser(grace, () =>
+      db.query<{ id: string }>("insert into public.companies (name) values ('Northwind') returning id"),
+    )
+    await asUser(grace, () =>
+      db.query(
+        `insert into public.applications (company_id, job_title, job_url, status)
+         values ($1, 'Backend Engineer', 'https://jobs.example/roles/1', 'saved')`,
+        [graceCompany.rows[0]?.id],
+      ),
+    )
+    const visible = await asUser(ada, () => db.query<{ slug: string }>("select slug from public.job_sources order by slug"))
+    expect(visible.rows.map((row) => row.slug)).toEqual(["greenhouse:northwind"])
+    const drafts = await db.query<{ slug: string }>(
+      "select slug from public.job_sources where approval_status = 'draft' order by slug",
+    )
+    expect(drafts.rows.map((row) => row.slug)).toEqual(["provider:ashby", "provider:greenhouse", "provider:lever"])
   })
 })

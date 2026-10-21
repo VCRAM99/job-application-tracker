@@ -14,6 +14,8 @@ SQL migrations for the hosted Supabase project live in this directory.
 
 `20261021120000_recommended_jobs.sql` adds the shared job catalog, private job preferences, saved and hidden postings, alert subscriptions, and alert deliveries. Ordinary users can read approved catalog rows and cannot write them. Catalog writes need the HMAC gate in [docs/jobs.md](../../docs/jobs.md). The gate secret ships null. This file does not drop existing tables and does not enable live ingestion.
 
+`20261021143000_application_match_key.sql` adds a normalized title-and-URL key on `applications`, a trigger that fills it, a per-user unique index, and `find_application_duplicate`. It does not rewrite historical duplicates that already share a key.
+
 Apply pending files to the existing project with `supabase db push` only when you intend to change that database. Do not run `supabase db reset` against the hosted database. Do not push the career or recommended-jobs migrations to production until the matching feature is explicitly approved. The production hardening release does not add a migration.
 
 See the README for the exact link and push commands.

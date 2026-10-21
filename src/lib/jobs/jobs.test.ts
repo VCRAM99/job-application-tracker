@@ -18,6 +18,7 @@ import { scorePosting, signalsFromVerified } from "@/lib/jobs/score"
 import { authorizeScheduler } from "@/lib/jobs/scheduler-auth"
 import { fetchAshbyJobs } from "@/lib/jobs/sources/ashby"
 import { fetchGreenhouseJobs } from "@/lib/jobs/sources/greenhouse"
+import { fetchApprovedJson } from "@/lib/jobs/sources/http"
 import { fetchLeverJobs } from "@/lib/jobs/sources/lever"
 import { ingestionAllowed } from "@/lib/jobs/sources/policy"
 import { adapterFor } from "@/lib/jobs/sources/registry"
@@ -281,6 +282,32 @@ describe("source adapters", () => {
     expect(() => assertApprovedSourceUrl("https://evil.example/jobs")).toThrow(/unapproved_host/)
     expect(() => assertApprovedSourceUrl("https://user:pass@api.lever.co/v0/postings/acme")).toThrow(/credentials_in_url/)
     await expect(fetchLeverJobs({ ...input, permitLiveFetch: false })).rejects.toThrow(/live_fetch_not_permitted/)
+    const board = "https://boards-api.greenhouse.io/v1/boards/acme/jobs"
+    await expect(
+      fetchApprovedJson(board, {
+        fetchImpl: async () => new Response(null, { status: 302, headers: { location: "https://evil.example" } }),
+      }),
+    ).rejects.toThrow(/redirect_blocked/)
+    await expect(
+      fetchApprovedJson(board, {
+        fetchImpl: async () => new Response("{}", { status: 200, headers: { "content-length": "2000000" } }),
+      }),
+    ).rejects.toThrow(/oversized/)
+    await expect(
+      fetchApprovedJson(board, {
+        timeoutMs: 10,
+        fetchImpl: (_target, init) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(new Error("aborted")))
+          }),
+      }),
+    ).rejects.toThrow(/aborted/)
+    const page = await fetchLeverJobs({
+      ...input,
+      load: async () => Array.from({ length: 100 }, () => ({})),
+    })
+    expect(page.nextCursor).toBe("100")
+    expect(page.complete).toBe(false)
     expect(adapterFor("ashby").validateConfig({ sourceIdentifier: "northwind", region: "global" })).toBe(true)
     expect(() => adapterFor("workday")).toThrow(/unsupported_provider/)
   })

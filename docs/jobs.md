@@ -159,7 +159,7 @@ There is no `vercel.json` cron and no hosted scheduler configuration in this rep
 
 If one private company has the same normalized name, that company is selected. If several do, the form asks for a choice and does not attach an arbitrary row. If none do, the form starts a new company. The user can edit the form before saving.
 
-Creating the application is skipped when this posting is already linked, or when the user already has an application with the same normalized title and URL among the latest 200. The original URL opens in a new tab. The app does not submit an application to an employer.
+Creating the application is skipped when this posting is already linked, or when `find_application_duplicate` finds the same normalized title and URL on any of the user's applications. `applications.job_match_key` is set by a trigger and is unique per user, so a concurrent second insert is rejected. Another user's matching title and URL is a separate application. The original URL opens in a new tab. The app does not submit an application to an employer.
 
 ## Local tests
 
@@ -170,7 +170,7 @@ npm test
 npm run build
 ```
 
-Database tests use an in-memory PGlite database and the SQL files in `supabase/migrations`. They do not connect to the hosted project. Adapter tests read `src/lib/jobs/sources/fixtures`. They do not call Greenhouse, Lever, or Ashby.
+Database tests use an in-memory PGlite database and the SQL files in `supabase/migrations`. They do not connect to the hosted project. `src/lib/jobs/local-postgres.integration.test.ts` runs only when `LOCAL_SUPABASE_URL` is exactly `http://127.0.0.1:54321` and the local anon and service-role keys are present. Adapter tests read `src/lib/jobs/sources/fixtures`. They do not call Greenhouse, Lever, or Ashby.
 
 Do not run `supabase db reset` unless you have confirmed the target is a disposable local database. Do not `db push` this migration to the hosted project until the production checklist below is approved.
 
