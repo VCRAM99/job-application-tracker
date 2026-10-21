@@ -177,6 +177,12 @@ describe("generateStructured", () => {
     const result = await generateStructured({ ...base, mode: "managed", managedAllowed: true }, run.deps)
     expect(result).toMatchObject({ ok: false, code: "quota_exceeded" })
     expect(resolveExecutionMode("byok", "managed")).toEqual({ ok: false, code: "mode_mismatch" })
+    const unauthorized = harness(async () => ({ text: good, inputTokens: 1, outputTokens: 1, finishReason: "stop" }))
+    unauthorized.deps.reserve.mockRejectedValue(new Error("not authorized"))
+    await expect(generateStructured({ ...base, mode: "managed", managedAllowed: true }, unauthorized.deps)).resolves.toMatchObject({
+      ok: false,
+      code: "accounting_unconfigured",
+    })
     expect(resolveExecutionMode("byok", "byok")).toEqual({ ok: true, mode: "byok" })
     expect(resolveExecutionMode(null, "byok")).toEqual({ ok: false, code: "not_configured" })
   })

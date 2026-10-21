@@ -42,7 +42,9 @@ Online verification would call the provider and can cost money. Leave the key un
 
 The server also requires `AI_MANAGED_ENABLED=true`, positive integer request and token limits, and the platform key for the selected provider. If any of those are missing, extraction returns a configuration error and does not call the provider.
 
-Users can call `reserve_ai_usage` for their own allowance. They cannot raise the limit, delete usage, or read another account’s rows.
+Usage reservation, finalize, void, suggestion insert, and audit insert require an HMAC proof. The server builds it with `AI_ACCOUNTING_SECRET`. The same value must be stored in `ai_accounting_gate` by a database owner. Authenticated users cannot read that table. A direct API call without the proof is rejected, so a signed-in browser cannot create, finalize, or reopen quota rows on its own. Reopening a voided managed reservation checks the monthly quota again. One open reservation is allowed at a time. Managed and bring-your-own-key modes stay on the reservation the server signed. A second finalize cannot change the stored token counts, and this milestone stores no estimated cost. Each account can have one open reservation and at most 200 usage rows in a calendar month. A single request cannot record more than 200,000 input tokens or 200,000 output tokens.
+
+Set both copies of the secret before extraction. Generate one with `openssl rand -base64 32`. Do not commit it. Leave the gate null until you are ready to use AI.
 
 ## Career knowledge base
 

@@ -223,15 +223,37 @@ create table public.ai_platform_policy (
   managed_enabled boolean not null default false,
   monthly_request_limit integer not null default 0,
   monthly_token_limit integer not null default 0,
+  monthly_event_cap integer not null default 200,
   updated_at timestamptz not null default now(),
   constraint ai_platform_policy_singleton check (id = 1),
   constraint ai_platform_policy_limits_check check (
-    monthly_request_limit >= 0 and monthly_token_limit >= 0
+    monthly_request_limit >= 0
+    and monthly_token_limit >= 0
+    and monthly_event_cap between 1 and 10000
   )
 );
 
-insert into public.ai_platform_policy (id, managed_enabled, monthly_request_limit, monthly_token_limit)
-values (1, false, 0, 0);
+insert into public.ai_platform_policy (
+  id, managed_enabled, monthly_request_limit, monthly_token_limit, monthly_event_cap
+) values (1, false, 0, 0, 200);
+
+-- The accounting secret is not readable by authenticated or anon.
+-- Staging sets the same value here and in AI_ACCOUNTING_SECRET. Leave it null until then.
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
+
+create table public.ai_accounting_gate (
+  id integer primary key,
+  secret text,
+  constraint ai_accounting_gate_singleton check (id = 1),
+  constraint ai_accounting_gate_secret_check check (
+    secret is null or char_length(secret) between 32 and 200
+  )
+);
+
+insert into public.ai_accounting_gate (id, secret) values (1, null);
+alter table public.ai_accounting_gate enable row level security;
+revoke all on table public.ai_accounting_gate from public, anon, authenticated;
 
 create table public.ai_credentials (
   id uuid primary key default gen_random_uuid(),
@@ -793,6 +815,8 @@ grant select (
 grant select on public.ai_credential_summaries to authenticated;
 revoke all on public.ai_credential_summaries from anon, public;
 
+revoke insert, update, delete on table public.ai_suggestions from authenticated;
+
 revoke all on table public.ai_usage_events from anon, authenticated;
 grant select on table public.ai_usage_events to authenticated;
 create policy "select own ai usage"
@@ -810,6 +834,43 @@ grant select on table public.ai_platform_policy to authenticated;
 create policy "read ai platform policy"
   on public.ai_platform_policy for select to authenticated
   using (true);
+
+create or replace function public.assert_ai_accounting_proof(
+  p_canonical text,
+  p_proof text
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  secret text;
+  expected text;
+begin
+  select g.secret into secret from public.ai_accounting_gate g where g.id = 1;
+  if secret is null then
+    raise exception 'ai accounting is not configured' using errcode = 'P0001';
+  end if;
+  if p_proof is null or p_proof !~ '^[a-f0-9]{64}$' then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+
+  expected := encode(
+    extensions.hmac(
+      convert_to(p_canonical, 'utf8'),
+      convert_to(secret, 'utf8'),
+      'sha256'
+    ),
+    'hex'
+  );
+  if expected is distinct from lower(p_proof) then
+    raise exception 'not authorized' using errcode = '42501';
+  end if;
+end;
+$$;
+
+revoke all on function public.assert_ai_accounting_proof(text, text) from public, anon, authenticated;
 
 create or replace function public.read_own_credential_material(p_credential_id uuid)
 returns table (ciphertext text, nonce text, auth_tag text, key_version text, provider text)
@@ -906,7 +967,8 @@ create or replace function public.reserve_ai_usage(
   p_idempotency_key text,
   p_execution_mode text,
   p_provider text,
-  p_model text
+  p_model text,
+  p_proof text
 )
 returns jsonb
 language plpgsql
@@ -919,7 +981,9 @@ declare
   policy public.ai_platform_policy%rowtype;
   used_requests integer;
   used_tokens integer;
+  month_events integer;
   created public.ai_usage_events%rowtype;
+  reopen boolean := false;
 begin
   if uid is null then
     raise exception 'not authenticated' using errcode = '42501';
@@ -930,6 +994,11 @@ begin
   if p_provider not in ('openai', 'anthropic', 'google') then
     raise exception 'unsupported provider' using errcode = '23514';
   end if;
+
+  perform public.assert_ai_accounting_proof(
+    concat_ws(E'\n', 'reserve', uid::text, p_idempotency_key, p_execution_mode, p_provider, p_model),
+    p_proof
+  );
 
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtext('job-tracker-ai'),
@@ -949,32 +1018,7 @@ begin
   where user_id = uid
     and idempotency_key = p_idempotency_key;
 
-  if found then
-    if existing.status in ('voided', 'failed', 'expired') then
-      update public.ai_usage_events
-        set status = 'reserved',
-            error_class = null,
-            finalized_at = null,
-            input_tokens = null,
-            output_tokens = null,
-            estimated_cost_micros = null,
-            reserved_at = pg_catalog.now(),
-            expires_at = pg_catalog.now() + interval '10 minutes',
-            updated_at = pg_catalog.now(),
-            execution_mode = p_execution_mode,
-            provider = p_provider,
-            model = p_model,
-            billed_to = case when p_execution_mode = 'managed' then 'platform' else 'user' end
-        where id = existing.id
-        returning * into created;
-      return pg_catalog.jsonb_build_object(
-        'id', created.id,
-        'status', created.status,
-        'reused', false,
-        'reopened', true
-      );
-    end if;
-
+  if found and existing.status in ('reserved', 'succeeded') then
     return pg_catalog.jsonb_build_object(
       'id', existing.id,
       'status', existing.status,
@@ -982,6 +1026,7 @@ begin
       'reopened', false
     );
   end if;
+  reopen := found;
 
   select * into policy from public.ai_platform_policy where id = 1;
 
@@ -1004,6 +1049,49 @@ begin
     if used_requests >= policy.monthly_request_limit or used_tokens >= policy.monthly_token_limit then
       raise exception 'quota exceeded' using errcode = 'P0001';
     end if;
+  end if;
+
+  if exists (
+    select 1 from public.ai_usage_events
+    where user_id = uid
+      and status = 'reserved'
+      and id is distinct from existing.id
+  ) then
+    raise exception 'reservation in progress' using errcode = 'P0001';
+  end if;
+
+  if reopen then
+    update public.ai_usage_events
+      set status = 'reserved',
+          error_class = null,
+          finalized_at = null,
+          input_tokens = null,
+          output_tokens = null,
+          estimated_cost_micros = null,
+          reserved_at = pg_catalog.now(),
+          expires_at = pg_catalog.now() + interval '10 minutes',
+          updated_at = pg_catalog.now(),
+          execution_mode = p_execution_mode,
+          provider = p_provider,
+          model = p_model,
+          billed_to = case when p_execution_mode = 'managed' then 'platform' else 'user' end
+      where id = existing.id
+      returning * into created;
+    return pg_catalog.jsonb_build_object(
+      'id', created.id,
+      'status', created.status,
+      'reused', false,
+      'reopened', true
+    );
+  end if;
+
+  select count(*)::integer into month_events
+  from public.ai_usage_events
+  where user_id = uid
+    and reserved_at >= date_trunc('month', pg_catalog.now());
+
+  if month_events >= policy.monthly_event_cap then
+    raise exception 'quota exceeded' using errcode = 'P0001';
   end if;
 
   insert into public.ai_usage_events (
@@ -1033,7 +1121,8 @@ create or replace function public.finalize_ai_usage(
   p_usage_event_id uuid,
   p_input_tokens integer,
   p_output_tokens integer,
-  p_estimated_cost_micros integer
+  p_estimated_cost_micros integer,
+  p_proof text
 )
 returns jsonb
 language plpgsql
@@ -1047,6 +1136,22 @@ begin
   if uid is null then
     raise exception 'not authenticated' using errcode = '42501';
   end if;
+  if p_input_tokens is not null and (p_input_tokens < 0 or p_input_tokens > 200000)
+    or p_output_tokens is not null and (p_output_tokens < 0 or p_output_tokens > 200000) then
+    raise exception 'token count is out of range' using errcode = '23514';
+  end if;
+
+  perform public.assert_ai_accounting_proof(
+    concat_ws(
+      E'\n',
+      'finalize',
+      uid::text,
+      p_usage_event_id::text,
+      coalesce(p_input_tokens::text, ''),
+      coalesce(p_output_tokens::text, '')
+    ),
+    p_proof
+  );
 
   select * into existing
   from public.ai_usage_events
@@ -1070,7 +1175,7 @@ begin
     set status = 'succeeded',
         input_tokens = p_input_tokens,
         output_tokens = p_output_tokens,
-        estimated_cost_micros = p_estimated_cost_micros,
+        estimated_cost_micros = null,
         finalized_at = pg_catalog.now(),
         error_class = null,
         updated_at = pg_catalog.now()
@@ -1082,7 +1187,8 @@ $$;
 
 create or replace function public.void_ai_usage(
   p_usage_event_id uuid,
-  p_error_class text
+  p_error_class text,
+  p_proof text
 )
 returns jsonb
 language plpgsql
@@ -1096,6 +1202,17 @@ begin
   if uid is null then
     raise exception 'not authenticated' using errcode = '42501';
   end if;
+
+  perform public.assert_ai_accounting_proof(
+    concat_ws(
+      E'\n',
+      'void',
+      uid::text,
+      p_usage_event_id::text,
+      left(coalesce(p_error_class, 'failed'), 80)
+    ),
+    p_proof
+  );
 
   select * into existing
   from public.ai_usage_events
@@ -1134,7 +1251,8 @@ create or replace function public.record_ai_audit(
   p_model text,
   p_status text,
   p_error_class text,
-  p_request_hash text
+  p_request_hash text,
+  p_proof text
 )
 returns uuid
 language plpgsql
@@ -1148,6 +1266,19 @@ begin
   if uid is null then
     raise exception 'not authenticated' using errcode = '42501';
   end if;
+
+  perform public.assert_ai_accounting_proof(
+    concat_ws(
+      E'\n',
+      'audit',
+      uid::text,
+      coalesce(p_usage_event_id::text, ''),
+      left(p_action, 80),
+      coalesce(p_request_hash, '')
+    ),
+    p_proof
+  );
+
   if p_usage_event_id is not null and not exists (
     select 1 from public.ai_usage_events
     where id = p_usage_event_id and user_id = uid
@@ -1180,7 +1311,8 @@ $$;
 create or replace function public.insert_career_suggestions(
   p_usage_event_id uuid,
   p_source_id uuid,
-  p_items jsonb
+  p_items_text text,
+  p_proof text
 )
 returns jsonb
 language plpgsql
@@ -1189,6 +1321,7 @@ set search_path = ''
 as $$
 declare
   uid uuid := auth.uid();
+  items jsonb;
   item jsonb;
   existing_id uuid;
   created_id uuid;
@@ -1197,7 +1330,14 @@ begin
   if uid is null then
     raise exception 'not authenticated' using errcode = '42501';
   end if;
-  if jsonb_typeof(p_items) is distinct from 'array' or jsonb_array_length(p_items) > 80 then
+
+  perform public.assert_ai_accounting_proof(
+    concat_ws(E'\n', 'suggestions', uid::text, p_usage_event_id::text, p_source_id::text, p_items_text),
+    p_proof
+  );
+
+  items := p_items_text::jsonb;
+  if jsonb_typeof(items) is distinct from 'array' or jsonb_array_length(items) > 80 then
     raise exception 'invalid suggestion batch' using errcode = '22023';
   end if;
   if not exists (
@@ -1218,7 +1358,7 @@ begin
     pg_catalog.hashtext(uid::text)
   );
 
-  for item in select value from jsonb_array_elements(p_items) loop
+  for item in select value from jsonb_array_elements(items) loop
     existing_id := null;
     select id into existing_id
     from public.ai_suggestions
@@ -1503,11 +1643,11 @@ $$;
 revoke all on function public.revoke_ai_credential(uuid) from public, anon;
 revoke all on function public.read_own_credential_material(uuid) from public, anon;
 revoke all on function public.rotate_ai_credential(text, text, text, text, text, text) from public, anon;
-revoke all on function public.reserve_ai_usage(text, text, text, text) from public, anon;
-revoke all on function public.finalize_ai_usage(uuid, integer, integer, integer) from public, anon;
-revoke all on function public.void_ai_usage(uuid, text) from public, anon;
-revoke all on function public.record_ai_audit(uuid, text, text, text, text, text, text, text) from public, anon;
-revoke all on function public.insert_career_suggestions(uuid, uuid, jsonb) from public, anon;
+revoke all on function public.reserve_ai_usage(text, text, text, text, text) from public, anon;
+revoke all on function public.finalize_ai_usage(uuid, integer, integer, integer, text) from public, anon;
+revoke all on function public.void_ai_usage(uuid, text, text) from public, anon;
+revoke all on function public.record_ai_audit(uuid, text, text, text, text, text, text, text, text) from public, anon;
+revoke all on function public.insert_career_suggestions(uuid, uuid, text, text) from public, anon;
 revoke all on function public.optional_date(text) from public, anon;
 revoke all on function public.accept_career_suggestion(uuid, jsonb) from public, anon;
 revoke all on function public.reject_career_suggestion(uuid) from public, anon;
@@ -1516,12 +1656,11 @@ revoke all on function public.supersede_career_fact(text, uuid) from public, ano
 grant execute on function public.revoke_ai_credential(uuid) to authenticated;
 grant execute on function public.read_own_credential_material(uuid) to authenticated;
 grant execute on function public.rotate_ai_credential(text, text, text, text, text, text) to authenticated;
-grant execute on function public.reserve_ai_usage(text, text, text, text) to authenticated;
-grant execute on function public.finalize_ai_usage(uuid, integer, integer, integer) to authenticated;
-grant execute on function public.void_ai_usage(uuid, text) to authenticated;
-grant execute on function public.record_ai_audit(uuid, text, text, text, text, text, text, text) to authenticated;
-grant execute on function public.insert_career_suggestions(uuid, uuid, jsonb) to authenticated;
-grant execute on function public.optional_date(text) to authenticated;
+grant execute on function public.reserve_ai_usage(text, text, text, text, text) to authenticated;
+grant execute on function public.finalize_ai_usage(uuid, integer, integer, integer, text) to authenticated;
+grant execute on function public.void_ai_usage(uuid, text, text) to authenticated;
+grant execute on function public.record_ai_audit(uuid, text, text, text, text, text, text, text, text) to authenticated;
+grant execute on function public.insert_career_suggestions(uuid, uuid, text, text) to authenticated;
 grant execute on function public.accept_career_suggestion(uuid, jsonb) to authenticated;
 grant execute on function public.reject_career_suggestion(uuid) to authenticated;
 grant execute on function public.supersede_career_fact(text, uuid) to authenticated;

@@ -127,7 +127,9 @@ function parseStructured<T>(schema: z.ZodType<T>, text: string) {
 function reservationFailureCode(error: unknown): AiErrorCode {
   if (error instanceof AiRequestError) return error.code
   const message = error instanceof Error ? error.message.toLowerCase() : ""
+  if (message.includes("reservation in progress")) return "in_progress"
   if (message.includes("quota")) return "quota_exceeded"
+  if (message.includes("accounting") || message.includes("not authorized")) return "accounting_unconfigured"
   if (message.includes("not configured")) return "managed_unconfigured"
   return "transient"
 }

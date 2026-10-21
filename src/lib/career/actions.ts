@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 
+import { accountingProof, accountingSecret } from "@/lib/ai/accounting"
 import { credentialShapeError, decryptSecret, encryptSecret, lastFour, parseKeyRing, sha256 } from "@/lib/ai/crypto"
 import { EXTRACTION_JSON_SCHEMA, extractionSchema, factSchema, isFactType } from "@/lib/ai/extraction"
 import { aiFeaturesEnabled, managedAllowance, readPlatformKey } from "@/lib/ai/flags"
@@ -316,6 +317,8 @@ export async function extractCareerFacts(
     return fail(AI_ERROR_MESSAGES.managed_unconfigured)
   }
   if (resolved.mode === "byok" && !apiKey) return fail(AI_ERROR_MESSAGES.missing_credentials)
+  const secret = accountingSecret()
+  if (!secret) return fail(AI_ERROR_MESSAGES.accounting_unconfigured)
 
   const idempotencyKey = sha256(
     `${context.user.id}\n${sourceId}\n${sha256(source.data.body)}\n${provider}\n${model}\n${resolved.mode}`,
@@ -339,6 +342,14 @@ export async function extractCareerFacts(
           p_execution_mode: resolved.mode,
           p_provider: provider,
           p_model: model,
+          p_proof: accountingProof(secret, [
+            "reserve",
+            context.user.id,
+            idempotencyKey,
+            resolved.mode,
+            provider,
+            model,
+          ]),
         })
         if (reserved.error) throw new Error(reserved.error.message)
         return asReservation(reserved.data)
@@ -349,6 +360,13 @@ export async function extractCareerFacts(
           p_input_tokens: usage.inputTokens,
           p_output_tokens: usage.outputTokens,
           p_estimated_cost_micros: null,
+          p_proof: accountingProof(secret, [
+            "finalize",
+            context.user.id,
+            id,
+            usage.inputTokens,
+            usage.outputTokens,
+          ]),
         })
         if (finalized.error) throw new AiRequestError("transient")
       },
@@ -356,6 +374,12 @@ export async function extractCareerFacts(
         await context.supabase.rpc("void_ai_usage", {
           p_usage_event_id: id,
           p_error_class: code,
+          p_proof: accountingProof(secret, [
+            "void",
+            context.user.id,
+            id,
+            (code || "failed").slice(0, 80),
+          ]),
         })
       },
       complete: (nextUser) => completeWithProvider(provider, {
@@ -368,15 +392,26 @@ export async function extractCareerFacts(
       }),
       persist: async (data, usageEventId) => {
         const planned = planSuggestions(sourceId, data)
-        const inserted = await context.supabase.rpc("insert_career_suggestions", {
-          p_usage_event_id: usageEventId,
-          p_source_id: sourceId,
-          p_items: planned.map((item) => ({
+        const itemsText = JSON.stringify(
+          planned.map((item) => ({
             fact_type: item.factType,
             payload: item.payload,
             evidence_excerpt: item.evidenceExcerpt,
             dedupe_key: item.dedupeKey,
           })),
+        )
+        const requestHash = sha256(EXTRACTION_SYSTEM_PROMPT + "\n" + userMessage)
+        const inserted = await context.supabase.rpc("insert_career_suggestions", {
+          p_usage_event_id: usageEventId,
+          p_source_id: sourceId,
+          p_items_text: itemsText,
+          p_proof: accountingProof(secret, [
+            "suggestions",
+            context.user.id,
+            usageEventId,
+            sourceId,
+            itemsText,
+          ]),
         })
         if (inserted.error) throw new AiRequestError("transient")
         await context.supabase.rpc("record_ai_audit", {
@@ -387,7 +422,14 @@ export async function extractCareerFacts(
           p_model: model,
           p_status: "suggested",
           p_error_class: null,
-          p_request_hash: sha256(EXTRACTION_SYSTEM_PROMPT + "\n" + userMessage),
+          p_request_hash: requestHash,
+          p_proof: accountingProof(secret, [
+            "audit",
+            context.user.id,
+            usageEventId,
+            "extract_career_facts",
+            requestHash,
+          ]),
         })
       },
     },

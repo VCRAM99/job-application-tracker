@@ -5,7 +5,10 @@ import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 
 import { PGlite } from "@electric-sql/pglite"
+import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
+
+import { accountingProof } from "@/lib/ai/accounting"
 
 const migrationsDir = path.join(process.cwd(), "supabase/migrations")
 
@@ -28,13 +31,19 @@ grant usage on schema public, auth to anon, authenticated;
 grant execute on function auth.uid() to anon, authenticated;
 `
 
+const ACCOUNTING_SECRET = "job-tracker-test-accounting-secret-32"
+
+function reserveProof(userId: string, key: string, mode: string, provider: string, model: string) {
+  return accountingProof(ACCOUNTING_SECRET, ["reserve", userId, key, mode, provider, model])
+}
+
 describe("career database isolation", () => {
   let db: PGlite
   const ada = randomUUID()
   const grace = randomUUID()
 
   beforeAll(async () => {
-    db = new PGlite()
+    db = new PGlite({ extensions: { pgcrypto } })
     await db.exec(bootstrap)
     const files = readdirSync(migrationsDir)
       .filter((name) => name.endsWith(".sql"))
@@ -43,6 +52,7 @@ describe("career database isolation", () => {
       await db.exec(readFileSync(path.join(migrationsDir, file), "utf8"))
     }
     await db.query("insert into auth.users (id) values ($1), ($2)", [ada, grace])
+    await db.query("update public.ai_accounting_gate set secret = $1 where id = 1", [ACCOUNTING_SECRET])
   }, 30000)
 
   afterAll(async () => {
@@ -116,29 +126,32 @@ describe("career database isolation", () => {
     const suggestionId = await asUser(ada, async () => {
       const source = await db.query<{ id: string }>("select id from public.career_sources")
       const reserved = await db.query<{ reserve_ai_usage: { id: string } }>(
-        `select public.reserve_ai_usage($1, 'byok', 'openai', 'gpt-5.4-mini') as reserve_ai_usage`,
-        ["idem-accept-0001"],
+        `select public.reserve_ai_usage($1, 'byok', 'openai', 'gpt-5.4-mini', $2) as reserve_ai_usage`,
+        ["idem-accept-0001", reserveProof(ada, "idem-accept-0001", "byok", "openai", "gpt-5.4-mini")],
       )
       const usageId = reserved.rows[0]?.reserve_ai_usage.id
       const dedupe = createHash("sha256").update("ada-job").digest("hex")
+      const sourceId = source.rows[0]?.id ?? ""
+      const itemsText = JSON.stringify([
+        {
+          fact_type: "employment",
+          dedupe_key: dedupe,
+          evidence_excerpt: "Engineer at Example",
+          payload: {
+            organization: "Example",
+            title: "Engineer",
+            current: false,
+            evidence: "Engineer at Example",
+          },
+        },
+      ])
       const inserted = await db.query<{ insert_career_suggestions: { ids: string[] } }>(
-        `select public.insert_career_suggestions($1, $2, $3::jsonb) as insert_career_suggestions`,
+        `select public.insert_career_suggestions($1, $2, $3, $4) as insert_career_suggestions`,
         [
           usageId,
-          source.rows[0]?.id,
-          JSON.stringify([
-            {
-              fact_type: "employment",
-              dedupe_key: dedupe,
-              evidence_excerpt: "Engineer at Example",
-              payload: {
-                organization: "Example",
-                title: "Engineer",
-                current: false,
-                evidence: "Engineer at Example",
-              },
-            },
-          ]),
+          sourceId,
+          itemsText,
+          accountingProof(ACCOUNTING_SECRET, ["suggestions", ada, usageId, sourceId, itemsText]),
         ],
       )
       return inserted.rows[0]?.insert_career_suggestions.ids[0]
@@ -153,7 +166,7 @@ describe("career database isolation", () => {
           [suggestionId],
         ),
       ),
-    ).rejects.toThrow(/accepted through review|42501/)
+    ).rejects.toThrow(/permission denied|accepted through review/)
 
     const factId = await asUser(ada, async () => {
       const accepted = await db.query<{ accept_career_suggestion: string }>(
@@ -200,26 +213,45 @@ describe("career database isolation", () => {
   })
 
   it("keeps rejected suggestions rejected and preserves a superseded fact", async () => {
+    await asUser(ada, async () => {
+      const open = await db.query<{ id: string }>(
+        "select id from public.ai_usage_events where status = 'reserved'",
+      )
+      for (const row of open.rows) {
+        await db.query("select public.void_ai_usage($1, 'transient', $2)", [
+          row.id,
+          accountingProof(ACCOUNTING_SECRET, ["void", ada, row.id, "transient"]),
+        ])
+      }
+    })
+
     const { suggestionId, factId } = await asUser(ada, async () => {
       const source = await db.query<{ id: string }>("select id from public.career_sources")
       const reserved = await db.query<{ reserve_ai_usage: { id: string } }>(
-        `select public.reserve_ai_usage($1, 'byok', 'anthropic', 'claude-haiku-4-5') as reserve_ai_usage`,
-        ["idem-reject-0001"],
+        `select public.reserve_ai_usage($1, 'byok', 'anthropic', 'claude-haiku-4-5', $2) as reserve_ai_usage`,
+        [
+          "idem-reject-0001",
+          reserveProof(ada, "idem-reject-0001", "byok", "anthropic", "claude-haiku-4-5"),
+        ],
       )
       const dedupe = createHash("sha256").update("ada-skill").digest("hex")
+      const usageId = reserved.rows[0]?.reserve_ai_usage.id ?? ""
+      const sourceId = source.rows[0]?.id ?? ""
+      const itemsText = JSON.stringify([
+        {
+          fact_type: "skill",
+          dedupe_key: dedupe,
+          evidence_excerpt: "TypeScript",
+          payload: { name: "TypeScript", evidence: "TypeScript" },
+        },
+      ])
       const inserted = await db.query<{ insert_career_suggestions: { ids: string[] } }>(
-        `select public.insert_career_suggestions($1, $2, $3::jsonb) as insert_career_suggestions`,
+        `select public.insert_career_suggestions($1, $2, $3, $4) as insert_career_suggestions`,
         [
-          reserved.rows[0]?.reserve_ai_usage.id,
-          source.rows[0]?.id,
-          JSON.stringify([
-            {
-              fact_type: "skill",
-              dedupe_key: dedupe,
-              evidence_excerpt: "TypeScript",
-              payload: { name: "TypeScript", evidence: "TypeScript" },
-            },
-          ]),
+          usageId,
+          sourceId,
+          itemsText,
+          accountingProof(ACCOUNTING_SECRET, ["suggestions", ada, usageId, sourceId, itemsText]),
         ],
       )
       const id = inserted.rows[0]?.insert_career_suggestions.ids[0]
@@ -257,7 +289,7 @@ describe("career database isolation", () => {
           [suggestionId],
         ),
       ),
-    ).rejects.toThrow(/immutable/)
+    ).rejects.toThrow(/permission denied|immutable/)
   })
 
   it("does not return ciphertext through the summary and blocks forged verification", async () => {
@@ -311,19 +343,24 @@ describe("career database isolation", () => {
 
     await expect(
       asUser(grace, () =>
-        db.query(`select public.reserve_ai_usage('grace-managed-1', 'managed', 'google', 'gemini-2.5-flash')`),
+        db.query(`select public.reserve_ai_usage('grace-managed-1', 'managed', 'google', 'gemini-2.5-flash', $1)`, [
+          reserveProof(grace, "grace-managed-1", "managed", "google", "gemini-2.5-flash"),
+        ]),
       ),
     ).resolves.toBeTruthy()
 
     await expect(
       asUser(grace, () =>
-        db.query(`select public.reserve_ai_usage('grace-managed-2', 'managed', 'google', 'gemini-2.5-flash')`),
+        db.query(`select public.reserve_ai_usage('grace-managed-2', 'managed', 'google', 'gemini-2.5-flash', $1)`, [
+          reserveProof(grace, "grace-managed-2", "managed", "google", "gemini-2.5-flash"),
+        ]),
       ),
     ).rejects.toThrow(/quota exceeded/)
 
     const reused = await asUser(grace, async () => {
       const result = await db.query<{ reserve_ai_usage: { reused: boolean; status: string } }>(
-        `select public.reserve_ai_usage('grace-managed-1', 'managed', 'google', 'gemini-2.5-flash') as reserve_ai_usage`,
+        `select public.reserve_ai_usage('grace-managed-1', 'managed', 'google', 'gemini-2.5-flash', $1) as reserve_ai_usage`,
+        [reserveProof(grace, "grace-managed-1", "managed", "google", "gemini-2.5-flash")],
       )
       return result.rows[0]?.reserve_ai_usage
     })
@@ -333,14 +370,22 @@ describe("career database isolation", () => {
       const result = await db.query<{ id: string }>(
         "select id from public.ai_usage_events where idempotency_key = 'grace-managed-1'",
       )
-      await db.query("select public.void_ai_usage($1, 'transient')", [result.rows[0]?.id])
+      const usageId = result.rows[0]?.id ?? ""
+      await db.query("select public.void_ai_usage($1, 'transient', $2)", [
+        usageId,
+        accountingProof(ACCOUNTING_SECRET, ["void", grace, usageId, "transient"]),
+      ])
       const reopened = await db.query<{ reserve_ai_usage: { reopened: boolean; status: string } }>(
-        `select public.reserve_ai_usage('grace-managed-1', 'managed', 'google', 'gemini-2.5-flash') as reserve_ai_usage`,
+        `select public.reserve_ai_usage('grace-managed-1', 'managed', 'google', 'gemini-2.5-flash', $1) as reserve_ai_usage`,
+        [reserveProof(grace, "grace-managed-1", "managed", "google", "gemini-2.5-flash")],
       )
-      await db.query("select public.finalize_ai_usage($1, 10, 5, null)", [result.rows[0]?.id])
+      await db.query("select public.finalize_ai_usage($1, 10, 5, null, $2)", [
+        usageId,
+        accountingProof(ACCOUNTING_SECRET, ["finalize", grace, usageId, 10, 5]),
+      ])
       const second = await db.query<{ finalize_ai_usage: { reused: boolean; status: string } }>(
-        "select public.finalize_ai_usage($1, 99, 99, 1) as finalize_ai_usage",
-        [result.rows[0]?.id],
+        "select public.finalize_ai_usage($1, 99, 99, 1, $2) as finalize_ai_usage",
+        [usageId, accountingProof(ACCOUNTING_SECRET, ["finalize", grace, usageId, 99, 99])],
       )
       const stored = await db.query<{ input_tokens: number }>(
         "select input_tokens from public.ai_usage_events where id = $1",
@@ -365,7 +410,8 @@ describe("career database isolation", () => {
     )
     const expired = await asUser(grace, async () => {
       await db.query(
-        `select public.reserve_ai_usage('grace-expired-other', 'byok', 'openai', 'gpt-5.4-mini')`,
+        `select public.reserve_ai_usage('grace-expired-other', 'byok', 'openai', 'gpt-5.4-mini', $1)`,
+        [reserveProof(grace, "grace-expired-other", "byok", "openai", "gpt-5.4-mini")],
       )
       const row = await db.query<{ status: string }>(
         "select status from public.ai_usage_events where idempotency_key = 'grace-expired-seed'",
@@ -398,5 +444,71 @@ describe("career database isolation", () => {
       companies: "companies",
       applications: "applications",
     })
+  })
+
+  it("rejects accounting calls that do not carry the server proof", async () => {
+    await expect(
+      asUser(ada, () =>
+        db.query(`select public.reserve_ai_usage('unsigned', 'byok', 'openai', 'gpt-5.4-mini', 'ab')`),
+      ),
+    ).rejects.toThrow(/not authorized/)
+
+    const stolen = reserveProof(ada, "stolen-mode", "managed", "openai", "gpt-5.4")
+    await expect(
+      asUser(grace, () =>
+        db.query(`select public.reserve_ai_usage('stolen-mode', 'managed', 'openai', 'gpt-5.4', $1)`, [stolen]),
+      ),
+    ).rejects.toThrow(/not authorized/)
+
+    await expect(
+      asUser(ada, () =>
+        db.query(
+          `insert into public.ai_suggestions (source_id, fact_type, payload, dedupe_key)
+           select id, 'skill', '{"name":"Forged"}'::jsonb, repeat('a', 64) from public.career_sources`,
+        ),
+      ),
+    ).rejects.toThrow(/permission denied/)
+  })
+
+  it("does not reopen a managed reservation after the quota is spent", async () => {
+    await db.exec("reset role")
+    await db.query(
+      `insert into public.ai_usage_events (
+         user_id, idempotency_key, execution_mode, provider, model, billed_to, status, expires_at, reserved_at
+       ) values ($1, 'grace-voided-over-quota', 'managed', 'google', 'gemini-2.5-flash', 'platform', 'voided', now() + interval '10 minutes', now())`,
+      [grace],
+    )
+    await expect(
+      asUser(grace, () =>
+        db.query(
+          `select public.reserve_ai_usage('grace-voided-over-quota', 'managed', 'google', 'gemini-2.5-flash', $1)`,
+          [reserveProof(grace, "grace-voided-over-quota", "managed", "google", "gemini-2.5-flash")],
+        ),
+      ),
+    ).rejects.toThrow(/quota exceeded/)
+  })
+
+  it("keeps an open reservation from being joined by another key", async () => {
+    await db.exec("reset role")
+    await db.query(
+      `update public.ai_platform_policy
+         set monthly_request_limit = 20, monthly_token_limit = 100000
+       where id = 1`,
+    )
+    await expect(
+      asUser(grace, () =>
+        db.query(`select public.reserve_ai_usage('grace-second-open', 'managed', 'google', 'gemini-2.5-flash', $1)`, [
+          reserveProof(grace, "grace-second-open", "managed", "google", "gemini-2.5-flash"),
+        ]),
+      ),
+    ).rejects.toThrow(/reservation in progress/)
+
+    const billing = await asUser(ada, async () => {
+      const row = await db.query<{ billed_to: string }>(
+        "select billed_to from public.ai_usage_events where idempotency_key = 'idem-accept-0001'",
+      )
+      return row.rows[0]?.billed_to
+    })
+    expect(billing).toBe("user")
   })
 })
