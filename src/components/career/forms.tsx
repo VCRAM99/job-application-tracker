@@ -139,7 +139,7 @@ export function SuggestionCard({
       {suggestion.status === "pending" ? (
         <div className="flex flex-wrap gap-2">
           <Button type="submit" disabled={pending}>Accept</Button>
-          <Button type="submit" variant="outline" formAction={reject} name="suggestionId" value={suggestion.id}>
+          <Button type="submit" variant="outline" formAction={reject}>
             Reject
           </Button>
         </div>
