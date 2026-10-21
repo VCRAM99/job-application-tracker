@@ -30,6 +30,10 @@ Create an account with your email. The app asks you to verify that address befor
 
 Career facts, pasted resume text, and AI settings are hidden in production until the server flag is turned on. Suggested facts stay suggestions until you accept them. See [docs/ai.md](docs/ai.md).
 
+### Recommended jobs (off in production)
+
+Recommended jobs adds a shared catalog, private search preferences, and optional alerts. The page is on in local development and off in production until `JOB_RECOMMENDATIONS_ENABLED` is set. Live source fetches, scheduled runs, and email are separate switches and stay off. See [docs/jobs.md](docs/jobs.md).
+
 ### Optional health tracking (beta)
 
 Health tracking is off for new accounts. Turn it on in Settings if you want it. Saved entries stay private to your account when the section is hidden.
@@ -88,7 +92,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-A Supabase project with email confirmation, plus the SQL migrations in `supabase/migrations`, is required before companies, applications, and the other signed-in tools will load. Deploying the Next.js app does not apply those migrations. Setup for auth redirects, mail, and `npx supabase db push` is in [docs/setup.md](docs/setup.md). Column rules are in [docs/data-model.md](docs/data-model.md). Career AI configuration is in [docs/ai.md](docs/ai.md). Server-only AI variables are commented in `.env.example`. Do not commit real keys.
+A Supabase project with email confirmation, plus the SQL migrations in `supabase/migrations`, is required before companies, applications, and the other signed-in tools will load. Deploying the Next.js app does not apply those migrations. Setup for auth redirects, mail, and `npx supabase db push` is in [docs/setup.md](docs/setup.md). Column rules are in [docs/data-model.md](docs/data-model.md). Career AI configuration is in [docs/ai.md](docs/ai.md). Recommended jobs configuration is in [docs/jobs.md](docs/jobs.md). Server-only AI and jobs variables are commented in `.env.example`. Do not commit real keys.
 
 | Command | Purpose |
 | --- | --- |
