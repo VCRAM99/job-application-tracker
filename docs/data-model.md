@@ -12,6 +12,8 @@ Insert and update triggers set `user_id` from `auth.uid()` and reject a change t
 
 The Supabase secret / service-role key bypasses RLS. This app does not use it.
 
+Career profiles, resume text sources, verified facts, credentials, and AI suggestions are added by `supabase/migrations/20261021043000_career_knowledge_and_ai.sql`. Suggested facts and verified facts are different rows. Details, encryption, and quotas are in [ai.md](ai.md).
+
 ## companies
 
 - `id uuid primary key default gen_random_uuid()`
