@@ -1,6 +1,7 @@
 import { Mark } from "@/components/brand/mark"
 import { signOut } from "@/lib/auth/actions"
 import type { AuthenticatedUser } from "@/lib/auth/session"
+import { NAV_ITEMS } from "@/lib/navigation"
 import { NavLinks } from "@/components/shell/nav-links"
 import { MobileNav } from "@/components/shell/mobile-nav"
 import { PageTransition } from "@/components/shell/page-transition"
@@ -17,11 +18,15 @@ function SignOutButton() {
   )
 }
 
+type NavItem = (typeof NAV_ITEMS)[number]
+
 export function AppShell({
   user,
+  items = NAV_ITEMS,
   children,
 }: {
   user: AuthenticatedUser
+  items?: readonly NavItem[]
   children: React.ReactNode
 }) {
   const email = user.email ?? "Signed in"
@@ -40,7 +45,7 @@ export function AppShell({
           <p className="text-sm font-medium tracking-tight">Job Tracker</p>
         </div>
         <div className="flex-1 overflow-y-auto px-2.5 py-2">
-          <NavLinks />
+          <NavLinks items={items} />
         </div>
         <div className="flex flex-col gap-3 border-t border-sidebar-border p-3">
           <p className="truncate px-1 text-xs text-muted-foreground" title={email}>
@@ -56,7 +61,7 @@ export function AppShell({
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center gap-2 border-b px-3 md:hidden">
-          <MobileNav />
+          <MobileNav items={items} />
           <Mark className="size-6" />
           <p className="flex-1 text-sm font-medium tracking-tight">Job Tracker</p>
           <ThemeToggle />

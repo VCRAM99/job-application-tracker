@@ -26,6 +26,10 @@ Create an account with your email. The app asks you to verify that address befor
 - A checklist for the selected day
 - Weekly completion insights
 
+### Career profile (off by default)
+
+Career facts, pasted resume text, and AI settings are hidden in production until the server flag is turned on. Suggested facts stay suggestions until you accept them. See [docs/ai.md](docs/ai.md).
+
 ### Optional health tracking (beta)
 
 Health tracking is off for new accounts. Turn it on in Settings if you want it. Saved entries stay private to your account when the section is hidden.
@@ -84,7 +88,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-A Supabase project with email confirmation, plus the SQL migrations in `supabase/migrations`, is required before companies, applications, and the other signed-in tools will load. Deploying the Next.js app does not apply those migrations. Setup for auth redirects, mail, and `npx supabase db push` is in [docs/setup.md](docs/setup.md). Column rules are in [docs/data-model.md](docs/data-model.md).
+A Supabase project with email confirmation, plus the SQL migrations in `supabase/migrations`, is required before companies, applications, and the other signed-in tools will load. Deploying the Next.js app does not apply those migrations. Setup for auth redirects, mail, and `npx supabase db push` is in [docs/setup.md](docs/setup.md). Column rules are in [docs/data-model.md](docs/data-model.md). Career AI configuration is in [docs/ai.md](docs/ai.md). Server-only AI variables are commented in `.env.example`. Do not commit real keys.
 
 | Command | Purpose |
 | --- | --- |

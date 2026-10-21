@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 
 import { ChangePasswordForm } from "@/components/auth/change-password-form"
+import { AiSettingsSection } from "@/components/settings/ai-settings"
 import { DeveloperNote } from "@/components/settings/developer-note"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
@@ -28,7 +29,7 @@ export default async function SettingsPage() {
       <header className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-          Account, password, and appearance for this signed-in session.
+          Account, password, appearance, and optional career AI for this signed-in session.
         </p>
       </header>
       <Card>
@@ -94,6 +95,7 @@ export default async function SettingsPage() {
           )}
         </CardContent>
       </Card>
+      <AiSettingsSection />
       <Card>
         <CardHeader>
           <CardTitle>More about the developer</CardTitle>

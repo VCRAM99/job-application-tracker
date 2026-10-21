@@ -12,6 +12,8 @@ Operational notes for running Job Tracker locally or in production. The public o
 
 Do not create a `NEXT_PUBLIC_` variable for the secret key. The app does not use the Supabase secret or service-role key. If a secret key is placed in `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, the client refuses to start.
 
+Career AI uses additional server-only variables. They are listed in `.env.example` and explained in [ai.md](ai.md). Leave them unset in production until you intend to enable the feature. Do not put provider keys in `NEXT_PUBLIC_` variables.
+
 ## Supabase project
 
 1. Create a project at [supabase.com/dashboard](https://supabase.com/dashboard).
@@ -71,6 +73,8 @@ npx supabase db push
 ```
 
 `db push` runs only migration files that are not already recorded. Stop if the dry run proposes to drop tables. Until `20261019220000_daily_tasks_and_health.sql` is applied, Daily Tasks shows an unavailable message and the rest of the app still loads.
+
+`20261021043000_career_knowledge_and_ai.sql` adds the career profile and AI accounting tables. It does not change existing tables. The app still runs if that file has not been applied. Do not push it to production until you have reviewed [ai.md](ai.md) and chosen to enable the feature.
 
 ## Deploying to Vercel
 

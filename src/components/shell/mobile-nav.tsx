@@ -4,7 +4,10 @@ import { Menu } from "lucide-react"
 import { useState } from "react"
 
 import { signOut } from "@/lib/auth/actions"
+import { NAV_ITEMS } from "@/lib/navigation"
 import { NavLinks } from "@/components/shell/nav-links"
+
+type NavItem = (typeof NAV_ITEMS)[number]
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -14,7 +17,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 
-export function MobileNav() {
+export function MobileNav({ items = NAV_ITEMS }: { items?: readonly NavItem[] }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -29,7 +32,7 @@ export function MobileNav() {
           <SheetTitle>Job Tracker</SheetTitle>
         </SheetHeader>
         <div className="px-3 py-3">
-          <NavLinks onNavigate={() => setOpen(false)} />
+          <NavLinks items={items} onNavigate={() => setOpen(false)} />
         </div>
         <form action={signOut} className="mt-auto border-t p-3">
           <Button type="submit" variant="outline" className="w-full">

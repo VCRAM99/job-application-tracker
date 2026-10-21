@@ -6,8 +6,13 @@ export const NAV_ITEMS = [
   { href: "/tasks", label: "Tasks" },
   { href: "/daily-tasks", label: "Daily Tasks" },
   { href: "/preparation", label: "Preparation" },
+  { href: "/career", label: "Career" },
   { href: "/settings", label: "Settings" },
 ] as const
+
+export function visibleNavItems(aiEnabled: boolean) {
+  return NAV_ITEMS.filter((item) => aiEnabled || item.href !== "/career")
+}
 
 export type NavHref = (typeof NAV_ITEMS)[number]["href"]
 
