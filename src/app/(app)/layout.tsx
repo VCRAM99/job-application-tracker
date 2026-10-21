@@ -5,6 +5,7 @@ import { AppShell } from "@/components/shell/app-shell"
 import { LoadingSpinner } from "@/components/shell/loading-spinner"
 import { aiFeaturesEnabled } from "@/lib/ai/flags"
 import { requireUser } from "@/lib/auth/session"
+import { recommendedJobsEnabled } from "@/lib/jobs/flags"
 import { visibleNavItems } from "@/lib/navigation"
 
 export const instant = false
@@ -28,7 +29,13 @@ export default function ProtectedLayout({
 async function ProtectedContent({ children }: { children: React.ReactNode }) {
   const user = await requireUser()
   return (
-    <AppShell user={user} items={visibleNavItems(aiFeaturesEnabled())}>
+    <AppShell
+      user={user}
+      items={visibleNavItems({
+        career: aiFeaturesEnabled(),
+        jobs: recommendedJobsEnabled(),
+      })}
+    >
       {children}
     </AppShell>
   )

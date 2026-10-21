@@ -63,6 +63,9 @@ export function ApplicationForm({
   id,
   submitLabel,
   cancelHref,
+  postingId,
+  lockSavedStatus = false,
+  companyNotice,
 }: {
   action: (state: RecordFormState, formData: FormData) => Promise<RecordFormState>
   values: ApplicationFormValues
@@ -70,6 +73,9 @@ export function ApplicationForm({
   id?: string
   submitLabel: string
   cancelHref: string
+  postingId?: string
+  lockSavedStatus?: boolean
+  companyNotice?: string | null
 }) {
   const [companyMode, setCompanyMode] = useState<"existing" | "new">(
     companies.length === 0 ? "new" : values.companyMode,
@@ -110,8 +116,14 @@ export function ApplicationForm({
     <form action={formAction} className="grid gap-4 sm:grid-cols-2" noValidate>
       <FormStatus state={state} />
       {id ? <input type="hidden" name="id" value={id} /> : null}
+      {postingId ? <input type="hidden" name="postingId" value={postingId} /> : null}
       <fieldset className="space-y-3 sm:col-span-2">
         <legend className="text-sm font-medium">Company</legend>
+        {companyNotice ? (
+          <p className="text-sm text-muted-foreground" role="status">
+            {companyNotice}
+          </p>
+        ) : null}
         <div className="flex flex-wrap gap-4 text-sm">
           <label className="flex items-center gap-2">
             <input
@@ -175,15 +187,25 @@ export function ApplicationForm({
           />
         </Field>
       </div>
-      <Field name="status" label="Status" error={state.fieldErrors.status}>
-        <NativeSelect id="status" name="status" defaultValue={values.status}>
-          {APPLICATION_STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {APPLICATION_STATUS_LABELS[status]}
-            </option>
-          ))}
-        </NativeSelect>
-      </Field>
+      {lockSavedStatus ? (
+        <>
+          <input type="hidden" name="status" value="saved" />
+          <input type="hidden" name="appliedAt" value="" />
+          <p className="text-sm text-muted-foreground sm:col-span-2">
+            This application is saved, not submitted. You can change the status after it is in your tracker.
+          </p>
+        </>
+      ) : (
+        <Field name="status" label="Status" error={state.fieldErrors.status}>
+          <NativeSelect id="status" name="status" defaultValue={values.status}>
+            {APPLICATION_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {APPLICATION_STATUS_LABELS[status]}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+      )}
       <Field name="source" label="Source" error={state.fieldErrors.source}>
         <Input id="source" name="source" defaultValue={values.source} />
       </Field>
@@ -240,9 +262,11 @@ export function ApplicationForm({
           aria-describedby={state.fieldErrors.salaryCurrency ? "salaryCurrency-error" : undefined}
         />
       </Field>
-      <Field name="appliedAt" label="Applied date" error={state.fieldErrors.appliedAt}>
-        <Input id="appliedAt" name="appliedAt" type="date" defaultValue={values.appliedAt} />
-      </Field>
+      {lockSavedStatus ? null : (
+        <Field name="appliedAt" label="Applied date" error={state.fieldErrors.appliedAt}>
+          <Input id="appliedAt" name="appliedAt" type="date" defaultValue={values.appliedAt} />
+        </Field>
+      )}
       <Field name="nextFollowUpDate" label="Follow-up date" error={state.fieldErrors.nextFollowUpDate}>
         <Input
           id="nextFollowUpDate"

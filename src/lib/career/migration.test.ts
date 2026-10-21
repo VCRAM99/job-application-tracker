@@ -4,16 +4,12 @@ import path from "node:path"
 import { describe, expect, it } from "vitest"
 
 const migrationsDir = path.join(process.cwd(), "supabase/migrations")
-const latest = readdirSync(migrationsDir)
-  .filter((name) => name.endsWith(".sql"))
-  .sort()
-  .at(-1)
-
-const sql = readFileSync(path.join(migrationsDir, latest ?? ""), "utf8").toLowerCase()
+const careerFile = "20261021043000_career_knowledge_and_ai.sql"
+const sql = readFileSync(path.join(migrationsDir, careerFile), "utf8").toLowerCase()
 
 describe("career migration safety", () => {
   it("is the additive career and AI migration", () => {
-    expect(latest).toBe("20261021043000_career_knowledge_and_ai.sql")
+    expect(readdirSync(migrationsDir).filter((name) => name.endsWith(".sql"))).toContain(careerFile)
   })
 
   it("does not rewrite V1 tables or grant the service role", () => {

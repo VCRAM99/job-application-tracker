@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
 import { requireUser } from "@/lib/auth/session"
+import { linkedApplicationId, loadTrackerPosting } from "@/lib/jobs/data"
+import { companyChoiceIsExplicit, findDuplicateApplication, planCompany } from "@/lib/jobs/prefill"
 import { isApplicationStatus } from "@/lib/records/constants"
 import type { CompanyFormValues, ApplicationFormValues } from "@/lib/records/schemas"
 import {
@@ -232,13 +234,70 @@ export async function createApplication(
     }
   }
 
-  const company = await resolveCompanyId(user.id, parsed.data)
+  const postingId = formText(formData, "postingId")
+  const tracked = isUuid(postingId)
+  const values = tracked ? { ...parsed.data, status: "saved" as const, appliedAt: null } : parsed.data
+  const supabase = await createClient()
+  if (tracked) {
+    const linked = await linkedApplicationId(postingId)
+    if (linked) redirect(`/applications/${linked}`)
+    const posting = await loadTrackerPosting(postingId)
+    if (!posting.ok) {
+      return {
+        status: "error",
+        message:
+          posting.error === "missing_table"
+            ? "Recommended jobs are not available yet. Apply the latest migration, then reload."
+            : "That recommended job could not be loaded.",
+        fieldErrors: {},
+      }
+    }
+    if (posting.data?.employerName) {
+      const owned = await supabase.from("companies").select("id, name").eq("user_id", user.id)
+      if (owned.error) {
+        return { status: "error", message: recordErrorMessage(owned.error), fieldErrors: {} }
+      }
+      const plan = planCompany(owned.data ?? [], posting.data.employerName)
+      if (!companyChoiceIsExplicit(plan, { mode: values.companyMode, companyId: values.companyId })) {
+        return {
+          status: "error",
+          message: null,
+          fieldErrors: {
+            companyId: "Several of your companies share this name. Choose one, or create a new company.",
+          },
+        }
+      }
+    }
+    if (values.jobUrl) {
+      const existing = await supabase
+        .from("applications")
+        .select("id, job_title, job_url")
+        .eq("user_id", user.id)
+        .limit(200)
+      const duplicate = findDuplicateApplication(
+        (existing.data ?? []).map((row) => ({
+          id: String(row.id),
+          jobTitle: String(row.job_title),
+          jobUrl: row.job_url ? String(row.job_url) : null,
+        })),
+        { jobTitle: values.jobTitle, jobUrl: values.jobUrl },
+      )
+      if (duplicate) {
+        return {
+          status: "error",
+          message: "You already have an application with this title and URL.",
+          fieldErrors: {},
+        }
+      }
+    }
+  }
+
+  const company = await resolveCompanyId(user.id, values)
   if ("status" in company) return company
 
-  const supabase = await createClient()
   const { data, error } = await supabase
     .from("applications")
-    .insert(applicationPayload(user.id, company.companyId, parsed.data))
+    .insert(applicationPayload(user.id, company.companyId, values))
     .select("id")
     .single()
 
@@ -247,6 +306,14 @@ export async function createApplication(
       await supabase.from("companies").delete().eq("user_id", user.id).eq("id", company.companyId)
     }
     return { status: "error", message: recordErrorMessage(error), fieldErrors: {} }
+  }
+
+  if (tracked) {
+    await supabase.from("application_postings").insert({
+      user_id: user.id,
+      application_id: data.id,
+      posting_id: postingId,
+    })
   }
 
   revalidatePath("/applications")
