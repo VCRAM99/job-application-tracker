@@ -372,8 +372,71 @@ describe("recommended jobs database", () => {
         [graceCompany.rows[0]?.id],
       ),
     )
+    const imported = await asUser(ada, () =>
+      db.query<{ import_applications: { applications_inserted: number; applications_skipped: number } }>(
+        `select public.import_applications($1::jsonb) as import_applications`,
+        [JSON.stringify([{ company_name: "Northwind", job_title: "Backend Engineer", job_url: "https://JOBS.example/roles/1#frag" }])],
+      ),
+    )
+    expect(imported.rows[0]?.import_applications.applications_inserted).toBe(0)
+    expect(imported.rows[0]?.import_applications.applications_skipped).toBe(1)
+
+    const blank = await asUser(ada, () =>
+      db.query(
+        `insert into public.applications (company_id, job_title, status)
+         values ($1, 'Untitled role', 'saved'), ($1, 'Untitled role', 'saved')`,
+        [company.rows[0]?.id],
+      ),
+    )
+    expect(blank.rowCount).toBe(2)
     const visible = await asUser(ada, () => db.query<{ slug: string }>("select slug from public.job_sources order by slug"))
     expect(visible.rows.map((row) => row.slug)).toEqual(["greenhouse:northwind"])
+    await db.exec("alter table public.applications disable trigger applications_set_match_key")
+    const historical = await asUser(ada, () =>
+      db.query<{ id: string }>(
+        `insert into public.applications (company_id, job_title, job_url, status)
+         values ($1, 'Duplicate Analyst', 'https://jobs.example/roles/historical', 'saved')
+         returning id`,
+        [company.rows[0]?.id],
+      ),
+    )
+    const later = await asUser(ada, () =>
+      db.query<{ id: string }>(
+        `insert into public.applications (company_id, job_title, job_url, status)
+         values ($1, 'Duplicate Analyst', 'https://jobs.example/roles/historical/', 'saved')
+         returning id`,
+        [company.rows[0]?.id],
+      ),
+    )
+    await db.exec(`select set_config('request.jwt.claim.sub', '${ada}', false)`)
+    await db.query(
+      `update public.applications
+       set job_match_key = public.application_match_key(job_title, job_url)
+       where id = $1`,
+      [historical.rows[0]?.id],
+    )
+    await db.query("update public.applications set job_match_key = null where id = $1", [later.rows[0]?.id])
+    await db.exec("select set_config('request.jwt.claim.sub', '', false)")
+    await db.exec("alter table public.applications enable trigger applications_set_match_key")
+    await asUser(ada, () =>
+      db.query("update public.applications set status = 'applied' where id = $1", [later.rows[0]?.id]),
+    )
+    const preserved = await db.query<{ status: string; job_match_key: string | null }>(
+      "select status, job_match_key from public.applications where id = $1",
+      [later.rows[0]?.id],
+    )
+    expect(preserved.rows[0]).toEqual({ status: "applied", job_match_key: null })
+    expect(historical.rows[0]?.id).toBeTruthy()
+    await expect(
+      asUser(ada, () =>
+        db.query(
+          `insert into public.applications (company_id, job_title, job_url, status)
+           values ($1, 'Duplicate Analyst', 'https://jobs.example/roles/historical', 'saved')`,
+          [company.rows[0]?.id],
+        ),
+      ),
+    ).rejects.toThrow(/duplicate key|applications_user_match_key_idx/)
+
     const drafts = await db.query<{ slug: string }>(
       "select slug from public.job_sources where approval_status = 'draft' order by slug",
     )

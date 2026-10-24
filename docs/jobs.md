@@ -159,7 +159,7 @@ There is no `vercel.json` cron and no hosted scheduler configuration in this rep
 
 If one private company has the same normalized name, that company is selected. If several do, the form asks for a choice and does not attach an arbitrary row. If none do, the form starts a new company. The user can edit the form before saving.
 
-Creating the application is skipped when this posting is already linked, or when `find_application_duplicate` finds the same normalized title and URL on any of the user's applications. `applications.job_match_key` is set by a trigger and is unique per user, so a concurrent second insert is rejected. Another user's matching title and URL is a separate application. The original URL opens in a new tab. The app does not submit an application to an employer.
+Creating the application is skipped when this posting is already linked, or when `find_application_duplicate` finds the same normalized title and URL on any of the user's applications. `applications.job_match_key` is set by a trigger and is unique per user, so a concurrent second insert is rejected. A preexisting duplicate whose key was left null can still be edited. A missing or non-HTTP URL does not create a key. Another user's matching title and URL is a separate application. The original URL opens in a new tab. The app does not submit an application to an employer.
 
 ## Local tests
 
