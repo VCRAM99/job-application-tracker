@@ -15,7 +15,7 @@ All of these are server-only. None belong in a `NEXT_PUBLIC_` variable.
 | `JOB_REFRESH_ENABLED` | Off until set to `true`. | `POST /api/jobs/scheduler`. |
 | `JOB_EMAIL_DELIVERY_ENABLED` and `JOB_EMAIL_FROM` | Off. Both must be set before the email adapter even considers a message. | Still does not send mail. The sender returns `sender_not_approved`. |
 | `JOB_CATALOG_WRITE_SECRET` | Unset. Must be 32–200 characters and match `job_catalog_gate.secret`. | HMAC for catalog and alert writes. |
-| `JOB_SCHEDULER_SECRET` | Unset. Must be at least 32 characters. | Bearer token for the scheduler route. |
+| `JOB_SCHEDULER_SECRET` | Unset. Must be at least 32 characters. A missing, empty, or short secret is rejected even when refresh is enabled. | Bearer token for the scheduler route. |
 
 `AI_FEATURES_ENABLED` does not affect jobs. Jobs flags do not enable managed AI.
 
