@@ -16,6 +16,8 @@ Career profiles, resume text sources, verified facts, credentials, and AI sugges
 
 The shared job catalog and private job preferences are added by `supabase/migrations/20261021120000_recommended_jobs.sql`. Catalog employers are not the private `companies` table. Signed-in users can read approved sources and their postings. They cannot write the catalog. Preferences, saves, hides, employer choices, application links, and alert rows are limited to `auth.uid()`. Alert delivery inserts are reserved for the catalog writer. Details, flags, and the source checklist are in [jobs.md](jobs.md).
 
+Fit analyses are added by `supabase/migrations/20261023223000_job_intelligence.sql`. `job_analyses` is private to `auth.uid()`. A composite foreign key keeps `application_id` on the same user. `posting_id` has to be a posting the signed-in user can read. Requirements and matches are JSON on the analysis row because they are one immutable snapshot and are always loaded together. A partial unique index on `(user_id, jd_hash, profile_fingerprint, prompt_version)` reuses a completed analysis. The same migration adds a nullable `provenance` object on the six fact tables so a suggested fact can point at an analysis without changing existing rows. Details are in [analyze.md](analyze.md).
+
 ## companies
 
 - `id uuid primary key default gen_random_uuid()`
