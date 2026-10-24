@@ -261,6 +261,63 @@ export async function addManualFact(
   return done("Verified fact added.")
 }
 
+export async function reviewSuggestedFact(
+  _previous: RecordFormState,
+  formData: FormData,
+): Promise<RecordFormState> {
+  const context = await ready()
+  if (!context.ok) return fail(context.message)
+  const factId = formText(formData, "factId")
+  const factType = formText(formData, "factType")
+  const decision = formText(formData, "decision")
+  if (!isUuid(factId) || !isFactType(factType)) return fail("That suggestion is no longer available.")
+  const table = tableFor(factType)
+  const facts = context.supabase as unknown as {
+    from: (name: string) => {
+      update: (value: Record<string, unknown>) => {
+        eq: (column: string, value: string) => {
+          eq: (column: string, value: string) => {
+            select: (columns: string) => PromiseLike<{ data: Array<{ id: string }> | null; error: { message: string } | null }>
+          }
+        }
+      }
+    }
+  }
+  if (decision === "reject") {
+    const rejected = await facts
+      .from(table)
+      .update({ verification_state: "rejected" })
+      .eq("id", factId)
+      .eq("verification_state", "suggested")
+      .select("id")
+    if (rejected.error || !rejected.data?.length) return fail("That suggestion is no longer available.")
+    revalidatePath("/career")
+    return done("Suggestion rejected. It was not verified.")
+  }
+  const primary = formText(formData, "primary").trim()
+  if (!primary) return fail("Name the fact before verifying it.")
+  if (factType === "skill" && primary.length > 80) return fail("Keep the skill name under 80 characters.")
+  const column =
+    factType === "employment" || factType === "accomplishment"
+      ? "title"
+      : factType === "education"
+        ? "credential"
+        : "name"
+  const accepted = await facts
+    .from(table)
+    .update({
+      verification_state: "user_verified",
+      approved_at: new Date().toISOString(),
+      [column]: primary,
+    })
+    .eq("id", factId)
+    .eq("verification_state", "suggested")
+    .select("id")
+  if (accepted.error || !accepted.data?.length) return fail("That suggestion could not be verified.")
+  revalidatePath("/career")
+  return done("Verified. Other suggestions are unchanged.")
+}
+
 export async function extractCareerFacts(
   _previous: RecordFormState,
   formData: FormData,

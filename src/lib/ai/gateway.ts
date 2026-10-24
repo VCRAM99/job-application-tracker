@@ -116,6 +116,67 @@ export async function generateStructured<T>(
   return failure("transient", reservation.id)
 }
 
+/**
+ * One analysis is one reservation. The caller may make more than one provider
+ * call inside `work` and must return the combined token usage.
+ */
+export async function withUsageReservation<T>(
+  input: {
+    mode: ExecutionMode
+    provider: string
+    model: string
+    apiKey: string | null
+    managedAllowed: boolean
+  },
+  deps: Omit<GatewayDeps<T>, "complete" | "persist">,
+  work: () => Promise<{ data: T; usage: TokenUsage }>,
+): Promise<GenerateResult<T>> {
+  if (input.mode === "local") return failure("mode_unavailable")
+  if (input.mode === "managed" && !input.managedAllowed) return failure("managed_unconfigured")
+  if (!input.apiKey) return failure("missing_credentials")
+
+  try {
+    assertSupportedModel(input.provider, input.model)
+  } catch (error) {
+    if (error instanceof AiRequestError) return failure(error.code)
+    return failure("unsupported_model")
+  }
+
+  let reservation: ReservationRecord
+  try {
+    reservation = await deps.reserve()
+  } catch (error) {
+    return failure(reservationFailureCode(error))
+  }
+
+  if (reservation.reused && reservation.status === "succeeded") {
+    return { ok: true, kind: "already-complete", usageEventId: reservation.id }
+  }
+  if (reservation.reused && reservation.status === "reserved") {
+    return failure("in_progress", reservation.id)
+  }
+
+  try {
+    const produced = await work()
+    await deps.finalize(reservation.id, produced.usage)
+    return {
+      ok: true,
+      kind: "generated",
+      usageEventId: reservation.id,
+      data: produced.data,
+      usage: produced.usage,
+    }
+  } catch (error) {
+    const ai = mapProviderFailure(error)
+    try {
+      await deps.voidReservation(reservation.id, ai.code)
+    } catch {
+      return failure(ai.code, reservation.id)
+    }
+    return failure(ai.code, reservation.id)
+  }
+}
+
 function parseStructured<T>(schema: z.ZodType<T>, text: string) {
   try {
     return schema.safeParse(JSON.parse(text))

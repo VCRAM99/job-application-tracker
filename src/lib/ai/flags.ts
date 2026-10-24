@@ -10,6 +10,21 @@ export function aiFeaturesEnabled(env: Env = process.env): boolean {
   return env.NODE_ENV !== "production"
 }
 
+/** Job fit analysis. Explicit "true" only, and only while career AI is enabled. */
+export function jobAnalysisEnabled(env: Env = process.env): boolean {
+  return env.JOB_ANALYSIS_ENABLED?.trim().toLowerCase() === "true" && aiFeaturesEnabled(env)
+}
+
+/**
+ * Local stand-in for provider calls. Never active in production.
+ * A missing or any other value keeps the real adapters.
+ */
+export function jobAnalysisMockProvider(env: Env = process.env): boolean {
+  if (env.JOB_ANALYSIS_MOCK_PROVIDER?.trim().toLowerCase() !== "true") return false
+  if (env.VERCEL_ENV === "production" || env.NODE_ENV === "production") return false
+  return true
+}
+
 export function managedAllowance(env: Env = process.env): {
   enabled: boolean
   requestLimit: number
