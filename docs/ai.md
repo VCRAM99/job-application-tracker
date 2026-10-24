@@ -1,5 +1,7 @@
 # Career AI (Milestone 1)
 
+Job fit analysis is a later layer on this gateway. Flags, routes, and the local Gemini eval are in [analyze.md](analyze.md).
+
 Career AI is an additive layer on Job Tracker. It does not change companies, applications, networking, tasks, preparation, daily tasks, or health tracking. The feature is off in production until `AI_FEATURES_ENABLED` is explicitly true. If the career migration has not been applied, Career and AI settings show an unavailable state and the rest of the app still loads.
 
 Live provider calls are not part of the automated tests. Tests use fake clients and an in-process PostgreSQL build.
