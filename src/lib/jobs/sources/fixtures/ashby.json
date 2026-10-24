@@ -1,0 +1,40 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "ash-1",
+      "title": "Applied AI Engineer",
+      "location": "San Francisco",
+      "secondaryLocations": [{ "location": "Remote", "address": { "addressCountry": "USA" } }],
+      "department": "Engineering",
+      "team": "Applied",
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "Hybrid",
+      "descriptionPlain": "Ship product features with Python and TypeScript.",
+      "descriptionHtml": "<p>Ship product features with Python and TypeScript.</p>",
+      "publishedAt": "2026-09-15T12:00:00.000Z",
+      "employmentType": "FullTime",
+      "address": { "postalAddress": { "addressLocality": "San Francisco", "addressRegion": "California", "addressCountry": "USA" } },
+      "jobUrl": "https://jobs.ashbyhq.com/northwind/ash-1",
+      "applyUrl": "https://jobs.ashbyhq.com/northwind/ash-1/application",
+      "compensation": {
+        "compensationTierSummary": "$170K – $210K",
+        "summaryComponents": [
+          { "compensationType": "EquityPercentage", "interval": "NONE", "currencyCode": null, "minValue": 0.1, "maxValue": 0.4 },
+          { "compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 170000, "maxValue": 210000 }
+        ]
+      }
+    },
+    {
+      "id": "ash-hidden",
+      "title": "Unlisted Role",
+      "isListed": false,
+      "jobUrl": "https://jobs.ashbyhq.com/northwind/hidden",
+      "applyUrl": "https://jobs.ashbyhq.com/northwind/hidden/application"
+    },
+    {
+      "title": "No url"
+    }
+  ]
+}

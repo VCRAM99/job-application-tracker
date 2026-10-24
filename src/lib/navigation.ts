@@ -2,6 +2,7 @@ export const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/companies", label: "Companies" },
   { href: "/applications", label: "Applications" },
+  { href: "/jobs", label: "Jobs" },
   { href: "/networking", label: "Networking" },
   { href: "/tasks", label: "Tasks" },
   { href: "/daily-tasks", label: "Daily Tasks" },
@@ -10,8 +11,17 @@ export const NAV_ITEMS = [
   { href: "/settings", label: "Settings" },
 ] as const
 
-export function visibleNavItems(aiEnabled: boolean) {
-  return NAV_ITEMS.filter((item) => aiEnabled || item.href !== "/career")
+export type NavFlags = {
+  career: boolean
+  jobs: boolean
+}
+
+export function visibleNavItems(flags: NavFlags) {
+  return NAV_ITEMS.filter((item) => {
+    if (item.href === "/career") return flags.career
+    if (item.href === "/jobs") return flags.jobs
+    return true
+  })
 }
 
 export type NavHref = (typeof NAV_ITEMS)[number]["href"]

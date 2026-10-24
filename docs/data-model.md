@@ -14,6 +14,8 @@ The Supabase secret / service-role key bypasses RLS. This app does not use it.
 
 Career profiles, resume text sources, verified facts, credentials, and AI suggestions are added by `supabase/migrations/20261021043000_career_knowledge_and_ai.sql`. Suggested facts and verified facts are different rows. Details, encryption, and quotas are in [ai.md](ai.md).
 
+The shared job catalog and private job preferences are added by `supabase/migrations/20261021120000_recommended_jobs.sql`. Catalog employers are not the private `companies` table. Signed-in users can read approved sources and their postings. They cannot write the catalog. Preferences, saves, hides, employer choices, application links, and alert rows are limited to `auth.uid()`. Alert delivery inserts are reserved for the catalog writer. Details, flags, and the source checklist are in [jobs.md](jobs.md).
+
 ## companies
 
 - `id uuid primary key default gen_random_uuid()`

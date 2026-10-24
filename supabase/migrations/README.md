@@ -12,6 +12,12 @@ SQL migrations for the hosted Supabase project live in this directory.
 
 `20261021043000_career_knowledge_and_ai.sql` adds career profiles, pasted text sources, verified fact tables, encrypted provider credentials, usage accounting, and AI suggestions. It does not alter the earlier tables. Authenticated users cannot read ciphertext or mark a key verified. Suggestions become verified facts only through `accept_career_suggestion`.
 
-Apply pending files to the existing project with `supabase db push` only when you intend to change that database. Do not run `supabase db reset` against the hosted database. Do not push the career migration to production until Career AI is explicitly approved. The production hardening release does not add a migration.
+`20261021120000_recommended_jobs.sql` adds the shared job catalog, private job preferences, saved and hidden postings, alert subscriptions, and alert deliveries. Ordinary users can read approved catalog rows and cannot write them. Catalog writes need the HMAC gate in [docs/jobs.md](../../docs/jobs.md). The gate secret ships null. This file does not drop existing tables and does not enable live ingestion.
+
+`20261021143000_application_match_key.sql` adds a normalized title-and-URL key on `applications`, a trigger that fills it, a per-user unique index, and `find_application_duplicate`. It does not rewrite historical duplicates that already share a key. Rows without a usable URL keep a null key.
+
+`20261023120000_preserve_historical_application_duplicates.sql` lets a preexisting duplicate stay editable. A later row whose key was left null keeps that null when another row already owns the key, including status changes. New inserts with the same key are still rejected. `import_applications` skips a row whose normalized title and URL already belong to that user, and it does not delete or merge applications.
+
+Apply pending files to the existing project with `supabase db push` only when you intend to change that database. Do not run `supabase db reset` against the hosted database. Do not push the career or recommended-jobs migrations to production until the matching feature is explicitly approved. The production hardening release does not add a migration.
 
 See the README for the exact link and push commands.

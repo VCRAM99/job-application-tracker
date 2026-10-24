@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
 import { requireUser } from "@/lib/auth/session"
+import { linkedApplicationId, loadTrackerPosting } from "@/lib/jobs/data"
+import { companyChoiceIsExplicit, planCompany } from "@/lib/jobs/prefill"
 import { isApplicationStatus } from "@/lib/records/constants"
 import type { CompanyFormValues, ApplicationFormValues } from "@/lib/records/schemas"
 import {
@@ -232,13 +234,71 @@ export async function createApplication(
     }
   }
 
-  const company = await resolveCompanyId(user.id, parsed.data)
+  const postingId = formText(formData, "postingId")
+  const tracked = isUuid(postingId)
+  const values = tracked ? { ...parsed.data, status: "saved" as const, appliedAt: null } : parsed.data
+  const supabase = await createClient()
+  if (tracked) {
+    const linked = await linkedApplicationId(postingId)
+    if (linked) redirect(`/applications/${linked}`)
+    const posting = await loadTrackerPosting(postingId)
+    if (!posting.ok) {
+      return {
+        status: "error",
+        message:
+          posting.error === "missing_table"
+            ? "Recommended jobs are not available yet. Apply the latest migration, then reload."
+            : "That recommended job could not be loaded.",
+        fieldErrors: {},
+      }
+    }
+    if (posting.data?.employerName) {
+      const owned = await supabase.from("companies").select("id, name").eq("user_id", user.id)
+      if (owned.error) {
+        return { status: "error", message: recordErrorMessage(owned.error), fieldErrors: {} }
+      }
+      const plan = planCompany(owned.data ?? [], posting.data.employerName)
+      if (!companyChoiceIsExplicit(plan, { mode: values.companyMode, companyId: values.companyId })) {
+        return {
+          status: "error",
+          message: null,
+          fieldErrors: {
+            companyId: "Several of your companies share this name. Choose one, or create a new company.",
+          },
+        }
+      }
+    }
+    if (values.jobUrl) {
+      const duplicate = await supabase.rpc("find_application_duplicate", {
+        p_title: values.jobTitle,
+        p_url: values.jobUrl,
+      })
+      if (duplicate.error) {
+        return {
+          status: "error",
+          message:
+            duplicate.error.code === "PGRST202"
+              ? "Recommended jobs are not available yet. Apply the latest migration, then reload."
+              : recordErrorMessage(duplicate.error),
+          fieldErrors: {},
+        }
+      }
+      if (duplicate.data) {
+        return {
+          status: "error",
+          message: "You already have an application with this title and URL.",
+          fieldErrors: {},
+        }
+      }
+    }
+  }
+
+  const company = await resolveCompanyId(user.id, values)
   if ("status" in company) return company
 
-  const supabase = await createClient()
   const { data, error } = await supabase
     .from("applications")
-    .insert(applicationPayload(user.id, company.companyId, parsed.data))
+    .insert(applicationPayload(user.id, company.companyId, values))
     .select("id")
     .single()
 
@@ -246,7 +306,33 @@ export async function createApplication(
     if (company.created) {
       await supabase.from("companies").delete().eq("user_id", user.id).eq("id", company.companyId)
     }
+    if (error?.code === "23505" && /applications_user_match_key_idx/.test(error.message ?? "")) {
+      return {
+        status: "error",
+        message: "You already have an application with this title and URL.",
+        fieldErrors: {},
+      }
+    }
     return { status: "error", message: recordErrorMessage(error), fieldErrors: {} }
+  }
+
+  if (tracked) {
+    const link = await supabase.from("application_postings").insert({
+      user_id: user.id,
+      application_id: data.id,
+      posting_id: postingId,
+    })
+    if (link.error) {
+      await supabase.from("applications").delete().eq("user_id", user.id).eq("id", data.id)
+      if (company.created) {
+        await supabase.from("companies").delete().eq("user_id", user.id).eq("id", company.companyId)
+      }
+      if (link.error.code === "23505") {
+        const winner = await linkedApplicationId(postingId)
+        if (winner) redirect(`/applications/${winner}`)
+      }
+      return { status: "error", message: recordErrorMessage(link.error), fieldErrors: {} }
+    }
   }
 
   revalidatePath("/applications")
