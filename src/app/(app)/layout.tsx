@@ -3,7 +3,7 @@ import { Suspense } from "react"
 
 import { AppShell } from "@/components/shell/app-shell"
 import { LoadingSpinner } from "@/components/shell/loading-spinner"
-import { aiFeaturesEnabled } from "@/lib/ai/flags"
+import { aiFeaturesEnabled, jobAnalysisEnabled } from "@/lib/ai/flags"
 import { requireUser } from "@/lib/auth/session"
 import { recommendedJobsEnabled } from "@/lib/jobs/flags"
 import { visibleNavItems } from "@/lib/navigation"
@@ -34,6 +34,7 @@ async function ProtectedContent({ children }: { children: React.ReactNode }) {
       items={visibleNavItems({
         career: aiFeaturesEnabled(),
         jobs: recommendedJobsEnabled(),
+        analyze: jobAnalysisEnabled(),
       })}
     >
       {children}

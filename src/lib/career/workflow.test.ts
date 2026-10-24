@@ -61,9 +61,11 @@ describe("resume extraction review", () => {
 describe("career navigation", () => {
   it("keeps the career route protected and hides it when AI is off", () => {
     expect(NAV_ITEMS.some((item) => item.href === "/career")).toBe(true)
-    expect(visibleNavItems({ career: false, jobs: false }).some((item) => item.href === "/career")).toBe(false)
-    expect(visibleNavItems({ career: true, jobs: false }).some((item) => item.href === "/career")).toBe(true)
-    expect(visibleNavItems({ career: false, jobs: true }).some((item) => item.href === "/jobs")).toBe(true)
-    expect(visibleNavItems({ career: true, jobs: false }).some((item) => item.href === "/jobs")).toBe(false)
+    expect(visibleNavItems({ career: false, jobs: false, analyze: false }).some((item) => item.href === "/career")).toBe(false)
+    expect(visibleNavItems({ career: true, jobs: false, analyze: false }).some((item) => item.href === "/career")).toBe(true)
+    expect(visibleNavItems({ career: false, jobs: true, analyze: false }).some((item) => item.href === "/jobs")).toBe(true)
+    expect(visibleNavItems({ career: true, jobs: false, analyze: false }).some((item) => item.href === "/jobs")).toBe(false)
+    expect(visibleNavItems({ career: true, jobs: false, analyze: false }).some((item) => item.href === "/analyze")).toBe(false)
+    expect(visibleNavItems({ career: true, jobs: false, analyze: true }).some((item) => item.href === "/analyze")).toBe(true)
   })
 })

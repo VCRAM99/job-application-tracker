@@ -6,6 +6,7 @@ import { DeleteRecordButton } from "@/components/records/delete-record-button"
 import { DetailList, PageHeader, RecordState } from "@/components/records/fields"
 import { StatusForm } from "@/components/records/status-form"
 import { Button } from "@/components/ui/button"
+import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { deleteApplication } from "@/lib/records/actions"
 import {
   APPLICATION_STATUS_LABELS,
@@ -58,6 +59,11 @@ export default async function ApplicationDetailPage({
         description={application.companyName}
         action={
           <div className="flex flex-wrap gap-2">
+            {jobAnalysisEnabled() ? (
+              <Button variant="outline" nativeButton={false} render={<Link href={`/analyze?application=${application.id}`} />}>
+                Analyze fit
+              </Button>
+            ) : null}
             <Button variant="outline" nativeButton={false} render={<Link href={`/applications/${application.id}/edit`} />}>
               Edit
             </Button>

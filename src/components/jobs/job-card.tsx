@@ -1,3 +1,5 @@
+import Link from "next/link"
+
 import { JobActionForm } from "@/components/jobs/job-action-form"
 import {
   clearJobFeedback,
@@ -113,6 +115,9 @@ export function JobCard({ job }: { job: JobListing }) {
         </div>
       </CardContent>
       <CardFooter className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <Button nativeButton={false} render={<Link href={`/jobs/${job.id}`} />}>
+          Details
+        </Button>
         <Button nativeButton={false} render={<a href={applyUrl} target="_blank" rel="noopener noreferrer" />}>
           Apply
         </Button>
