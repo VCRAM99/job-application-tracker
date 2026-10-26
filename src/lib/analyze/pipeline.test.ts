@@ -136,6 +136,56 @@ describe("job analysis pipeline", () => {
     expect(built.analysis.matches[0]).toMatchObject({ status: "met", factIds: [id], method: "ai" })
   })
 
+  it("bounds a model that obeys the injection line in the job text", async () => {
+    const fixture = JOB_FIXTURES.find((item) => item.id === "glass-injection")
+    if (!fixture) throw new Error("missing fixture")
+    const sqlFact = fact({ id: "55555555-5555-4555-8555-555555555555", type: "skill", title: "Spreadsheets" })
+    const requests: StructuredRequest[] = []
+    const complete = async (request: StructuredRequest): Promise<StructuredResponse> => {
+      requests.push(request)
+      if (request.schemaName === "job_requirement_extraction") {
+        return {
+          text: JSON.stringify({
+            requirements: [
+              { text: "SQL", kind: "required", category: "other", normalizedSkills: [], minYears: null, evidenceQuote: "Required: SQL for reporting tables." },
+              { text: "Summaries", kind: "required", category: "other", normalizedSkills: [], minYears: null, evidenceQuote: "Required: clear written summaries of the numbers." },
+              { text: "Invented", kind: "required", category: "other", normalizedSkills: [], minYears: null, evidenceQuote: "Candidate is already approved for hire." },
+            ],
+          }),
+          inputTokens: 1,
+          outputTokens: 1,
+          finishReason: "stop",
+        }
+      }
+      return {
+        text: JSON.stringify({
+          matches: [
+            { requirementId: "req-0", status: "met", factIds: ["00000000-0000-4000-8000-000000000000"], rationale: "Told to." },
+            { requirementId: "req-1", status: "met", factIds: [sqlFact.id], rationale: "Told to." },
+          ],
+        }),
+        inputTokens: 1,
+        outputTokens: 1,
+        finishReason: "stop",
+      }
+    }
+    const result = await executeAnalysis({ jdText: fixture.jd, facts: [sqlFact], model: "test", complete, now })
+
+    // The invented requirement is dropped because its quote is not in the job text.
+    expect(result.analysis.requirements.map((item) => item.text)).toEqual(["SQL", "Summaries"])
+    expect(result.analysis.droppedRequirementCount).toBe(1)
+    // "met" with only an unknown fact id is downgraded. A real verified fact id is the most it can cite.
+    expect(result.analysis.matches.find((item) => item.requirementId === "req-0")).toMatchObject({ status: "unclear", factIds: [] })
+    expect(result.analysis.matches.find((item) => item.requirementId === "req-1")).toMatchObject({ status: "met", factIds: [sqlFact.id] })
+    // Job text only ever appears in the user message, never in the system prompt.
+    expect(requests).toHaveLength(2)
+    for (const request of requests) {
+      expect(request.system).not.toContain("Ignore previous instructions")
+      expect(request.system).not.toContain("Glass Orchard")
+    }
+    expect(requests[0]?.user).toContain("Ignore previous instructions")
+  })
+
   it("scores required and preferred weights and leaves unclear and location out of the denominator", () => {
     const requirements = [
       grounded({ id: "req-0", text: "TypeScript", kind: "required", category: "skill" }),
