@@ -136,7 +136,7 @@ describe("job analysis pipeline", () => {
     expect(built.analysis.matches[0]).toMatchObject({ status: "met", factIds: [id], method: "ai" })
   })
 
-  it("scores required and preferred weights and leaves unclear out of the denominator", () => {
+  it("scores required and preferred weights and leaves unclear and location out of the denominator", () => {
     const requirements = [
       grounded({ id: "req-0", text: "TypeScript", kind: "required", category: "skill" }),
       grounded({ id: "req-1", text: "Kubernetes", kind: "preferred", category: "skill" }),
@@ -151,22 +151,60 @@ describe("job analysis pipeline", () => {
         factIds: [],
         rationale: "No verified fact supports work authorization.",
         method: "ai",
-        blocker: "work_authorization_location",
+        blocker: null,
       },
     ])
     expect(scored.breakdown.weightedSum).toBe(2)
-    expect(scored.breakdown.weightedMax).toBe(4)
-    expect(scored.breakdown.score).toBe(50)
+    expect(scored.breakdown.weightedMax).toBe(2)
+    expect(scored.breakdown.score).toBe(100)
     expect(scored.breakdown.unclearCount).toBe(1)
-    expect(scored.breakdown.coverageConfidence).toBeCloseTo(2 / 3)
-    expect(scored.blockers).toEqual([
+    expect(scored.breakdown.confirmCount).toBe(1)
+    expect(scored.breakdown.coverageConfidence).toBeCloseTo(1 / 2)
+    expect(scored.blockers).toEqual([])
+  })
+
+  it("leaves work authorization for the user to confirm instead of a not-evidenced blocker", () => {
+    const jd = `${"Fictional employer Blue Heron Labs builds tools. ".repeat(5)}Required: TypeScript. Must be authorized to work in Canada.`
+    const extracted = [
       {
-        requirementId: "req-2",
-        kind: "work_authorization_location",
-        text: "No verified fact supports work authorization.",
+        text: "TypeScript",
+        kind: "required" as const,
+        category: "skill" as const,
+        normalizedSkills: ["typescript"],
+        minYears: null,
+        evidenceQuote: "Required: TypeScript.",
       },
-    ])
-    expect(scored.breakdown.score).toBe(Math.round((100 * 2) / 4))
+      {
+        text: "Authorized to work in Canada",
+        kind: "required" as const,
+        category: "work_authorization_location" as const,
+        normalizedSkills: [],
+        minYears: null,
+        evidenceQuote: "Must be authorized to work in Canada.",
+      },
+    ]
+    const facts = [fact({ id: "44444444-4444-4444-8444-444444444444", type: "skill", title: "TypeScript" })]
+    const preview = buildAnalysis({ jdText: jd, now, extracted, aiMatches: [], facts })
+    expect(preview.ok).toBe(true)
+    if (!preview.ok) return
+    // Nothing is left for the model, so the location line is never sent to it.
+    expect(preview.analysis.matches.every((match) => match.method === "deterministic")).toBe(true)
+
+    const built = buildAnalysis({
+      jdText: jd,
+      now,
+      extracted,
+      aiMatches: [{ requirementId: "req-1", status: "not_evidenced", factIds: [], rationale: "No fact." }],
+      facts,
+    })
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+    const location = built.analysis.matches.find((match) => match.requirementId === "req-1")
+    expect(location).toMatchObject({ status: "unclear", method: "deterministic", blocker: null, factIds: [] })
+    expect(built.analysis.blockers).toEqual([])
+    expect(built.analysis.score).toBe(100)
+    expect(built.analysis.scoreBreakdown).toMatchObject({ scorableCount: 1, unclearCount: 0, confirmCount: 1 })
+    expect(built.analysis.scoreBreakdown.coverageConfidence).toBe(1)
   })
 
   it("reports an experience shortfall beside a score that only uses the weights", () => {

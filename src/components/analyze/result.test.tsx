@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 
 import { AnalysisResult } from "@/components/analyze/result"
-import { QUALIFICATION_DISCLAIMER } from "@/lib/analyze/copy"
+import { CONFIRM_NOTE, QUALIFICATION_DISCLAIMER } from "@/lib/analyze/copy"
 import type { AnalysisRecord } from "@/lib/analyze/data"
 
 const analysis: AnalysisRecord = {
@@ -74,5 +74,47 @@ describe("fit result", () => {
     expect(screen.getByText("Unclear")).toBeTruthy()
     expect(document.body.textContent ?? "").not.toMatch(/\bATS\b/i)
     expect(screen.getByRole("button", { name: "Re-check with your own key" })).toBeTruthy()
+  })
+
+  it("shows work authorization as a neutral item to confirm, not a blocker or learning gap", () => {
+    render(
+      <AnalysisResult
+        analysis={{
+          ...analysis,
+          requirements: [
+            {
+              id: "req-0",
+              text: "Authorized to work in Canada",
+              kind: "required",
+              category: "work_authorization_location",
+              normalizedSkills: [],
+              minYears: null,
+              evidenceQuote: "Required: TypeScript",
+              spanStart: 0,
+              spanEnd: 20,
+            },
+          ],
+          matches: [
+            {
+              requirementId: "req-0",
+              status: "not_evidenced",
+              factIds: [],
+              rationale: "No verified fact.",
+              method: "ai",
+              blocker: null,
+            },
+          ],
+        }}
+        factLabels={{}}
+        executionMode="byok"
+        reused={false}
+      />,
+    )
+    expect(screen.getByText("Confirm before applying")).toBeTruthy()
+    expect(screen.getByText(CONFIRM_NOTE)).toBeTruthy()
+    expect(screen.getByRole("cell", { name: "Confirm" })).toBeTruthy()
+    expect(screen.queryByText("Not evidenced")).toBeNull()
+    expect(screen.getByText("No blocker was recorded.")).toBeTruthy()
+    expect(screen.getByText("No not-evidenced requirements are waiting for a suggestion.")).toBeTruthy()
   })
 })

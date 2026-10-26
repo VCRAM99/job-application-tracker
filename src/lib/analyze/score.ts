@@ -17,6 +17,7 @@ export function scoreRequirements(
   let weightedMax = 0
   let scorableCount = 0
   let unclearCount = 0
+  let confirmCount = 0
   const blockers: Blocker[] = []
 
   for (const requirement of requirements) {
@@ -29,6 +30,10 @@ export function scoreRequirements(
         text: match.rationale || requirement.text,
       })
     }
+    if (requirement.category === "work_authorization_location") {
+      confirmCount += 1
+      continue
+    }
     if (status === "unclear") {
       unclearCount += 1
       continue
@@ -40,7 +45,8 @@ export function scoreRequirements(
   }
 
   const score = weightedMax === 0 ? null : Math.round((100 * weightedSum) / weightedMax)
-  const coverageConfidence = requirements.length === 0 ? null : scorableCount / requirements.length
+  const considered = requirements.length - confirmCount
+  const coverageConfidence = considered === 0 ? null : scorableCount / considered
   return {
     breakdown: {
       score,
@@ -49,6 +55,7 @@ export function scoreRequirements(
       coverageConfidence,
       scorableCount,
       unclearCount,
+      confirmCount,
     },
     blockers,
   }

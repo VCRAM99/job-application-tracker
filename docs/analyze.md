@@ -13,7 +13,7 @@ The feature stays off until both `JOB_ANALYSIS_ENABLED=true` and career AI are e
 5. Match skills, certifications, education, titles, seniority, and years from verified facts in code. The model sees only the remaining requirements and the verified facts, with their ids.
 6. Drop any fact id the model returns that is not in that verified set. A met or partial match with no remaining fact id becomes unclear.
 7. Score the scorable requirements. Required counts double a preferred requirement. Met is 1, partial is 0.5, and not evidenced is 0. Unclear requirements stay out of the denominator and are reported in coverage confidence.
-8. List work-authorization or location mismatches and years-of-experience shortfalls beside the score.
+8. List years-of-experience shortfalls beside the score. Work-authorization and location requirements are listed as items to confirm. They are not scored and are not sent to the model.
 9. Optionally run readability heuristics on a pasted resume source. Those checks do not parse a file.
 
 "I have this" inserts a skill fact in the `suggested` state with provenance pointing at the analysis. Accepting it on Career is a separate review. Nothing is auto-verified.
@@ -58,7 +58,7 @@ The script prints a warning, then per-fixture precision and recall against the e
 
 - Years of experience are the merged span of verified employment dates. Overlapping roles are not double counted, and undated roles do not add years.
 - Contradictory lines in a job description are scored as separate requirements.
-- Work authorization and location are blockers only when the match status is not evidenced. Unclear means the facts were not enough to decide.
+- Work authorization and location are never scored and never become blockers because a fact is missing. Verified facts do not record them, so the page asks the user to confirm them. A blocker would need a verified fact or saved preference that contradicts the requirement, and neither feeds the analysis yet.
 - Catalog descriptions are stored up to 8,000 characters. Longer text has to be pasted.
 - A cached analysis is reused until a verified fact changes or the prompt version changes, including when you press re-check.
 - The local mock provider is for interface checks. It is not a measure of extraction quality.

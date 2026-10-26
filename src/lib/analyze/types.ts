@@ -65,6 +65,8 @@ export type ScoreBreakdown = {
   coverageConfidence: number | null
   scorableCount: number
   unclearCount: number
+  /** Work authorization or location requirements left for the user to confirm. */
+  confirmCount?: number
 }
 
 export type Blocker = {

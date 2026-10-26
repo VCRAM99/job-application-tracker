@@ -1,7 +1,7 @@
 import Link from "next/link"
 
 import { ClaimButton, RerunButton } from "@/components/analyze/forms"
-import { BLOCKER_NOTE, QUALIFICATION_DISCLAIMER, READABILITY_NOTE } from "@/lib/analyze/copy"
+import { BLOCKER_NOTE, CONFIRM_NOTE, QUALIFICATION_DISCLAIMER, READABILITY_NOTE } from "@/lib/analyze/copy"
 import type { AnalysisRecord } from "@/lib/analyze/data"
 import type { GroundedRequirement, RequirementCategory, RequirementMatch } from "@/lib/analyze/types"
 
@@ -73,11 +73,13 @@ export function AnalysisResult({
 }) {
   const matches = new Map(analysis.matches.map((match) => [match.requirementId, match]))
   const claimed = new Set(analysis.claims.map((claim) => claim.requirementId))
-  const learningGaps = analysis.requirements.filter((requirement) => {
+  const toConfirm = analysis.requirements.filter((requirement) => requirement.category === "work_authorization_location")
+  const comparable = analysis.requirements.filter((requirement) => requirement.category !== "work_authorization_location")
+  const learningGaps = comparable.filter((requirement) => {
     const match = matches.get(requirement.id)
     return match?.status === "not_evidenced" && !claimed.has(requirement.id)
   })
-  const mayHave = analysis.requirements.filter((requirement) => {
+  const mayHave = comparable.filter((requirement) => {
     const match = matches.get(requirement.id)
     return match?.status === "partial" && !claimed.has(requirement.id)
   })
@@ -130,8 +132,22 @@ export function AnalysisResult({
       <section className="grid gap-3" aria-labelledby="blocker-heading">
         <h2 id="blocker-heading" className="text-base font-medium">Separate checks</h2>
         <p className="text-sm leading-6 text-muted-foreground">{BLOCKER_NOTE}</p>
+        {toConfirm.length > 0 ? (
+          <div className="grid gap-2">
+            <h3 className="text-sm font-medium">Confirm before applying</h3>
+            <p className="text-sm leading-6 text-muted-foreground">{CONFIRM_NOTE}</p>
+            <ul className="grid gap-2">
+              {toConfirm.map((requirement) => (
+                <li key={requirement.id} className="rounded-lg border px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">Confirm. </span>
+                  {requirement.text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {analysis.blockers.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No work-authorization, location, or years shortfall was recorded.</p>
+          <p className="text-sm text-muted-foreground">No blocker was recorded.</p>
         ) : (
           <ul className="grid gap-2">
             {analysis.blockers.map((blocker) => (
@@ -276,6 +292,7 @@ function RequirementRow({
   factLabels: Record<string, string>
 }) {
   const status = match?.status ?? "unclear"
+  const statusLabel = requirement.category === "work_authorization_location" ? "Confirm" : STATUS_LABEL[status]
   return (
     <tr className="border-b align-top last:border-b-0">
       <th scope="row" className="px-3 py-3 font-normal">
@@ -289,7 +306,7 @@ function RequirementRow({
       </th>
       <td className="px-3 py-3">{KIND_LABEL[requirement.kind]}</td>
       <td className="px-3 py-3">{CATEGORY_LABEL[requirement.category]}</td>
-      <td className="px-3 py-3">{STATUS_LABEL[status]}</td>
+      <td className="px-3 py-3">{statusLabel}</td>
       <td className="px-3 py-3">
         {match && match.factIds.length > 0 ? (
           <ul className="flex flex-wrap gap-2">

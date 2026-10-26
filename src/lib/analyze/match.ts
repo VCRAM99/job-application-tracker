@@ -129,6 +129,23 @@ function matchTitle(requirement: GroundedRequirement, facts: VerifiedFact[]): Re
   }
 }
 
+/**
+ * Verified career facts do not record work authorization or location, so these
+ * requirements are never scored or sent to a model. The user confirms them.
+ * A blocker needs an explicit contradiction, and no verified fact or saved
+ * preference feeds this analysis yet, so none is recorded here.
+ */
+function confirmMatch(requirement: GroundedRequirement): RequirementMatch {
+  return {
+    requirementId: requirement.id,
+    status: "unclear",
+    factIds: [],
+    rationale: "Confirm this yourself. Verified career facts do not record work authorization or location.",
+    method: "deterministic",
+    blocker: null,
+  }
+}
+
 export function deterministicMatches(
   requirements: GroundedRequirement[],
   facts: VerifiedFact[],
@@ -137,6 +154,10 @@ export function deterministicMatches(
   const matches: RequirementMatch[] = []
   const remaining: GroundedRequirement[] = []
   for (const requirement of requirements) {
+    if (requirement.category === "work_authorization_location") {
+      matches.push(confirmMatch(requirement))
+      continue
+    }
     const years = matchYears(requirement, facts, now)
     if (years) {
       matches.push(years)
@@ -197,17 +218,13 @@ export function applyAiMatches(
     }
     const factIds = [...new Set(ai.factIds.filter((id) => allowedFactIds.has(id)))]
     const status = (ai.status === "met" || ai.status === "partial") && factIds.length === 0 ? "unclear" : ai.status
-    const blocker =
-      status === "not_evidenced" && requirement.category === "work_authorization_location"
-        ? "work_authorization_location"
-        : null
     return {
       requirementId: requirement.id,
       status,
       factIds,
       rationale: ai.rationale || "Compared with verified career facts.",
       method: "ai",
-      blocker,
+      blocker: null,
     }
   })
 }
