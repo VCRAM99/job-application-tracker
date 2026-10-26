@@ -16,13 +16,15 @@ export function jobAnalysisEnabled(env: Env = process.env): boolean {
 }
 
 /**
- * Local stand-in for provider calls. Never active in production.
- * A missing or any other value keeps the real adapters.
+ * Local stand-in for provider calls. Never active on a Vercel production or
+ * preview deployment, or in any production build. Only `vercel dev` or no
+ * Vercel at all may use it. A missing or any other value keeps the real adapters.
  */
 export function jobAnalysisMockProvider(env: Env = process.env): boolean {
   if (env.JOB_ANALYSIS_MOCK_PROVIDER?.trim().toLowerCase() !== "true") return false
-  if (env.VERCEL_ENV === "production" || env.NODE_ENV === "production") return false
-  return true
+  if (env.NODE_ENV === "production") return false
+  const vercel = env.VERCEL_ENV?.trim()
+  return !vercel || vercel === "development"
 }
 
 export function managedAllowance(env: Env = process.env): {

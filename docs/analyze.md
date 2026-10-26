@@ -33,7 +33,7 @@ The value must already be in the curated model list. Prompt version is `job-fit-
 | Variable | Default | What it controls |
 | --- | --- | --- |
 | `JOB_ANALYSIS_ENABLED` | Off unless the value is `true`. | `/analyze`, posting and application entry points, and the fit nav item. Also requires career AI to be enabled. |
-| `JOB_ANALYSIS_MOCK_PROVIDER` | Off. Ignored when `NODE_ENV` or `VERCEL_ENV` is `production`. | Local stand-in that returns structured JSON and does not call a provider or reserve quota. |
+| `JOB_ANALYSIS_MOCK_PROVIDER` | Off. Ignored when `NODE_ENV` is `production` or `VERCEL_ENV` is set to anything but `development`, so no Vercel production or preview deployment can use it. | Local stand-in that returns structured JSON and does not call a provider or reserve quota. |
 
 `JOB_ANALYSIS_ENABLED=1` and `JOB_ANALYSIS_ENABLED=yes` stay off.
 
