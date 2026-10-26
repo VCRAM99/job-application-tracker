@@ -10,11 +10,29 @@ security invoker
 set search_path = ''
 as $$
 begin
+  -- A referenced posting, application, or resume source was deleted and the
+  -- foreign key is clearing its link. This also runs for catalog deletes made
+  -- without a user session. Allow it only when nothing else in the row changes.
+  if tg_op = 'UPDATE'
+    and (new.posting_id is null or new.posting_id is not distinct from old.posting_id)
+    and (new.application_id is null or new.application_id is not distinct from old.application_id)
+    and (new.resume_source_id is null or new.resume_source_id is not distinct from old.resume_source_id)
+    and (pg_catalog.to_jsonb(new) - array['posting_id', 'application_id', 'resume_source_id', 'updated_at'])
+      = (pg_catalog.to_jsonb(old) - array['posting_id', 'application_id', 'resume_source_id', 'updated_at'])
+    and (new.posting_id, new.application_id, new.resume_source_id)
+      is distinct from (old.posting_id, old.application_id, old.resume_source_id)
+  then
+    return new;
+  end if;
+
   if auth.uid() is null then
     raise exception 'not authenticated' using errcode = '42501';
   end if;
   if new.user_id is distinct from auth.uid() then
     raise exception 'not authorized' using errcode = '42501';
+  end if;
+  if tg_op = 'UPDATE' and new.user_id is distinct from old.user_id then
+    raise exception 'user_id cannot be changed' using errcode = '42501';
   end if;
 
   if tg_op = 'INSERT' then
@@ -29,7 +47,9 @@ begin
     end if;
   end if;
 
-  if new.application_id is not null and not exists (
+  if new.application_id is not null
+    and (tg_op = 'INSERT' or new.application_id is distinct from old.application_id)
+    and not exists (
     select 1
     from public.applications
     where id = new.application_id
@@ -38,7 +58,9 @@ begin
     raise exception 'application not owned' using errcode = '42501';
   end if;
 
-  if new.posting_id is not null and not exists (
+  if new.posting_id is not null
+    and (tg_op = 'INSERT' or new.posting_id is distinct from old.posting_id)
+    and not exists (
     select 1
     from public.job_postings
     where id = new.posting_id
@@ -46,7 +68,9 @@ begin
     raise exception 'posting not visible' using errcode = '42501';
   end if;
 
-  if new.resume_source_id is not null and not exists (
+  if new.resume_source_id is not null
+    and (tg_op = 'INSERT' or new.resume_source_id is distinct from old.resume_source_id)
+    and not exists (
     select 1
     from public.career_sources
     where id = new.resume_source_id
@@ -184,7 +208,7 @@ create index job_analyses_user_created_idx
   on public.job_analyses (user_id, created_at desc);
 
 create trigger job_analyses_10_set_user_id
-  before insert or update on public.job_analyses
+  before insert on public.job_analyses
   for each row execute function public.assign_user_id();
 
 create trigger job_analyses_20_guard
@@ -225,6 +249,34 @@ create policy "delete own job analyses"
   to authenticated
   using (auth.uid() = user_id);
 
+-- A suggested fact may point back at the analysis it came from. The pointer
+-- must name one of the caller's own analyses when it is written.
+create or replace function public.guard_fact_provenance()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  if new.provenance is null
+    or (tg_op = 'UPDATE' and new.provenance is not distinct from old.provenance) then
+    return new;
+  end if;
+  if auth.uid() is null or not exists (
+    select 1
+    from public.job_analyses
+    where id = (new.provenance->>'analysisId')::uuid
+      and user_id = auth.uid()
+  ) then
+    raise exception 'analysis not owned' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.guard_fact_provenance() from public, anon;
+grant execute on function public.guard_fact_provenance() to authenticated;
+
 do $$
 declare
   tbl text;
@@ -250,6 +302,12 @@ begin
        )',
       tbl,
       tbl || '_provenance_check'
+    );
+    execute format(
+      'create trigger %I before insert or update of provenance on public.%I
+         for each row execute function public.guard_fact_provenance()',
+      tbl || '_provenance_guard',
+      tbl
     );
   end loop;
 end $$;
