@@ -166,9 +166,7 @@ export function deterministicMatches(
     const skillEligible =
       requirement.category === "skill" ||
       requirement.category === "domain" ||
-      (requirement.normalizedSkills.length > 0 &&
-        requirement.category !== "experience_years" &&
-        requirement.category !== "work_authorization_location")
+      (requirement.normalizedSkills.length > 0 && requirement.category !== "experience_years")
     const skills = skillEligible ? matchSkills(requirement, facts) : null
     if (skills) {
       matches.push(skills)
