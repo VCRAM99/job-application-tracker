@@ -15,6 +15,7 @@ import {
 import { executeAnalysis } from "@/lib/analyze/execute"
 import { sha256 } from "@/lib/analyze/hash"
 import { mockStructuredResponse } from "@/lib/analyze/mock"
+import { settleDuplicateRun } from "@/lib/analyze/settle"
 import { validateJobDescription } from "@/lib/analyze/text"
 import { completeWithProvider } from "@/lib/ai/providers"
 import { AiRequestError, AI_ERROR_MESSAGES, isProvider, isStoredMode, type AiErrorCode } from "@/lib/ai/types"
@@ -230,7 +231,16 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
     },
   )
 
-  if (!result.ok) return { ok: false, message: messageFor(result.code) }
+  if (!result.ok) {
+    const settled = await settleDuplicateRun(result, () =>
+      findCachedAnalysis({ jdHash, profileFingerprint: fingerprint }),
+    )
+    if (settled) return { ok: true, id: settled, reused: true }
+    if (result.code === "in_progress" && result.usageEventId) {
+      return { ok: false, message: "This analysis is still running. It will appear in your history when it finishes." }
+    }
+    return { ok: false, message: messageFor(result.code) }
+  }
   if (result.kind === "already-complete") {
     const again = await findCachedAnalysis({ jdHash, profileFingerprint: fingerprint })
     if (!again) return { ok: false, message: "This analysis already finished. Refresh the history list." }
