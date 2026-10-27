@@ -1,7 +1,7 @@
 import { AiSettingsForm } from "@/components/career/forms"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { aiFeaturesEnabled, managedAllowance, platformKeyConfigured } from "@/lib/ai/flags"
-import { parseKeyRing } from "@/lib/ai/crypto"
+import { credentialConfigError } from "@/lib/ai/crypto"
 import { revokeProviderCredential, saveAiSettings, saveProviderCredential } from "@/lib/career/actions"
 import { loadCareer } from "@/lib/career/data"
 
@@ -60,7 +60,7 @@ export async function AiSettingsSection() {
           settings={loaded.workspace.settings}
           credentials={loaded.workspace.credentials}
           usage={loaded.workspace.usage}
-          encryptionReady={encryptionReady()}
+          encryptionError={credentialConfigError()}
           managedReady={
             allowance.enabled && provider !== null && platformKeyConfigured(provider)
           }
@@ -70,10 +70,3 @@ export async function AiSettingsSection() {
   )
 }
 
-function encryptionReady(): boolean {
-  try {
-    return parseKeyRing() !== null
-  } catch {
-    return false
-  }
-}

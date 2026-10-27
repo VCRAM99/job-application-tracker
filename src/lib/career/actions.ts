@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { accountingProof, accountingSecret } from "@/lib/ai/accounting"
-import { credentialShapeError, decryptSecret, encryptSecret, lastFour, parseKeyRing, sha256 } from "@/lib/ai/crypto"
+import { credentialConfigError, credentialShapeError, decryptSecret, encryptSecret, lastFour, parseKeyRing, sha256 } from "@/lib/ai/crypto"
 import { EXTRACTION_JSON_SCHEMA, extractionSchema, factSchema, isFactType } from "@/lib/ai/extraction"
 import { aiFeaturesEnabled, managedAllowance, readPlatformKey } from "@/lib/ai/flags"
 import { generateStructured, type ReservationRecord } from "@/lib/ai/gateway"
@@ -164,8 +164,12 @@ export async function saveProviderCredential(
   if (!parsed.success || !isProvider(parsed.data.provider)) return fail("Enter a provider key.")
   const shape = credentialShapeError(parsed.data.provider, parsed.data.secret)
   if (shape) return fail(shape)
-  const ring = readRing()
-  if (!ring) return fail(AI_ERROR_MESSAGES.encryption_unconfigured)
+  const configError = credentialConfigError()
+  const ring = configError ? null : readRing()
+  if (!ring) {
+    console.error(`Provider key not saved: ${configError ?? AI_ERROR_MESSAGES.encryption_unconfigured}`)
+    return fail(configError ?? AI_ERROR_MESSAGES.encryption_unconfigured)
+  }
   const encrypted = encryptSecret(parsed.data.secret.trim(), ring)
   const { error } = await context.supabase.rpc("rotate_ai_credential", {
     p_provider: parsed.data.provider,
@@ -175,7 +179,10 @@ export async function saveProviderCredential(
     p_nonce: encrypted.nonce,
     p_auth_tag: encrypted.authTag,
   })
-  if (error) return fail("The key could not be saved.")
+  if (error) {
+    console.error(`Provider key not saved: rotate_ai_credential failed (${error.code ?? "no code"}).`)
+    return fail("The key could not be saved.")
+  }
   revalidatePath("/settings")
   return done("Key saved. It is unverified until a live check is explicitly enabled.")
 }

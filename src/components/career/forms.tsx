@@ -264,7 +264,7 @@ export function AiSettingsForm({
   settings,
   credentials,
   usage,
-  encryptionReady,
+  encryptionError,
   managedReady,
 }: {
   action: Action
@@ -273,7 +273,7 @@ export function AiSettingsForm({
   settings: AiSettingsView
   credentials: Array<{ id: string; provider: ProviderId; lastFour: string; status: string }>
   usage: { requests: number; tokens: number; policyEnabled: boolean; requestLimit: number; tokenLimit: number }
-  encryptionReady: boolean
+  encryptionError: string | null
   managedReady: boolean
 }) {
   const [state, formAction, pending] = useActionState(action, initialRecordFormState)
@@ -333,12 +333,14 @@ export function AiSettingsForm({
         <Field name="secret" label="API key">
           <Input id="secret" name="secret" type="password" autoComplete="off" placeholder="Paste a new key" />
         </Field>
-        <p className="text-sm text-muted-foreground">
-          {encryptionReady
-            ? "Saved keys stay encrypted. The full key is not shown again. Saving a key does not mark the provider as connected."
-            : "Set AI_CREDENTIALS_KEY on the server before saving a key."}
-        </p>
-        <Button type="submit" variant="outline" disabled={credentialPending || !encryptionReady}>Save key</Button>
+        {encryptionError ? (
+          <p className="text-sm text-destructive" role="alert">{encryptionError}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Saved keys stay encrypted. The full key is not shown again. Saving a key does not mark the provider as connected.
+          </p>
+        )}
+        <Button type="submit" variant="outline" disabled={credentialPending || Boolean(encryptionError)}>Save key</Button>
       </form>
       <ul className="grid gap-2">
         {credentials.length === 0 ? <li className="text-sm text-muted-foreground">No keys saved.</li> : null}
