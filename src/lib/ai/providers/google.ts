@@ -2,7 +2,7 @@ import "server-only"
 
 import { GoogleGenAI, ThinkingLevel } from "@google/genai"
 
-import { findModel } from "@/lib/ai/models"
+import { findModel, responseSchemaFor } from "@/lib/ai/models"
 import { mapProviderFailure } from "@/lib/ai/provider-error"
 import { AiRequestError, type StructuredRequest, type StructuredResponse } from "@/lib/ai/types"
 
@@ -43,7 +43,7 @@ export async function completeGemini(
       config: {
         systemInstruction: request.system,
         responseMimeType: "application/json",
-        responseJsonSchema: request.jsonSchema,
+        responseJsonSchema: responseSchemaFor("google", request.model, request.jsonSchema),
         ...(lowThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
       },
     })

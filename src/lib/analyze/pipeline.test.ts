@@ -5,6 +5,7 @@ import { AI_ERROR_MESSAGES, AiRequestError, type StructuredRequest, type Structu
 import { buildAnalysis } from "@/lib/analyze/build"
 import { analysisModelFor, cacheIdentity, PROMPT_VERSION } from "@/lib/analyze/constants"
 import { executeAnalysis } from "@/lib/analyze/execute"
+import { mockStructuredResponse } from "@/lib/analyze/mock"
 import { canonicalSkill, experienceYears, profileFingerprint } from "@/lib/analyze/facts"
 import { JOB_FIXTURES } from "@/lib/analyze/fixtures"
 import { groundRequirements } from "@/lib/analyze/ground"
@@ -513,5 +514,65 @@ describe("job analysis pipeline", () => {
     )
     expect(result).toMatchObject({ ok: false, code: "model_unavailable", message: AI_ERROR_MESSAGES.model_unavailable })
     expect(voided).toEqual(["model_unavailable"])
+  })
+
+  describe("overloaded provider", () => {
+    const fixture = JOB_FIXTURES.find((item) => item.id === "glass-injection")!
+    const overloaded = () =>
+      Object.assign(new Error('{"error":{"code":503,"message":"This model is currently experiencing high demand.","status":"UNAVAILABLE"}}'), {
+        status: 503,
+      })
+
+    async function run(failures: Array<() => Error>) {
+      let calls = 0
+      const waits: number[] = []
+      const outcome = await executeAnalysis({
+        jdText: fixture.jd,
+        facts: [],
+        model: "gemini-3.5-flash-lite",
+        now,
+        wait: async (ms) => {
+          waits.push(ms)
+        },
+        complete: async (request) => {
+          calls += 1
+          const failure = failures.shift()
+          if (failure) throw failure()
+          return mockStructuredResponse(request)
+        },
+      }).then(
+        () => "ok" as const,
+        (error: AiRequestError) => error.code,
+      )
+      return { outcome, calls, waits }
+    }
+
+    it("retries a 503 once after a backoff, then succeeds", async () => {
+      const first = await run([overloaded])
+      expect(first.outcome).toBe("ok")
+      expect(first.waits).toHaveLength(1)
+      expect(first.waits[0]).toBeGreaterThanOrEqual(2000)
+    })
+
+    it("stops after one retry and reports the outage", async () => {
+      const result = await run([overloaded, overloaded, overloaded])
+      expect(result).toMatchObject({ outcome: "provider_outage", calls: 2 })
+      expect(result.waits).toHaveLength(1)
+      expect(AI_ERROR_MESSAGES.provider_outage).toMatch(/Try again later/)
+    })
+
+    it.each([
+      [429, "rate_limited"],
+      [404, "model_unavailable"],
+      [500, "provider_outage"],
+    ])("does not retry a %i", async (status, code) => {
+      const result = await run([() => Object.assign(new Error("failure"), { status })])
+      expect(result).toEqual({ outcome: code, calls: 1, waits: [] })
+    })
+  })
+
+  it("lets JOB_ANALYSIS_GOOGLE_MODEL pick the Flash-Lite fallback", () => {
+    expect(analysisModelFor("google", { JOB_ANALYSIS_GOOGLE_MODEL: "gemini-3.5-flash-lite" })).toBe("gemini-3.5-flash-lite")
+    expect(() => analysisModelFor("google", { JOB_ANALYSIS_GOOGLE_MODEL: "gemini-3.7-flash" })).toThrow()
   })
 })

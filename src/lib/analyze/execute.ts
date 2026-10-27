@@ -1,4 +1,4 @@
-import { mapProviderFailure } from "@/lib/ai/provider-error"
+import { mapProviderFailure, withOverloadRetry } from "@/lib/ai/provider-error"
 import { AiRequestError, type StructuredRequest, type StructuredResponse, type TokenUsage } from "@/lib/ai/types"
 import { buildAnalysis } from "@/lib/analyze/build"
 import {
@@ -29,28 +29,28 @@ function addUsage(total: TokenUsage, next: TokenUsage): TokenUsage {
   }
 }
 
-async function callWithRetry(complete: AnalysisComplete, request: StructuredRequest): Promise<StructuredResponse> {
-  let last: AiRequestError = new AiRequestError("transient")
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      return await complete(request)
-    } catch (error) {
-      last = mapProviderFailure(error)
-      if (!last.retryable || attempt === 3) throw last
-    }
+async function callWithRetry(
+  complete: AnalysisComplete,
+  request: StructuredRequest,
+  wait?: (ms: number) => Promise<void>,
+): Promise<StructuredResponse> {
+  try {
+    return await withOverloadRetry(() => complete(request), { wait })
+  } catch (error) {
+    throw mapProviderFailure(error)
   }
-  throw last
 }
 
 async function structuredText(
   complete: AnalysisComplete,
   request: StructuredRequest,
   parse: (text: string) => unknown,
+  wait?: (ms: number) => Promise<void>,
 ): Promise<{ data: unknown; usage: TokenUsage }> {
   let usage: TokenUsage = { inputTokens: null, outputTokens: null }
   let user = request.user
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const response = await callWithRetry(complete, { ...request, user })
+    const response = await callWithRetry(complete, { ...request, user }, wait)
     usage = addUsage(usage, response)
     const data = parse(response.text)
     if (data) return { data, usage }
@@ -66,6 +66,7 @@ export async function executeAnalysis(input: {
   model: string
   complete: AnalysisComplete
   now?: Date
+  wait?: (ms: number) => Promise<void>
 }): Promise<{ analysis: BuiltAnalysis; usage: TokenUsage }> {
   const validated = validateJobDescription(input.jdText)
   if (!validated.ok) throw new AiRequestError("invalid_response", { message: validated.message })
@@ -81,6 +82,7 @@ export async function executeAnalysis(input: {
       thinking: "low",
     },
     parseExtraction,
+    input.wait,
   )
   const extracted = extraction.data as ReturnType<typeof parseExtraction>
   if (!extracted) throw new AiRequestError("invalid_response")
@@ -110,6 +112,7 @@ export async function executeAnalysis(input: {
         jsonSchema: MATCH_JSON_SCHEMA,
       },
       parseMatches,
+      input.wait,
     )
     const parsed = matched.data as ReturnType<typeof parseMatches>
     if (!parsed) throw new AiRequestError("invalid_response")

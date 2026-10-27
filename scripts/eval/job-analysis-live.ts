@@ -8,13 +8,18 @@
  *
  * The model is the app's Google default from src/lib/analyze/constants.ts,
  * or JOB_ANALYSIS_GOOGLE_MODEL when set. Either must be in the model registry.
+ * If the default is overloaded, try the Flash-Lite fallback:
+ *
+ *   JOB_ANALYSIS_GOOGLE_MODEL=gemini-3.5-flash-lite GEMINI_API_KEY=... npx tsx scripts/eval/job-analysis-live.ts
+ *
+ * A 503 or overloaded response is retried once after a short wait, as in the app.
  *
  * Warning: this makes real API calls and spends tokens.
  */
 import { GoogleGenAI, ThinkingLevel } from "@google/genai"
 
-import { findModel } from "../../src/lib/ai/models"
-import { mapProviderFailure } from "../../src/lib/ai/provider-error"
+import { findModel, responseSchemaFor } from "../../src/lib/ai/models"
+import { mapProviderFailure, withOverloadRetry } from "../../src/lib/ai/provider-error"
 import { analysisModelFor } from "../../src/lib/analyze/constants"
 import { JOB_FIXTURES, type JobFixture } from "../../src/lib/analyze/fixtures"
 import { groundRequirements } from "../../src/lib/analyze/ground"
@@ -78,16 +83,18 @@ async function main() {
       rows.push(`${fixture.id}\tlocal-reject\tn/a\tn/a\t0`)
       continue
     }
-    const response = await client.models.generateContent({
-      model,
-      contents: extractionUserMessage(validated.text),
-      config: {
-        systemInstruction: EXTRACTION_SYSTEM_PROMPT,
-        responseMimeType: "application/json",
-        responseJsonSchema: EXTRACTION_JSON_SCHEMA,
-        ...(thinkingConfig ? { thinkingConfig } : {}),
-      },
-    })
+    const response = await withOverloadRetry(() =>
+      client.models.generateContent({
+        model,
+        contents: extractionUserMessage(validated.text),
+        config: {
+          systemInstruction: EXTRACTION_SYSTEM_PROMPT,
+          responseMimeType: "application/json",
+          responseJsonSchema: responseSchemaFor("google", model, EXTRACTION_JSON_SCHEMA),
+          ...(thinkingConfig ? { thinkingConfig } : {}),
+        },
+      }),
+    )
     inputTokens += response.usageMetadata?.promptTokenCount ?? 0
     outputTokens += response.usageMetadata?.candidatesTokenCount ?? 0
     const parsed = parseExtraction(response.text ?? "")
@@ -117,6 +124,8 @@ async function main() {
 main().catch((error: unknown) => {
   const ai = mapProviderFailure(error)
   console.error(ai.code === "model_unavailable" ? `${ai.message} Model: ${model}.` : ai.message)
+  const status = error && typeof error === "object" && "status" in error ? (error as { status: unknown }).status : "none"
+  console.error(`HTTP status: ${String(status)}`)
   if (error instanceof Error) console.error(error.message)
   process.exit(1)
 })

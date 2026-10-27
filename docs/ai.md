@@ -16,7 +16,7 @@ Supported cloud providers:
 | --- | --- | --- |
 | OpenAI | Chat Completions JSON schema | `gpt-5.4-mini`, `gpt-5.4` |
 | Anthropic | Messages API JSON schema | `claude-sonnet-5`, `claude-haiku-5-5`, `claude-haiku-4-5` |
-| Google Gemini | `generateContent` JSON schema | `gemini-3.8-flash`, `gemini-2.5-flash`, `gemini-2.5-pro` |
+| Google Gemini | `generateContent` JSON schema | `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-pro` |
 
 The model list lives in `src/lib/ai/models.ts`. The first model for each provider is the default in AI settings. Prices are not stored. Unsupported model strings are rejected before a provider call. The client cannot choose an API endpoint.
 

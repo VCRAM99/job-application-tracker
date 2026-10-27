@@ -136,6 +136,28 @@ describe("provider adapters", () => {
     expect(mapProviderFailure(Object.assign(new Error("Internal error"), { status: 500 })).code).toBe("provider_outage")
   })
 
+  it("drops maxItems from the Gemini schema only for Flash-Lite", async () => {
+    const schemas: unknown[] = []
+    const client = {
+      models: {
+        generateContent: async (args: { config: { responseJsonSchema: unknown } }) => {
+          schemas.push(args.config.responseJsonSchema)
+          return { text: json, candidates: [{ finishReason: "STOP" }] }
+        },
+      },
+    }
+    const jsonSchema = { type: "object", properties: { items: { type: "array", maxItems: 60, items: { type: "string" } } } }
+    await completeGemini({ ...request, model: "gemini-3.5-flash-lite", jsonSchema }, client)
+    await completeGemini({ ...request, model: "gemini-3.8-flash", jsonSchema }, client)
+    expect(JSON.stringify(schemas[0])).not.toContain("maxItems")
+    expect(schemas[1]).toEqual(jsonSchema)
+  })
+
+  it("does not tell the user to retry a request the provider rejected as invalid", () => {
+    const invalid = Object.assign(new Error('{"error":{"code":400,"status":"INVALID_ARGUMENT"}}'), { status: 400 })
+    expect(mapProviderFailure(invalid)).toMatchObject({ code: "unsupported_model", retryable: false })
+  })
+
   it("lists the current default models in the registry", () => {
     expect(assertSupportedModel("google", "gemini-3.8-flash").thinkingLevel).toBe(true)
     expect(assertSupportedModel("anthropic", "claude-haiku-5-5").label).toBe("Claude Haiku 5.5")

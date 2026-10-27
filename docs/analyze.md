@@ -26,7 +26,9 @@ Default models, overridable on the server:
 | Anthropic | `JOB_ANALYSIS_ANTHROPIC_MODEL` | `claude-haiku-5-5` |
 | Google | `JOB_ANALYSIS_GOOGLE_MODEL` | `gemini-3.8-flash` |
 
-The value must already be in the curated model list. The OpenAI default has not been checked against OpenAI's current model list. On Gemini 3.8 Flash the extraction call asks for a low thinking level, which costs fewer tokens. The match call uses the model's default. Prompt version is `job-fit-2026-10-23`. Schema version is `job-fit-schema-1`. Change the prompt version when the schema changes so older cached analyses are not reused.
+The value must already be in the curated model list. The OpenAI default has not been checked against OpenAI's current model list. If Gemini 3.8 Flash is overloaded, set `JOB_ANALYSIS_GOOGLE_MODEL=gemini-3.5-flash-lite`. The app and the live eval both read it. On Gemini 3.8 Flash and 3.5 Flash-Lite the extraction call asks for a low thinking level, which costs fewer tokens. The match call uses the model's default. Prompt version is `job-fit-2026-10-23`. Schema version is `job-fit-schema-1`. Change the prompt version when the schema changes so older cached analyses are not reused.
+
+A 503 or 529 response, or an overloaded message, is retried once after about two seconds. A 404, 429, or other error is not retried. If the retry also fails, the user sees "The provider is unavailable. Try again later."
 
 ## Flags
 
