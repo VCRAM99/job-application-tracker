@@ -6,6 +6,7 @@ import { AnalyzeForm } from "@/components/analyze/forms"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { jobAnalysisEnabled, jobAnalysisMockProvider } from "@/lib/ai/flags"
+import { analysisBlockedReason } from "@/lib/analyze/readiness"
 import { listAnalyses, loadAnalysisContext, loadApplicationPrefill, loadPostingText } from "@/lib/analyze/data"
 import { isUuid } from "@/lib/records/form-state"
 
@@ -73,9 +74,12 @@ export default async function AnalyzePage({
     postingId: posting && posting.ok ? postingId : "",
     applicationId: application && application.ok ? applicationId : "",
   }
-  const missingKey = Boolean(
-    context.settings?.executionMode === "byok" && !context.hasByokKey && !jobAnalysisMockProvider(),
-  )
+  const mockProvider = jobAnalysisMockProvider()
+  const blockedReason = analysisBlockedReason({
+    settings: context.settings,
+    hasByokKey: context.hasByokKey,
+    mockProvider,
+  })
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
@@ -95,8 +99,8 @@ export default async function AnalyzePage({
             settings={context.settings}
             sources={context.sources}
             defaults={defaults}
-            mockProvider={jobAnalysisMockProvider()}
-            missingKey={missingKey}
+            mockProvider={mockProvider}
+            blockedReason={blockedReason}
           />
         </CardContent>
       </Card>

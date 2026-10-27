@@ -16,7 +16,7 @@ export function AnalyzeForm({
   sources,
   defaults,
   mockProvider,
-  missingKey,
+  blockedReason,
 }: {
   settings: { executionMode: "managed" | "byok"; provider: string } | null
   sources: Array<{ id: string; label: string }>
@@ -28,26 +28,14 @@ export function AnalyzeForm({
     applicationId: string
   }
   mockProvider: boolean
-  missingKey: boolean
+  blockedReason: string | null
 }) {
   const [state, formAction, pending] = useActionState(startAnalysis, initialRecordFormState)
   const [jdText, setJdText] = useState(defaults.jdText)
   const count = normalizeJobText(jdText).length
-  if (!settings) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Save a provider and an execution mode in Settings before running a qualification match.
-      </p>
-    )
-  }
   return (
     <form action={formAction} className="grid gap-4">
       <FormStatus state={state} />
-      {missingKey ? (
-        <p className="text-sm text-destructive" role="alert">
-          Save a key for the selected provider before running AI.
-        </p>
-      ) : null}
       {mockProvider ? (
         <p className="text-sm text-muted-foreground">
           A local mock provider is on. This run does not call OpenAI, Anthropic, or Gemini.
@@ -77,11 +65,11 @@ export function AnalyzeForm({
       <fieldset className="grid gap-2">
         <legend className="text-sm font-medium">Execution mode</legend>
         <label className="flex items-center gap-2 text-sm">
-          <input type="radio" name="executionMode" value="byok" defaultChecked={settings.executionMode !== "managed"} />
+          <input type="radio" name="executionMode" value="byok" defaultChecked={settings?.executionMode !== "managed"} />
           Bring your own key
         </label>
         <label className="flex items-center gap-2 text-sm">
-          <input type="radio" name="executionMode" value="managed" defaultChecked={settings.executionMode === "managed"} />
+          <input type="radio" name="executionMode" value="managed" defaultChecked={settings?.executionMode === "managed"} />
           Managed AI
         </label>
       </fieldset>
@@ -96,7 +84,14 @@ export function AnalyzeForm({
       </label>
       {defaults.postingId ? <input type="hidden" name="postingId" value={defaults.postingId} /> : null}
       {defaults.applicationId ? <input type="hidden" name="applicationId" value={defaults.applicationId} /> : null}
-      <Button type="submit" disabled={pending}>{pending ? "Analyzing…" : "Analyze fit"}</Button>
+      {blockedReason ? (
+        <p id="analyze-blocked" className="text-sm text-destructive" role="alert">
+          {blockedReason}
+        </p>
+      ) : null}
+      <Button type="submit" disabled={pending || Boolean(blockedReason)} aria-describedby={blockedReason ? "analyze-blocked" : undefined}>
+        {pending ? "Analyzing…" : "Analyze fit"}
+      </Button>
     </form>
   )
 }
