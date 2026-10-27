@@ -7,8 +7,8 @@ export const MAX_REQUIREMENTS = 40
 
 const FAST_MODELS: Record<ProviderId, string> = {
   openai: "gpt-5.4-mini",
-  anthropic: "claude-haiku-4-5",
-  google: "gemini-2.5-flash",
+  anthropic: "claude-haiku-5-5",
+  google: "gemini-3.8-flash",
 }
 
 const MODEL_ENV: Record<ProviderId, string> = {

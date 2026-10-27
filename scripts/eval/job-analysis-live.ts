@@ -6,10 +6,16 @@
  *
  *   GEMINI_API_KEY=... npx tsx scripts/eval/job-analysis-live.ts
  *
+ * The model is the app's Google default from src/lib/analyze/constants.ts,
+ * or JOB_ANALYSIS_GOOGLE_MODEL when set. Either must be in the model registry.
+ *
  * Warning: this makes real API calls and spends tokens.
  */
-import { GoogleGenAI } from "@google/genai"
+import { GoogleGenAI, ThinkingLevel } from "@google/genai"
 
+import { findModel } from "../../src/lib/ai/models"
+import { mapProviderFailure } from "../../src/lib/ai/provider-error"
+import { analysisModelFor } from "../../src/lib/analyze/constants"
 import { JOB_FIXTURES, type JobFixture } from "../../src/lib/analyze/fixtures"
 import { groundRequirements } from "../../src/lib/analyze/ground"
 import { EXTRACTION_SYSTEM_PROMPT, extractionUserMessage } from "../../src/lib/analyze/prompt"
@@ -24,7 +30,15 @@ if (!apiKey) {
   process.exit(1)
 }
 
-const model = process.env.JOB_ANALYSIS_GOOGLE_MODEL?.trim() || "gemini-2.5-flash"
+let model: string
+try {
+  model = analysisModelFor("google")
+} catch {
+  console.error("JOB_ANALYSIS_GOOGLE_MODEL is not in the model registry (src/lib/ai/models.ts).")
+  process.exit(1)
+}
+const thinkingConfig = findModel("google", model)?.thinkingLevel ? { thinkingLevel: ThinkingLevel.LOW } : undefined
+console.warn(`Model: ${model}${thinkingConfig ? " (low thinking)" : ""}`)
 const client = new GoogleGenAI({ apiKey })
 
 function includesExpected(text: string, needle: string) {
@@ -71,6 +85,7 @@ async function main() {
         systemInstruction: EXTRACTION_SYSTEM_PROMPT,
         responseMimeType: "application/json",
         responseJsonSchema: EXTRACTION_JSON_SCHEMA,
+        ...(thinkingConfig ? { thinkingConfig } : {}),
       },
     })
     inputTokens += response.usageMetadata?.promptTokenCount ?? 0
@@ -100,6 +115,8 @@ async function main() {
 }
 
 main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : "Gemini request failed")
+  const ai = mapProviderFailure(error)
+  console.error(ai.code === "model_unavailable" ? `${ai.message} Model: ${model}.` : ai.message)
+  if (error instanceof Error) console.error(error.message)
   process.exit(1)
 })

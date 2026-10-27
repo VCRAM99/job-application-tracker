@@ -78,6 +78,7 @@ export async function executeAnalysis(input: {
       user: extractionUserMessage(validated.text),
       schemaName: "job_requirement_extraction",
       jsonSchema: EXTRACTION_JSON_SCHEMA,
+      thinking: "low",
     },
     parseExtraction,
   )

@@ -21,6 +21,14 @@ function classify(status: number | null, message: string): AiErrorCode {
     return "context_limit"
   }
   if (status === 401 || status === 403) return "invalid_credentials"
+  if (status === 404) return "model_unavailable"
+  if (
+    text.includes("model_not_found") ||
+    text.includes("no longer available") ||
+    (text.includes("model") && (text.includes("not found") || text.includes("does not exist")))
+  ) {
+    return "model_unavailable"
+  }
   if (status === 429) return "rate_limited"
   if (status === 408 || status === 409 || status === 529) return "transient"
   if (status != null && status >= 500) return "provider_outage"

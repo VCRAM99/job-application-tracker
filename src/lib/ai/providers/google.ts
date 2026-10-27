@@ -1,7 +1,8 @@
 import "server-only"
 
-import { GoogleGenAI } from "@google/genai"
+import { GoogleGenAI, ThinkingLevel } from "@google/genai"
 
+import { findModel } from "@/lib/ai/models"
 import { mapProviderFailure } from "@/lib/ai/provider-error"
 import { AiRequestError, type StructuredRequest, type StructuredResponse } from "@/lib/ai/types"
 
@@ -20,6 +21,7 @@ export type GeminiLike = {
         systemInstruction: string
         responseMimeType: string
         responseJsonSchema: Record<string, unknown>
+        thinkingConfig?: { thinkingLevel: ThinkingLevel }
       }
     }) => Promise<GeminiResponse>
   }
@@ -33,6 +35,7 @@ export async function completeGemini(
   request: StructuredRequest,
   client: GeminiLike = createGeminiClient(request.apiKey),
 ): Promise<StructuredResponse> {
+  const lowThinking = request.thinking === "low" && findModel("google", request.model)?.thinkingLevel
   try {
     const response = await client.models.generateContent({
       model: request.model,
@@ -41,6 +44,7 @@ export async function completeGemini(
         systemInstruction: request.system,
         responseMimeType: "application/json",
         responseJsonSchema: request.jsonSchema,
+        ...(lowThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
       },
     })
     if (!response.text) throw new AiRequestError("invalid_response")

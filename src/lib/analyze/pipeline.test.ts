@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 
 import { withUsageReservation } from "@/lib/ai/gateway"
-import { AiRequestError, type StructuredRequest, type StructuredResponse } from "@/lib/ai/types"
+import { AI_ERROR_MESSAGES, AiRequestError, type StructuredRequest, type StructuredResponse } from "@/lib/ai/types"
 import { buildAnalysis } from "@/lib/analyze/build"
 import { analysisModelFor, cacheIdentity, PROMPT_VERSION } from "@/lib/analyze/constants"
 import { executeAnalysis } from "@/lib/analyze/execute"
@@ -431,7 +431,10 @@ describe("job analysis pipeline", () => {
     expect(fixture?.rejected).toBe(true)
     expect(validateJobDescription(fixture?.jd ?? "").ok).toBe(false)
     expect(JOB_FIXTURES.filter((item) => !item.rejected).every((item) => validateJobDescription(item.jd).ok)).toBe(true)
-    expect(analysisModelFor("google", {})).toBe("gemini-2.5-flash")
+    expect(analysisModelFor("google", {})).toBe("gemini-3.8-flash")
+    expect(analysisModelFor("anthropic", {})).toBe("claude-haiku-5-5")
+    expect(analysisModelFor("openai", {})).toBe("gpt-5.4-mini")
+    expect(() => analysisModelFor("google", { JOB_ANALYSIS_GOOGLE_MODEL: "gemini-1.0-pro" })).toThrow(AiRequestError)
     expect(analysisModelFor("openai", { JOB_ANALYSIS_OPENAI_MODEL: "gpt-5.4" })).toBe("gpt-5.4")
     expect(() => analysisModelFor("openai", { JOB_ANALYSIS_OPENAI_MODEL: "gpt-obsolete" })).toThrow(AiRequestError)
   })
@@ -480,5 +483,35 @@ describe("job analysis pipeline", () => {
       jsonSchema: {},
     })
     expect([...names]).toEqual(["job_requirement_extraction", "job_requirement_matches"])
+  })
+
+  it("turns a provider 404 into a model-unavailable failure and voids the reservation", async () => {
+    const fixture = JOB_FIXTURES.find((item) => item.id === "glass-injection")
+    if (!fixture) throw new Error("missing fixture")
+    const voided: string[] = []
+    const result = await withUsageReservation(
+      { mode: "byok", provider: "google", model: analysisModelFor("google", {}), apiKey: "test-key", managedAllowed: false },
+      {
+        reserve: async () => ({ id: "evt-404", status: "reserved", reused: false, reopened: false }),
+        finalize: async () => {
+          throw new Error("must not charge")
+        },
+        voidReservation: async (_id, code) => {
+          voided.push(code)
+        },
+      },
+      () =>
+        executeAnalysis({
+          jdText: fixture.jd,
+          facts: [],
+          model: "gemini-2.5-flash",
+          now,
+          complete: async () => {
+            throw Object.assign(new Error("models/gemini-2.5-flash is no longer available to new users"), { status: 404 })
+          },
+        }).then((produced) => ({ data: produced.analysis, usage: produced.usage })),
+    )
+    expect(result).toMatchObject({ ok: false, code: "model_unavailable", message: AI_ERROR_MESSAGES.model_unavailable })
+    expect(voided).toEqual(["model_unavailable"])
   })
 })

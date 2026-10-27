@@ -13,6 +13,7 @@ export const AI_ERROR_CODES = [
   "invalid_credentials",
   "encryption_unconfigured",
   "unsupported_model",
+  "model_unavailable",
   "rate_limited",
   "provider_outage",
   "invalid_response",
@@ -35,6 +36,7 @@ export const AI_ERROR_MESSAGES: Record<AiErrorCode, string> = {
   invalid_credentials: "The provider rejected the saved key.",
   encryption_unconfigured: "The server cannot store provider keys until AI_CREDENTIALS_KEY is set.",
   unsupported_model: "That model is not available for structured career extraction.",
+  model_unavailable: "The provider says the selected model is not available. Choose another model in AI settings, or ask the operator to update the default.",
   rate_limited: "The provider is rate limiting requests. Wait a moment and try again.",
   provider_outage: "The provider is unavailable. Try again later.",
   invalid_response: "The model response did not match the expected career facts. Nothing was saved as verified.",
@@ -61,6 +63,8 @@ export type StructuredRequest = {
   user: string
   schemaName: string
   jsonSchema: Record<string, unknown>
+  /** Ask for less reasoning where the model supports it. Adapters that cannot honor it ignore it. */
+  thinking?: "low"
 }
 
 export type StructuredResponse = TokenUsage & {

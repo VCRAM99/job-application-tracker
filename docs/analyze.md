@@ -23,10 +23,10 @@ Default models, overridable on the server:
 | Provider | Environment variable | Default |
 | --- | --- | --- |
 | OpenAI | `JOB_ANALYSIS_OPENAI_MODEL` | `gpt-5.4-mini` |
-| Anthropic | `JOB_ANALYSIS_ANTHROPIC_MODEL` | `claude-haiku-4-5` |
-| Google | `JOB_ANALYSIS_GOOGLE_MODEL` | `gemini-2.5-flash` |
+| Anthropic | `JOB_ANALYSIS_ANTHROPIC_MODEL` | `claude-haiku-5-5` |
+| Google | `JOB_ANALYSIS_GOOGLE_MODEL` | `gemini-3.8-flash` |
 
-The value must already be in the curated model list. Prompt version is `job-fit-2026-10-23`. Schema version is `job-fit-schema-1`. Change the prompt version when the schema changes so older cached analyses are not reused.
+The value must already be in the curated model list. The OpenAI default has not been checked against OpenAI's current model list. On Gemini 3.8 Flash the extraction call asks for a low thinking level, which costs fewer tokens. The match call uses the model's default. Prompt version is `job-fit-2026-10-23`. Schema version is `job-fit-schema-1`. Change the prompt version when the schema changes so older cached analyses are not reused.
 
 ## Flags
 
@@ -52,7 +52,7 @@ Automated tests do not call Gemini. To score the fictional fixtures yourself:
 GEMINI_API_KEY=your-key npx tsx scripts/eval/job-analysis-live.ts
 ```
 
-The script prints a warning, then per-fixture precision and recall against the expected phrases, the share of requirements dropped for grounding, and token totals. It does not write to the database. Keep the key out of the client and out of git.
+It uses the same Google default as the app, or `JOB_ANALYSIS_GOOGLE_MODEL` when set, and the same low thinking level. The script prints a warning and the model, then per-fixture precision and recall against the expected phrases, the share of requirements dropped for grounding, and token totals. It does not write to the database. Keep the key out of the client and out of git.
 
 ## Limitations
 
