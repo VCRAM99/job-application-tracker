@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { assertCloudExecution, DESKTOP_EXECUTION_AVAILABLE } from "@/lib/ai/executor"
-import { aiFeaturesEnabled, managedAllowance } from "@/lib/ai/flags"
+import { aiFeaturesEnabled, jobAnalysisEnabled, jobAnalysisMockProvider, managedAllowance } from "@/lib/ai/flags"
 import { AiRequestError } from "@/lib/ai/types"
 
 describe("AI feature flags", () => {
@@ -29,6 +29,52 @@ describe("AI feature flags", () => {
       }),
     ).toBe(true)
     expect(aiFeaturesEnabled({ NODE_ENV: "development", AI_FEATURES_ENABLED: "false" })).toBe(false)
+  })
+
+  it("keeps job analysis off unless it is explicitly true and career AI is on", () => {
+    expect(jobAnalysisEnabled({ NODE_ENV: "development" })).toBe(false)
+    expect(jobAnalysisEnabled({ NODE_ENV: "development", JOB_ANALYSIS_ENABLED: "yes" })).toBe(false)
+    expect(jobAnalysisEnabled({ NODE_ENV: "development", JOB_ANALYSIS_ENABLED: "1" })).toBe(false)
+    expect(jobAnalysisEnabled({ NODE_ENV: "development", JOB_ANALYSIS_ENABLED: "true" })).toBe(true)
+    expect(
+      jobAnalysisEnabled({
+        NODE_ENV: "development",
+        JOB_ANALYSIS_ENABLED: "true",
+        AI_FEATURES_ENABLED: "false",
+      }),
+    ).toBe(false)
+    expect(
+      jobAnalysisEnabled({
+        NODE_ENV: "production",
+        VERCEL_ENV: "production",
+        JOB_ANALYSIS_ENABLED: "true",
+      }),
+    ).toBe(false)
+    expect(
+      jobAnalysisEnabled({
+        NODE_ENV: "production",
+        VERCEL_ENV: "production",
+        JOB_ANALYSIS_ENABLED: "true",
+        AI_FEATURES_ENABLED: "true",
+      }),
+    ).toBe(true)
+    expect(jobAnalysisMockProvider({ NODE_ENV: "development", JOB_ANALYSIS_MOCK_PROVIDER: "true" })).toBe(true)
+    expect(jobAnalysisMockProvider({ NODE_ENV: "development" })).toBe(false)
+  })
+
+  it.each([
+    { NODE_ENV: "development", VERCEL_ENV: undefined, expected: true },
+    { NODE_ENV: "test", VERCEL_ENV: undefined, expected: true },
+    { NODE_ENV: "development", VERCEL_ENV: "development", expected: true },
+    { NODE_ENV: "production", VERCEL_ENV: undefined, expected: false },
+    { NODE_ENV: "production", VERCEL_ENV: "development", expected: false },
+    { NODE_ENV: "production", VERCEL_ENV: "preview", expected: false },
+    { NODE_ENV: "production", VERCEL_ENV: "production", expected: false },
+    { NODE_ENV: "development", VERCEL_ENV: "preview", expected: false },
+    { NODE_ENV: "development", VERCEL_ENV: "production", expected: false },
+    { NODE_ENV: "development", VERCEL_ENV: "staging", expected: false },
+  ])("mock provider with NODE_ENV=$NODE_ENV VERCEL_ENV=$VERCEL_ENV is $expected", ({ expected, ...env }) => {
+    expect(jobAnalysisMockProvider({ ...env, JOB_ANALYSIS_MOCK_PROVIDER: "true" })).toBe(expected)
   })
 
   it("keeps managed AI off until the operator sets positive limits", () => {

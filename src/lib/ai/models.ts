@@ -5,17 +5,27 @@ export type ModelCapability = {
   id: string
   label: string
   structured: true
+  /** Accepts a Gemini thinking level on generateContent. */
+  thinkingLevel?: true
+  /** Returns HTTP 400 when a response schema has maxItems. Zod still enforces the caps. */
+  rejectsMaxItems?: true
 }
 
 /**
  * Curated models with structured-output support. Update this list when a
  * provider retires a model. Prices are intentionally not stored here.
+ * The first model per provider is the settings form default.
+ * Gemini 2.5 models stay for accounts that already use them. Google no
+ * longer serves them to new users, so they are not a default anywhere.
  */
 export const MODEL_REGISTRY: readonly ModelCapability[] = [
   { provider: "openai", id: "gpt-5.4-mini", label: "GPT-5.4 mini", structured: true },
   { provider: "openai", id: "gpt-5.4", label: "GPT-5.4", structured: true },
   { provider: "anthropic", id: "claude-sonnet-5", label: "Claude Sonnet 5", structured: true },
+  { provider: "anthropic", id: "claude-haiku-5-5", label: "Claude Haiku 5.5", structured: true },
   { provider: "anthropic", id: "claude-haiku-4-5", label: "Claude Haiku 4.5", structured: true },
+  { provider: "google", id: "gemini-3.8-flash", label: "Gemini 3.8 Flash", structured: true, thinkingLevel: true },
+  { provider: "google", id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash-Lite", structured: true, thinkingLevel: true, rejectsMaxItems: true },
   { provider: "google", id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", structured: true },
   { provider: "google", id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", structured: true },
 ]
@@ -36,4 +46,20 @@ export function assertSupportedModel(provider: string, modelId: string): ModelCa
     throw new AiRequestError("unsupported_model")
   }
   return model
+}
+
+/** The response schema to send to a model, without keywords it rejects. */
+export function responseSchemaFor(provider: ProviderId, model: string, schema: Record<string, unknown>): Record<string, unknown> {
+  if (!findModel(provider, model)?.rejectsMaxItems) return schema
+  return withoutKey(schema, "maxItems") as Record<string, unknown>
+}
+
+function withoutKey(value: unknown, key: string): unknown {
+  if (Array.isArray(value)) return value.map((item) => withoutKey(item, key))
+  if (!value || typeof value !== "object") return value
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([name]) => name !== key)
+      .map(([name, item]) => [name, withoutKey(item, key)]),
+  )
 }

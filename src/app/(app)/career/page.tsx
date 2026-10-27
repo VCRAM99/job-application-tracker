@@ -6,6 +6,7 @@ import {
   ManualFactForm,
   ProfileForm,
   SourceForm,
+  SuggestedFactCard,
   SuggestionCard,
 } from "@/components/career/forms"
 import { PageHeader, RecordState } from "@/components/records/fields"
@@ -16,6 +17,7 @@ import {
   createCareerSource,
   extractCareerFacts,
   rejectCareerSuggestion,
+  reviewSuggestedFact,
   saveCareerProfile,
   supersedeCareerFact,
 } from "@/lib/career/actions"
@@ -58,6 +60,7 @@ export default async function CareerPage() {
 function Workspace({ workspace }: { workspace: CareerWorkspace }) {
   const pending = workspace.suggestions.filter((item) => item.status === "pending")
   const rejected = workspace.suggestions.filter((item) => item.status === "rejected")
+  const suggestedFacts = workspace.facts.filter((fact) => fact.verificationState === "suggested")
   return (
     <div className="grid gap-6">
       <Card>
@@ -100,17 +103,21 @@ function Workspace({ workspace }: { workspace: CareerWorkspace }) {
           )}
         </CardContent>
       </Card>
-      <Card>
+      <Card id="suggestions">
         <CardHeader>
           <CardTitle>Suggestions</CardTitle>
           <CardDescription>
-            Accepting one suggestion verifies only that item. Rejected items stay rejected.
+            Accepting one suggestion verifies only that item. Rejected items stay rejected. Facts saved from a fit analysis start here as suggested.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3">
-          {pending.length === 0 ? (
+          {suggestedFacts.map((fact) => (
+            <SuggestedFactCard key={fact.id} fact={fact} action={reviewSuggestedFact} />
+          ))}
+          {pending.length === 0 && suggestedFacts.length === 0 ? (
             <p className="text-sm text-muted-foreground">No suggestions waiting for review.</p>
-          ) : (
+          ) : null}
+          {pending.length === 0 ? null : (
             pending.map((suggestion) => (
               <SuggestionCard
                 key={suggestion.id}

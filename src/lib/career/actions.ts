@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { accountingProof, accountingSecret } from "@/lib/ai/accounting"
-import { credentialShapeError, decryptSecret, encryptSecret, lastFour, parseKeyRing, sha256 } from "@/lib/ai/crypto"
+import { credentialConfigError, credentialShapeError, decryptSecret, encryptSecret, lastFour, parseKeyRing, sha256 } from "@/lib/ai/crypto"
 import { EXTRACTION_JSON_SCHEMA, extractionSchema, factSchema, isFactType } from "@/lib/ai/extraction"
 import { aiFeaturesEnabled, managedAllowance, readPlatformKey } from "@/lib/ai/flags"
 import { generateStructured, type ReservationRecord } from "@/lib/ai/gateway"
@@ -164,8 +164,12 @@ export async function saveProviderCredential(
   if (!parsed.success || !isProvider(parsed.data.provider)) return fail("Enter a provider key.")
   const shape = credentialShapeError(parsed.data.provider, parsed.data.secret)
   if (shape) return fail(shape)
-  const ring = readRing()
-  if (!ring) return fail(AI_ERROR_MESSAGES.encryption_unconfigured)
+  const configError = credentialConfigError()
+  const ring = configError ? null : readRing()
+  if (!ring) {
+    console.error(`Provider key not saved: ${configError ?? AI_ERROR_MESSAGES.encryption_unconfigured}`)
+    return fail(configError ?? AI_ERROR_MESSAGES.encryption_unconfigured)
+  }
   const encrypted = encryptSecret(parsed.data.secret.trim(), ring)
   const { error } = await context.supabase.rpc("rotate_ai_credential", {
     p_provider: parsed.data.provider,
@@ -175,7 +179,10 @@ export async function saveProviderCredential(
     p_nonce: encrypted.nonce,
     p_auth_tag: encrypted.authTag,
   })
-  if (error) return fail("The key could not be saved.")
+  if (error) {
+    console.error(`Provider key not saved: rotate_ai_credential failed (${error.code ?? "no code"}).`)
+    return fail("The key could not be saved.")
+  }
   revalidatePath("/settings")
   return done("Key saved. It is unverified until a live check is explicitly enabled.")
 }
@@ -259,6 +266,63 @@ export async function addManualFact(
   if (error) return fail("The fact could not be saved.")
   revalidatePath("/career")
   return done("Verified fact added.")
+}
+
+export async function reviewSuggestedFact(
+  _previous: RecordFormState,
+  formData: FormData,
+): Promise<RecordFormState> {
+  const context = await ready()
+  if (!context.ok) return fail(context.message)
+  const factId = formText(formData, "factId")
+  const factType = formText(formData, "factType")
+  const decision = formText(formData, "decision")
+  if (!isUuid(factId) || !isFactType(factType)) return fail("That suggestion is no longer available.")
+  const table = tableFor(factType)
+  const facts = context.supabase as unknown as {
+    from: (name: string) => {
+      update: (value: Record<string, unknown>) => {
+        eq: (column: string, value: string) => {
+          eq: (column: string, value: string) => {
+            select: (columns: string) => PromiseLike<{ data: Array<{ id: string }> | null; error: { message: string } | null }>
+          }
+        }
+      }
+    }
+  }
+  if (decision === "reject") {
+    const rejected = await facts
+      .from(table)
+      .update({ verification_state: "rejected" })
+      .eq("id", factId)
+      .eq("verification_state", "suggested")
+      .select("id")
+    if (rejected.error || !rejected.data?.length) return fail("That suggestion is no longer available.")
+    revalidatePath("/career")
+    return done("Suggestion rejected. It was not verified.")
+  }
+  const primary = formText(formData, "primary").trim()
+  if (!primary) return fail("Name the fact before verifying it.")
+  if (factType === "skill" && primary.length > 80) return fail("Keep the skill name under 80 characters.")
+  const column =
+    factType === "employment" || factType === "accomplishment"
+      ? "title"
+      : factType === "education"
+        ? "credential"
+        : "name"
+  const accepted = await facts
+    .from(table)
+    .update({
+      verification_state: "user_verified",
+      approved_at: new Date().toISOString(),
+      [column]: primary,
+    })
+    .eq("id", factId)
+    .eq("verification_state", "suggested")
+    .select("id")
+  if (accepted.error || !accepted.data?.length) return fail("That suggestion could not be verified.")
+  revalidatePath("/career")
+  return done("Verified. Other suggestions are unchanged.")
 }
 
 export async function extractCareerFacts(

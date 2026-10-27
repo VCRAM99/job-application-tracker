@@ -2,7 +2,7 @@ import "server-only"
 
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto"
 
-import { AiRequestError, type ProviderId } from "@/lib/ai/types"
+import { AiRequestError, AI_ERROR_MESSAGES, type ProviderId } from "@/lib/ai/types"
 
 export type KeyRing = {
   currentVersion: string
@@ -31,6 +31,15 @@ export function parseKeyRing(env: Record<string, string | undefined> = process.e
     })
   }
   return { currentVersion: version, keys: { [version]: key } }
+}
+
+/** Says why provider keys cannot be stored, or null when the key ring is usable. Never includes the key. */
+export function credentialConfigError(env: Record<string, string | undefined> = process.env): string | null {
+  try {
+    return parseKeyRing(env) ? null : AI_ERROR_MESSAGES.encryption_unconfigured
+  } catch (error) {
+    return error instanceof AiRequestError ? error.message : AI_ERROR_MESSAGES.encryption_unconfigured
+  }
 }
 
 export function encryptSecret(plaintext: string, ring: KeyRing): EncryptedSecret {

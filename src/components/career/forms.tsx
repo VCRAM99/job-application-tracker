@@ -186,6 +186,33 @@ export function ManualFactForm({ action }: { action: Action }) {
   )
 }
 
+export function SuggestedFactCard({
+  fact,
+  action,
+}: {
+  fact: CareerFact
+  action: Action
+}) {
+  const [state, formAction, pending] = useActionState(action, initialRecordFormState)
+  return (
+    <form action={formAction} id={`fact-${fact.id}`} className="grid gap-3 rounded-lg border p-3">
+      <p className="text-sm font-medium">{FACT_LABELS[fact.factType]} · Suggested</p>
+      <p className="text-sm text-muted-foreground">This stays unverified until you accept it.</p>
+      <FormStatus state={state} />
+      <input type="hidden" name="factId" value={fact.id} />
+      <input type="hidden" name="factTable" value={fact.factTable} />
+      <input type="hidden" name="factType" value={fact.factType} />
+      <Field name={`primary-${fact.id}`} label="Title or name">
+        <Input id={`primary-${fact.id}`} name="primary" defaultValue={fact.title} />
+      </Field>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" name="decision" value="accept" disabled={pending}>Accept and verify</Button>
+        <Button type="submit" name="decision" value="reject" variant="outline" disabled={pending}>Reject</Button>
+      </div>
+    </form>
+  )
+}
+
 export function FactList({
   facts,
   sources,
@@ -201,7 +228,7 @@ export function FactList({
     <div className="grid gap-4">
       {active.length === 0 ? <p className="text-sm text-muted-foreground">No verified facts yet.</p> : null}
       {active.map((fact) => (
-        <article key={fact.id} className="rounded-lg border p-3">
+        <article key={fact.id} id={`fact-${fact.id}`} className="rounded-lg border p-3">
           <p className="text-xs text-muted-foreground">{FACT_LABELS[fact.factType]} · Verified</p>
           <h3 className="font-medium">{fact.title}</h3>
           <p className="text-sm text-muted-foreground">{fact.detail}</p>
@@ -237,7 +264,7 @@ export function AiSettingsForm({
   settings,
   credentials,
   usage,
-  encryptionReady,
+  encryptionError,
   managedReady,
 }: {
   action: Action
@@ -246,7 +273,7 @@ export function AiSettingsForm({
   settings: AiSettingsView
   credentials: Array<{ id: string; provider: ProviderId; lastFour: string; status: string }>
   usage: { requests: number; tokens: number; policyEnabled: boolean; requestLimit: number; tokenLimit: number }
-  encryptionReady: boolean
+  encryptionError: string | null
   managedReady: boolean
 }) {
   const [state, formAction, pending] = useActionState(action, initialRecordFormState)
@@ -306,12 +333,14 @@ export function AiSettingsForm({
         <Field name="secret" label="API key">
           <Input id="secret" name="secret" type="password" autoComplete="off" placeholder="Paste a new key" />
         </Field>
-        <p className="text-sm text-muted-foreground">
-          {encryptionReady
-            ? "Saved keys stay encrypted. The full key is not shown again. Saving a key does not mark the provider as connected."
-            : "Set AI_CREDENTIALS_KEY on the server before saving a key."}
-        </p>
-        <Button type="submit" variant="outline" disabled={credentialPending || !encryptionReady}>Save key</Button>
+        {encryptionError ? (
+          <p className="text-sm text-destructive" role="alert">{encryptionError}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Saved keys stay encrypted. The full key is not shown again. Saving a key does not mark the provider as connected.
+          </p>
+        )}
+        <Button type="submit" variant="outline" disabled={credentialPending || Boolean(encryptionError)}>Save key</Button>
       </form>
       <ul className="grid gap-2">
         {credentials.length === 0 ? <li className="text-sm text-muted-foreground">No keys saved.</li> : null}

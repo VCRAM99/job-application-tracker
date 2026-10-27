@@ -81,6 +81,25 @@ describe("recommended jobs flags", () => {
       ok: false,
       reason: "refresh_disabled",
     })
+    expect(authorizeScheduler("Bearer secret", { JOB_REFRESH_ENABLED: "true" })).toMatchObject({
+      ok: false,
+      status: 503,
+      reason: "scheduler_secret_missing",
+    })
+    expect(
+      authorizeScheduler("Bearer secret", { JOB_REFRESH_ENABLED: "true", JOB_SCHEDULER_SECRET: "" }),
+    ).toMatchObject({
+      ok: false,
+      status: 503,
+      reason: "scheduler_secret_missing",
+    })
+    expect(
+      authorizeScheduler("Bearer secret", { JOB_REFRESH_ENABLED: "true", JOB_SCHEDULER_SECRET: "   " }),
+    ).toMatchObject({
+      ok: false,
+      status: 503,
+      reason: "scheduler_secret_missing",
+    })
     const secret = "scheduler-secret-value-with-32-characters"
     expect(authorizeScheduler(`Bearer ${secret}`, { JOB_REFRESH_ENABLED: "true", JOB_SCHEDULER_SECRET: secret }).ok).toBe(true)
     expect(authorizeScheduler("Bearer no", { JOB_REFRESH_ENABLED: "true", JOB_SCHEDULER_SECRET: secret })).toMatchObject({

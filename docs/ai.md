@@ -1,5 +1,7 @@
 # Career AI (Milestone 1)
 
+Job fit analysis is a later layer on this gateway. Flags, routes, and the local Gemini eval are in [analyze.md](analyze.md).
+
 Career AI is an additive layer on Job Tracker. It does not change companies, applications, networking, tasks, preparation, daily tasks, or health tracking. The feature is off in production until `AI_FEATURES_ENABLED` is explicitly true. If the career migration has not been applied, Career and AI settings show an unavailable state and the rest of the app still loads.
 
 Live provider calls are not part of the automated tests. Tests use fake clients and an in-process PostgreSQL build.
@@ -13,10 +15,12 @@ Supported cloud providers:
 | Provider | Adapter | Curated models |
 | --- | --- | --- |
 | OpenAI | Chat Completions JSON schema | `gpt-5.4-mini`, `gpt-5.4` |
-| Anthropic | Messages API JSON schema | `claude-sonnet-5`, `claude-haiku-4-5` |
-| Google Gemini | `generateContent` JSON schema | `gemini-2.5-flash`, `gemini-2.5-pro` |
+| Anthropic | Messages API JSON schema | `claude-sonnet-5`, `claude-haiku-5-5`, `claude-haiku-4-5` |
+| Google Gemini | `generateContent` JSON schema | `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-pro` |
 
-The model list lives in `src/lib/ai/models.ts`. Prices are not stored. Unsupported model strings are rejected before a provider call. The client cannot choose an API endpoint.
+The model list lives in `src/lib/ai/models.ts`. The first model for each provider is the default in AI settings. Prices are not stored. Unsupported model strings are rejected before a provider call. The client cannot choose an API endpoint.
+
+Google no longer serves the Gemini 2.5 models to new users. They stay in the list for accounts that already use them. A provider 404, or a "model not found" message, is reported as `model_unavailable` with a message that asks the user to pick another model. It is not retried.
 
 Execution modes:
 
