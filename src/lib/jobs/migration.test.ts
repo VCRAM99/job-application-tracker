@@ -22,3 +22,22 @@ describe("recommended jobs migration safety", () => {
     expect(sql).toContain("terms_status")
   })
 })
+
+describe("jobs activation migration safety", () => {
+  const activation = readFileSync(
+    path.join(process.cwd(), "supabase/migrations/20261028120000_jobs_activation.sql"),
+    "utf8",
+  ).toLowerCase()
+
+  it("changes no table, grant, or policy beyond the new list function", () => {
+    expect(activation).not.toContain("service_role")
+    expect(activation).not.toMatch(/\b(drop|alter|truncate)\s+(table|policy|function|schema)\b/)
+    expect(activation).not.toContain("create table")
+    expect(activation).not.toContain("create policy")
+    expect(activation.match(/^grant /gm)).toEqual(["grant "])
+    expect(activation).toContain("grant execute on function public.list_job_ingestion_sources(text, text) to anon, authenticated")
+    expect(activation).toContain("create or replace function public.apply_job_catalog(p_payload text, p_proof text)")
+    expect(activation).toContain("perform public.assert_job_operation_proof('apply-catalog', p_payload, p_proof)")
+    expect(activation).toContain("on conflict (source_id, source_job_id) do update")
+  })
+})

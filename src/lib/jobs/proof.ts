@@ -9,6 +9,7 @@ export const JOB_OPERATIONS = [
   "record-source-failure",
   "record-alerts",
   "collect-alerts",
+  "list-ingestion-sources",
 ] as const
 
 export type JobOperation = (typeof JOB_OPERATIONS)[number]

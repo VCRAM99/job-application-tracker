@@ -85,6 +85,7 @@ describe("recommended jobs database", () => {
       "record-source-failure": "record_job_source_failure",
       "record-alerts": "record_job_alerts",
       "collect-alerts": "collect_alert_workspace",
+      "list-ingestion-sources": "list_job_ingestion_sources",
     }
     const result = await db.query<{ result: Record<string, unknown> }>(
       `select public.${functions[operation]}($1, $2) as result`,
@@ -278,6 +279,110 @@ describe("recommended jobs database", () => {
       postings: [],
     })
     expect(blocked).toMatchObject({ ok: false, reason: "empty_snapshot_blocked" })
+  })
+
+  it("refreshes the same source again and reactivates a posting that returns", async () => {
+    const activation = {
+      accessMethod: "documented_https_json",
+      approvedUsage: "Store normalized public posting fields for signed-in recommendations.",
+      attributionRequirements: "Name Greenhouse and link the original posting.",
+      retentionRestrictions: "Expire listings omitted from a successful full refresh.",
+      allowedStorageFields: ["title", "location", "urls"],
+    }
+    await operate("register-source", {
+      provider: "greenhouse",
+      slug: "greenhouse:repeat",
+      displayName: "Repeat",
+      sourceIdentifier: "repeat",
+      employerName: "Repeat",
+      employerDomain: "repeat.example",
+      ...activation,
+    })
+    await operate("approve-source", {
+      slug: "greenhouse:repeat",
+      approvalStatus: "approved",
+      termsStatus: "permitted",
+      liveIngestionEnabled: true,
+      refreshLimitPerDay: 24,
+      ...activation,
+    })
+    const posting = (id: string, title: string) => ({
+      sourceJobId: id,
+      employerName: "Repeat",
+      employerDomain: "repeat.example",
+      title,
+      listingUrl: `https://boards.greenhouse.io/repeat/jobs/${id}`,
+      contentHash: hash(),
+      listingStatus: "active",
+    })
+    const apply = (key: string, postings: unknown[]) =>
+      operate("apply-catalog", { sourceSlug: "greenhouse:repeat", idempotencyKey: key, completeSnapshot: true, postings })
+    const status = async () =>
+      (
+        await db.query<{ source_job_id: string; title: string; listing_status: string }>(
+          `select p.source_job_id, p.title, p.listing_status from public.job_postings p
+           join public.job_sources s on s.id = p.source_id where s.slug = 'greenhouse:repeat' order by 1`,
+        )
+      ).rows
+
+    expect(await apply("repeat-1", [posting("a", "Engineer"), posting("b", "Designer")])).toMatchObject({
+      ok: true,
+      upserted: 2,
+      inserted: 2,
+      expired: 0,
+    })
+    expect(await apply("repeat-2", [posting("a", "Senior Engineer"), posting("a", "Senior Engineer")])).toMatchObject({
+      ok: true,
+      upserted: 1,
+      inserted: 0,
+      expired: 1,
+    })
+    expect(await status()).toEqual([
+      { source_job_id: "a", title: "Senior Engineer", listing_status: "active" },
+      { source_job_id: "b", title: "Designer", listing_status: "expired" },
+    ])
+    expect(await apply("repeat-3", [posting("a", "Senior Engineer"), posting("b", "Designer")])).toMatchObject({
+      ok: true,
+      inserted: 0,
+      expired: 0,
+    })
+    expect((await status()).map((row) => row.listing_status)).toEqual(["active", "active"])
+  })
+
+  it("lists approved sources for the runner only with a fresh signed request", async () => {
+    const list = (payload: string, proof: string) =>
+      asUser(null, () =>
+        db.query<{ result: { ok: boolean; sources: Array<{ slug: string; liveIngestionEnabled: boolean }> } }>(
+          "select public.list_job_ingestion_sources($1, $2) as result",
+          [payload, proof],
+        ),
+      )
+    const fresh = JSON.stringify({ now: new Date().toISOString() })
+    const listed = await list(fresh, jobOperationProof(SECRET, "list-ingestion-sources", fresh))
+    const slugs = listed.rows[0]?.result.sources.map((source) => source.slug) ?? []
+    expect(slugs).toContain("greenhouse:repeat")
+    expect(slugs.some((slug) => slug.startsWith("provider:"))).toBe(false)
+
+    const stale = JSON.stringify({ now: new Date(Date.now() - 10 * 60_000).toISOString() })
+    await expect(list(stale, jobOperationProof(SECRET, "list-ingestion-sources", stale))).rejects.toThrow(/stale request/)
+    await expect(list(fresh, jobOperationProof(SECRET, "collect-alerts", fresh))).rejects.toThrow(/not authorized/)
+    await expect(list("not json", jobOperationProof(SECRET, "list-ingestion-sources", "not json"))).rejects.toThrow()
+
+    await operate("approve-source", {
+      slug: "greenhouse:repeat",
+      approvalStatus: "revoked",
+      termsStatus: "permitted",
+      liveIngestionEnabled: false,
+      refreshLimitPerDay: 0,
+      accessMethod: "documented_https_json",
+      approvedUsage: "Revoked.",
+      attributionRequirements: "Revoked.",
+      retentionRestrictions: "Revoked.",
+      allowedStorageFields: ["title"],
+    })
+    const again = JSON.stringify({ now: new Date().toISOString() })
+    const after = await list(again, jobOperationProof(SECRET, "list-ingestion-sources", again))
+    expect(after.rows[0]?.result.sources.map((source) => source.slug)).not.toContain("greenhouse:repeat")
   })
 
   it("keeps alert deliveries private and idempotent", async () => {
