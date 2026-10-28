@@ -1,0 +1,232 @@
+import { readFileSync } from "node:fs"
+import path from "node:path"
+
+import { describe, expect, it, vi } from "vitest"
+
+import type { CatalogCaller, CatalogRpcResult } from "@/lib/jobs/catalog-rpc"
+import {
+  fetchSourcePages,
+  ingestionKey,
+  MAX_BATCH_POSTINGS,
+  runIngestion,
+  type FetchedSource,
+  type IngestionSource,
+} from "@/lib/jobs/ingest"
+import type { NormalizedJob } from "@/lib/jobs/normalize"
+import type { JobOperation } from "@/lib/jobs/proof"
+
+const now = new Date("2026-10-28T11:05:00.000Z")
+const env = { JOB_INGESTION_ENABLED: "true" }
+const greenhouseFixture = JSON.parse(
+  readFileSync(path.join(process.cwd(), "src/lib/jobs/sources/fixtures/greenhouse.json"), "utf8"),
+) as unknown
+
+function source(slug: string, overrides: Partial<IngestionSource> = {}): IngestionSource {
+  return {
+    slug,
+    provider: "greenhouse",
+    sourceIdentifier: slug.replace(/[^a-z0-9]/g, ""),
+    region: "global",
+    employerName: "Northwind",
+    employerDomain: "northwind.example",
+    accessMethod: "documented_https_json",
+    approvedUsage: "Store normalized public posting fields.",
+    attributionRequirements: "Name Greenhouse.",
+    retentionRestrictions: "Expire omitted listings.",
+    allowedStorageFields: ["title"],
+    refreshLimitPerDay: 4,
+    approvalStatus: "approved",
+    termsStatus: "permitted",
+    liveIngestionEnabled: true,
+    ...overrides,
+  }
+}
+
+function job(id: string): NormalizedJob {
+  return {
+    sourceJobId: id,
+    employerName: "Northwind",
+    employerDomain: "northwind.example",
+    title: `Role ${id}`,
+    locationText: null,
+    countryCode: null,
+    region: null,
+    workArrangement: "unknown",
+    employmentType: "unknown",
+    seniority: "unknown",
+    compensationMin: null,
+    compensationMax: null,
+    currency: null,
+    salaryPeriod: "unknown",
+    postedAt: null,
+    listingUrl: `https://boards.greenhouse.io/northwind/jobs/${id}`,
+    applicationUrl: null,
+    applicationMethod: "ats",
+    requisitionId: null,
+    descriptionText: "Confidential listing body text",
+    skills: [],
+    titleTokens: [],
+    skillTokens: [],
+    contentHash: "a".repeat(64),
+    listingStatus: "active",
+    provenance: {},
+  }
+}
+
+type Call = { operation: JobOperation; payload: Record<string, unknown> }
+
+function fakeCatalog(
+  sources: IngestionSource[],
+  respond: (call: Call) => CatalogRpcResult = (call) =>
+    call.operation === "apply-catalog"
+      ? { data: { ok: true, upserted: (call.payload.postings as unknown[]).length, inserted: 1, expired: 0 }, error: null }
+      : { data: { ok: true, activeUnchanged: 3 }, error: null },
+) {
+  const calls: Call[] = []
+  const call: CatalogCaller = async (operation, payload) => {
+    const parsed = { operation, payload: JSON.parse(payload) as Record<string, unknown> }
+    calls.push(parsed)
+    if (operation === "list-ingestion-sources") return { data: { ok: true, sources }, error: null }
+    return respond(parsed)
+  }
+  return { call, calls }
+}
+
+const fetched = (jobs: NormalizedJob[], complete = true): FetchedSource => ({ jobs, complete, rejected: 0 })
+
+describe("ingestion runner", () => {
+  it("does nothing while ingestion is off", async () => {
+    const catalog = fakeCatalog([source("greenhouse:a")])
+    await expect(runIngestion({ call: catalog.call, now, env: {} })).resolves.toEqual({
+      status: "inactive",
+      reason: "ingestion_disabled",
+    })
+    expect(catalog.calls).toEqual([])
+  })
+
+  it("isolates each source and keeps going after a fetch failure or a database error", async () => {
+    const catalog = fakeCatalog(
+      [
+        source("greenhouse:down"),
+        source("greenhouse:ok"),
+        source("greenhouse:paused", { liveIngestionEnabled: false }),
+        source("greenhouse:dberror"),
+        source("greenhouse:boom"),
+      ],
+      (call) => {
+        if (call.payload.sourceSlug === "greenhouse:dberror") return { data: null, error: { message: "x", code: "57014" } }
+        if (call.operation === "apply-catalog") return { data: { ok: true, upserted: 2, inserted: 1, expired: 0 }, error: null }
+        return { data: { ok: true, activeUnchanged: 5 }, error: null }
+      },
+    )
+    const fetchSource = vi.fn(async (item: IngestionSource) => {
+      if (item.slug === "greenhouse:down") throw new Error("http_status")
+      if (item.slug === "greenhouse:boom") throw "not an error object"
+      return fetched([job("1"), job("2")])
+    })
+    const summary = await runIngestion({ call: catalog.call, now, env, fetchSource })
+    expect(summary).toEqual({
+      status: "completed",
+      window: "2026-10-28T11",
+      sources: [
+        { slug: "greenhouse:down", outcome: "failed", reason: "http_status", recorded: true },
+        {
+          slug: "greenhouse:ok",
+          outcome: "applied",
+          fetched: 2,
+          inserted: 1,
+          updated: 1,
+          expired: 0,
+          rejected: 0,
+          completeSnapshot: true,
+          truncated: false,
+        },
+        { slug: "greenhouse:paused", outcome: "skipped", reason: "source_not_activated" },
+        { slug: "greenhouse:dberror", outcome: "error", reason: "apply_failed:57014" },
+        { slug: "greenhouse:boom", outcome: "failed", reason: "source_request_failed", recorded: true },
+      ],
+    })
+    expect(fetchSource).toHaveBeenCalledTimes(4)
+  })
+
+  it("records a failed fetch without sending an apply that could expire listings", async () => {
+    const catalog = fakeCatalog([source("greenhouse:down")])
+    await runIngestion({
+      call: catalog.call,
+      now,
+      env,
+      fetchSource: async () => {
+        throw new Error("timeout")
+      },
+    })
+    expect(catalog.calls.map((call) => call.operation)).toEqual(["list-ingestion-sources", "record-source-failure"])
+    expect(catalog.calls[1]?.payload).toEqual({
+      sourceSlug: "greenhouse:down",
+      idempotencyKey: "greenhouse:down:2026-10-28T11",
+      error: "timeout",
+    })
+  })
+
+  it("never asks to expire listings from an empty, partial, or truncated snapshot", async () => {
+    const run = async (result: FetchedSource) => {
+      const catalog = fakeCatalog([source("greenhouse:a")])
+      await runIngestion({ call: catalog.call, now, env, fetchSource: async () => result })
+      return catalog.calls.find((call) => call.operation === "apply-catalog")?.payload
+    }
+    expect(await run(fetched([]))).toMatchObject({ completeSnapshot: false, allowEmpty: false, postings: [] })
+    expect(await run(fetched([job("1")], false))).toMatchObject({ completeSnapshot: false })
+    const many = Array.from({ length: MAX_BATCH_POSTINGS + 5 }, (_, index) => job(String(index)))
+    const truncated = await run(fetched(many))
+    expect(truncated).toMatchObject({ completeSnapshot: false })
+    expect((truncated?.postings as unknown[]).length).toBe(MAX_BATCH_POSTINGS)
+    expect(await run(fetched([job("1")]))).toMatchObject({ completeSnapshot: true, allowEmpty: false })
+  })
+
+  it("uses one idempotency key per source and UTC hour", async () => {
+    expect(ingestionKey("greenhouse:a", now)).toBe("greenhouse:a:2026-10-28T11")
+    expect(ingestionKey("greenhouse:a", new Date("2026-10-28T11:59:59.999Z"))).toBe("greenhouse:a:2026-10-28T11")
+    expect(ingestionKey("greenhouse:a", new Date("2026-10-28T12:00:00.000Z"))).toBe("greenhouse:a:2026-10-28T12")
+    const catalog = fakeCatalog([source("greenhouse:a")])
+    await runIngestion({ call: catalog.call, now, env, fetchSource: async () => fetched([job("1")]) })
+    expect(catalog.calls[1]?.payload.idempotencyKey).toBe("greenhouse:a:2026-10-28T11")
+  })
+
+  it.each([
+    [{ ok: true, reason: "duplicate" }, { outcome: "duplicate" }],
+    [{ ok: false, reason: "lock_held" }, { outcome: "skipped", reason: "lock_held" }],
+    [{ ok: false, reason: "rate_limited" }, { outcome: "skipped", reason: "rate_limited" }],
+    [{ ok: false, reason: "refresh_limit_unset" }, { outcome: "skipped", reason: "refresh_limit_unset" }],
+  ])("reports the database answer %j without retrying", async (data, expected) => {
+    const catalog = fakeCatalog([source("greenhouse:a")], () => ({ data, error: null }))
+    const summary = await runIngestion({ call: catalog.call, now, env, fetchSource: async () => fetched([job("1")]) })
+    expect(summary).toMatchObject({ status: "completed", sources: [{ slug: "greenhouse:a", ...expected }] })
+    expect(catalog.calls.filter((call) => call.operation === "apply-catalog")).toHaveLength(1)
+  })
+
+  it("stops before fetching when the source list cannot be read, and leaks no listing text", async () => {
+    const fetchSource = vi.fn()
+    const failing: CatalogCaller = async () => ({ data: null, error: { message: "stale request", code: "42501" } })
+    await expect(runIngestion({ call: failing, now, env, fetchSource })).resolves.toEqual({
+      status: "error",
+      reason: "list_failed:42501",
+    })
+    expect(fetchSource).not.toHaveBeenCalled()
+
+    const catalog = fakeCatalog([source("greenhouse:a")])
+    const summary = await runIngestion({ call: catalog.call, now, env, fetchSource: async () => fetched([job("1")]) })
+    expect(JSON.stringify(summary)).not.toContain("Confidential listing body text")
+  })
+
+  it("fetches a fixture board through the adapter without live HTTP", async () => {
+    const load = vi.fn(async () => greenhouseFixture)
+    const page = await fetchSourcePages(source("greenhouse:northwind"), now, { load, permitLiveFetch: false })
+    expect(page.jobs.map((item) => item.title)).toEqual(["Senior Backend Engineer", "Account Executive"])
+    expect(page).toMatchObject({ complete: true, rejected: 1 })
+    await expect(
+      fetchSourcePages(source("greenhouse:northwind"), now, { permitLiveFetch: false }),
+    ).rejects.toThrow(/live_fetch_not_permitted/)
+    await expect(
+      fetchSourcePages(source("greenhouse:bad", { sourceIdentifier: "bad id" }), now, { load, permitLiveFetch: false }),
+    ).rejects.toThrow(/invalid_source_config/)
+  })
+})
