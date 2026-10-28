@@ -128,7 +128,7 @@ async function main() {
     const built = registerPayload(args.flags)
     if (!built.ok) fail(built.message)
     const { call } = await catalog(`register source ${String(built.payload.slug)} as a draft`)
-    return report(await call("register-source", JSON.stringify(built.payload)))
+    return report(await call("register-source", JSON.stringify({ ...built.payload, now: new Date().toISOString() })))
   }
   if (args.command === "approve") {
     const built = approvePayload(args.flags)
@@ -137,7 +137,7 @@ async function main() {
     const { call } = await catalog(
       `set ${String(slug)} to ${String(approvalStatus)}, terms ${String(termsStatus)}, refresh ${String(refreshLimitPerDay)}/day, live ${String(liveIngestionEnabled)}`,
     )
-    return report(await call("approve-source", JSON.stringify(built.payload)))
+    return report(await call("approve-source", JSON.stringify({ ...built.payload, now: new Date().toISOString() })))
   }
   if (args.command === "refresh") {
     if (!jobIngestionEnabled(process.env)) fail("Set JOB_INGESTION_ENABLED=true in the shell for this command.")

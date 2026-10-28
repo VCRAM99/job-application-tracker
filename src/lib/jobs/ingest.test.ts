@@ -167,6 +167,14 @@ describe("ingestion runner", () => {
     })
   })
 
+  it("reports a source the database no longer treats as live without counting it as recorded", async () => {
+    const catalog = fakeCatalog([source("greenhouse:revoked")], () => ({ data: { ok: false, reason: "source_not_live" }, error: null }))
+    const failing = await runIngestion({ call: catalog.call, now, env, fetchSource: async () => { throw new Error("timeout") } })
+    expect(failing).toMatchObject({ sources: [{ slug: "greenhouse:revoked", outcome: "skipped", reason: "source_not_live" }] })
+    const applying = await runIngestion({ call: catalog.call, now, env, fetchSource: async () => fetched([job("1")]) })
+    expect(applying).toMatchObject({ sources: [{ slug: "greenhouse:revoked", outcome: "skipped", reason: "source_not_live" }] })
+  })
+
   it("never asks to expire listings from an empty, partial, or truncated snapshot", async () => {
     const run = async (result: FetchedSource) => {
       const catalog = fakeCatalog([source("greenhouse:a")])

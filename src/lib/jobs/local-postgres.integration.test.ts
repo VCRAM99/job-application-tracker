@@ -74,7 +74,11 @@ async function rest(token: string | null, path: string, init: RequestInit = {}) 
 }
 
 async function operate(operation: JobOperation, payload: unknown) {
-  const text = JSON.stringify(payload)
+  const stamped =
+    (operation === "register-source" || operation === "approve-source") && payload && typeof payload === "object" && !("now" in payload)
+      ? { ...(payload as Record<string, unknown>), now: new Date().toISOString() }
+      : payload
+  const text = JSON.stringify(stamped)
   const proof = jobOperationProof(secret, operation, text)
   const functions: Record<JobOperation, string> = {
     "apply-catalog": "apply_job_catalog",
@@ -184,7 +188,7 @@ describe.skipIf(!enabled)("local postgres and postgrest", () => {
       slug,
       approvalStatus: "approved",
       termsStatus: "permitted",
-      liveIngestionEnabled: false,
+      liveIngestionEnabled: true,
       refreshLimitPerDay: 4,
       accessMethod: "documented_https_json",
       approvedUsage: "Store normalized public posting fields for the local security check.",

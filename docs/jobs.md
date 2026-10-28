@@ -43,6 +43,8 @@ Private, owned by `auth.uid()`:
 
 The runner has no user session, so it reads approved sources through `list_job_ingestion_sources` from `20261028120000_jobs_activation.sql`. That function checks its own HMAC operation name, `list-ingestion-sources`, and rejects a payload whose `now` is more than five minutes from the database clock. It returns activation fields only.
 
+The same migration makes `apply_job_catalog` and `record_job_source_failure` return `{ok: false, reason: "source_not_live"}` without writing anything unless the source is approved, terms permitted, and live ingestion on. `register_job_source` and `approve_job_source` require a payload `now` within five minutes of the database clock, so a captured approval cannot be replayed after a revoke. The CLI adds `now` to each call.
+
 `job_catalog_gate`, `job_source_runs`, and `job_processing_locks` have no policies and no grants for `anon` or `authenticated`.
 
 Catalog and alert writes go through security-definer functions. Each call checks an HMAC of `operation + newline + exact payload` with `extensions.hmac`, the same construction as `createHmac('sha256', secret)` in Node. `assert_job_operation_proof` is revoked from `public`, `anon`, and `authenticated`. The gate secret ships null, so every write fails until an operator sets it in the database and sets the matching server secret. The app does not use the Supabase service-role key.
@@ -195,7 +197,7 @@ Alerts default to off. A user can save daily or weekly, pause, or delete. Each s
 
 `/api/jobs/scheduler` accepts `GET`, which Vercel Cron uses, and `POST`. It is not behind the signed-in session check. It returns 503 when both `JOB_INGESTION_ENABLED` and `JOB_REFRESH_ENABLED` are off or the scheduler secret is missing, and 401 when the bearer token does not match. A matching bearer still does nothing useful until `JOB_CATALOG_WRITE_SECRET` matches the database gate.
 
-A run does ingestion first, only when `JOB_INGESTION_ENABLED` is on, then alerts, only when `JOB_REFRESH_ENABLED` is on, so alerts see the refreshed catalog. An ingestion failure is reported and alerts still run. The response is 500 when either step failed. A duplicate call in the same UTC hour is a no-op for ingestion and an upsert for alerts. A missed day is caught up by the next full refresh.
+A run does ingestion first, only when `JOB_INGESTION_ENABLED` is on, then alerts, only when `JOB_REFRESH_ENABLED` is on, so alerts see the refreshed catalog. Either flag alone is enough. The response reports each stage as `{state: "ran", ok, result}` or `{state: "skipped", reason}`. An ingestion failure is reported and alerts still run. The response is 500 when a stage that ran failed, or when ingestion is on but `JOB_CATALOG_WRITE_SECRET` is missing. A duplicate call in the same UTC hour is a no-op for ingestion and an upsert for alerts. A missed day is caught up by the next full refresh.
 
 `vercel.json` schedules one cron, `0 11 * * *` (11:00 UTC daily), on `/api/jobs/scheduler`. The route sets `maxDuration = 300` because ingestion fetches each board in turn. Check that your Vercel plan allows that duration; a lower plan limit cuts the run short, and the next day's run starts over.
 
@@ -262,7 +264,7 @@ Do these in order, only when you mean to change the hosted project. `20261021120
    JOB_INGESTION_ENABLED=true npx tsx --conditions=react-server scripts/jobs/cli.ts refresh --target production
    ```
 
-   Expect `applied` with an inserted count for the board. `skipped` with `source_not_activated` means the approval did not set `--live`.
+   Expect `applied` with an inserted count for the board. `skipped` with `source_not_activated` or `source_not_live` means the approval did not set `--live`.
 7. **Verify `/jobs`** while signed in as an allowlisted user: the board's listings appear with attribution. Sign in as another account and confirm the off state. After the next 11:00 UTC run, check the Vercel cron log for a 200 and a `duplicate` or `applied` outcome.
 
 Email stays inactive until a product sender is chosen and `deliverJobAlertEmail` is implemented for that sender. Setting the email flag does not send mail today.

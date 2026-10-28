@@ -76,7 +76,7 @@ describe("scheduler run order", async () => {
           order.push("ingest")
           return completed
         }),
-        alerts: vi.fn(async () => {
+        alerts: vi.fn(async (): Promise<{ status: number; body: Record<string, unknown> }> => {
           order.push("alerts")
           return { status: 200, body: { status: "completed" } }
         }),
@@ -84,32 +84,63 @@ describe("scheduler run order", async () => {
     }
   }
 
-  it("ingests before alerts and runs each only behind its own flag", async () => {
-    const both = deps()
-    const result = await realRun(now, { JOB_INGESTION_ENABLED: "true", JOB_REFRESH_ENABLED: "true", JOB_CATALOG_WRITE_SECRET: "w".repeat(40) }, both.deps)
-    expect(both.order).toEqual(["ingest", "alerts"])
-    expect(result).toMatchObject({ status: 200, body: { status: "completed", ingestion: completed } })
+  const writer = { JOB_CATALOG_WRITE_SECRET: "w".repeat(40) }
 
+  it("runs ingestion alone when only JOB_INGESTION_ENABLED is set", async () => {
+    const run = deps()
+    const result = await realRun(now, { JOB_INGESTION_ENABLED: "true", ...writer }, run.deps)
+    expect(run.order).toEqual(["ingest"])
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        status: "completed",
+        ingestion: { state: "ran", ok: true, result: completed },
+        alerts: { state: "skipped", reason: "refresh_disabled" },
+      },
+    })
+  })
+
+  it("runs alerts only when refresh is enabled, after ingestion", async () => {
     const alertsOnly = deps()
-    const skipped = await realRun(now, { JOB_REFRESH_ENABLED: "true" }, alertsOnly.deps)
-    expect(alertsOnly.order).toEqual(["alerts"])
-    expect(skipped.body.ingestion).toEqual({ status: "skipped", reason: "ingestion_disabled" })
-
-    const ingestOnly = deps()
-    await realRun(now, { JOB_INGESTION_ENABLED: "true", JOB_CATALOG_WRITE_SECRET: "w".repeat(40) }, ingestOnly.deps)
-    expect(ingestOnly.order).toEqual(["ingest"])
+    expect(await realRun(now, { JOB_REFRESH_ENABLED: "true" }, alertsOnly.deps)).toEqual({
+      status: 200,
+      body: {
+        status: "completed",
+        ingestion: { state: "skipped", reason: "ingestion_disabled" },
+        alerts: { state: "ran", ok: true, result: { status: "completed" } },
+      },
+    })
+    const both = deps()
+    await realRun(now, { JOB_INGESTION_ENABLED: "true", JOB_REFRESH_ENABLED: "true", ...writer }, both.deps)
+    expect(both.order).toEqual(["ingest", "alerts"])
+    const neither = deps()
+    expect((await realRun(now, {}, neither.deps)).body).toMatchObject({
+      ingestion: { state: "skipped" },
+      alerts: { state: "skipped" },
+    })
+    expect(neither.order).toEqual([])
   })
 
   it("still runs alerts and reports a failure when ingestion cannot run", async () => {
     const missing = deps()
     const result = await realRun(now, { JOB_INGESTION_ENABLED: "true", JOB_REFRESH_ENABLED: "true" }, missing.deps)
     expect(missing.order).toEqual(["alerts"])
-    expect(result).toMatchObject({ status: 500, body: { ingestion: { status: "inactive", reason: "catalog_writer_unconfigured" } } })
+    expect(result).toMatchObject({ status: 500, body: { ingestion: { state: "skipped", reason: "catalog_writer_unconfigured" } } })
 
     const throwing = deps()
     throwing.deps.ingest.mockRejectedValueOnce(new Error("boom"))
-    const thrown = await realRun(now, { JOB_INGESTION_ENABLED: "true", JOB_REFRESH_ENABLED: "true", JOB_CATALOG_WRITE_SECRET: "w".repeat(40) }, throwing.deps)
+    const thrown = await realRun(now, { JOB_INGESTION_ENABLED: "true", JOB_REFRESH_ENABLED: "true", ...writer }, throwing.deps)
     expect(throwing.order).toEqual(["alerts"])
-    expect(thrown).toMatchObject({ status: 500, body: { ingestion: { status: "error", reason: "unexpected" } } })
+    expect(thrown).toMatchObject({
+      status: 500,
+      body: { ingestion: { state: "ran", ok: false, result: { status: "error", reason: "unexpected" } }, alerts: { state: "ran", ok: true } },
+    })
+
+    const alertFail = deps()
+    alertFail.deps.alerts.mockResolvedValueOnce({ status: 500, body: { status: "error", reason: "collect_failed" } })
+    expect(await realRun(now, { JOB_REFRESH_ENABLED: "true" }, alertFail.deps)).toMatchObject({
+      status: 500,
+      body: { alerts: { state: "ran", ok: false, result: { reason: "collect_failed" } } },
+    })
   })
 })

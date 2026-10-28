@@ -152,7 +152,9 @@ async function ingestSource(
     const payload = JSON.stringify({ sourceSlug: slug, idempotencyKey, error: plan.reason })
     const result = await call("record-source-failure", payload)
     if (result.error) return { slug, outcome: "error", reason: `record_failure_failed:${result.error.code ?? "unknown"}` }
-    return { slug, outcome: "failed", reason: plan.reason, recorded: record(result.data).reason !== "duplicate" }
+    const body = record(result.data)
+    if (body.ok !== true) return { slug, outcome: "skipped", reason: typeof body.reason === "string" ? body.reason : "failure_rejected" }
+    return { slug, outcome: "failed", reason: plan.reason, recorded: body.reason !== "duplicate" }
   }
 
   const truncated = plan.jobs.length > MAX_BATCH_POSTINGS

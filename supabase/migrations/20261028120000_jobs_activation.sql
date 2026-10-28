@@ -12,7 +12,35 @@
 --    operation name and rejects a `now` more than five minutes from the
 --    database clock, so a captured request cannot be replayed later.
 --
+-- 3. apply_job_catalog and record_job_source_failure return
+--    {ok: false, reason: 'source_not_live'} without writing unless the source
+--    is approved, terms permitted, and live ingestion on.
+-- 4. register_job_source and approve_job_source, same bodies plus a check
+--    that payload `now` is within five minutes of the database clock, so a
+--    captured approval cannot be replayed after a revoke. The shared check is
+--    job_request_is_fresh, which no client role can execute.
+--
 -- No table is created, altered, or dropped. No service role is used.
+
+create or replace function public.job_request_is_fresh(p_payload text)
+returns boolean
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  v_now timestamptz;
+begin
+  begin
+    v_now := (p_payload::jsonb->>'now')::timestamptz;
+  exception when others then
+    return false;
+  end;
+  return v_now is not null and abs(extract(epoch from (pg_catalog.now() - v_now))) <= 300;
+end;
+$$;
+
+revoke all on function public.job_request_is_fresh(text) from public, anon, authenticated;
 
 create or replace function public.apply_job_catalog(p_payload text, p_proof text)
 returns jsonb
@@ -50,6 +78,15 @@ begin
   where slug = v_slug;
   if v_source is null then
     raise exception 'source not found' using errcode = 'P0002';
+  end if;
+  if not exists (
+    select 1 from public.job_sources
+    where id = v_source
+      and approval_status = 'approved'
+      and terms_status = 'permitted'
+      and live_ingestion_enabled
+  ) then
+    return pg_catalog.jsonb_build_object('ok', false, 'reason', 'source_not_live');
   end if;
   if exists (select 1 from public.job_source_runs where idempotency_key = v_key) then
     return pg_catalog.jsonb_build_object('ok', true, 'reason', 'duplicate');
@@ -272,7 +309,6 @@ as $$
 declare
   v_secret text;
   v_expected text;
-  v_now timestamptz;
   v_sources jsonb;
 begin
   if p_payload is null or char_length(p_payload) = 0 or char_length(p_payload) > 1000 then
@@ -297,12 +333,7 @@ begin
     raise exception 'not authorized' using errcode = '42501';
   end if;
 
-  begin
-    v_now := (p_payload::jsonb->>'now')::timestamptz;
-  exception when others then
-    v_now := null;
-  end;
-  if v_now is null or abs(extract(epoch from (pg_catalog.now() - v_now))) > 300 then
+  if not public.job_request_is_fresh(p_payload) then
     raise exception 'stale request' using errcode = '42501';
   end if;
 
@@ -333,3 +364,164 @@ $$;
 
 revoke all on function public.list_job_ingestion_sources(text, text) from public, anon, authenticated;
 grant execute on function public.list_job_ingestion_sources(text, text) to anon, authenticated;
+
+create or replace function public.register_job_source(p_payload text, p_proof text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  body jsonb;
+  created uuid;
+begin
+  perform public.assert_job_operation_proof('register-source', p_payload, p_proof);
+  if not public.job_request_is_fresh(p_payload) then
+    raise exception 'stale request' using errcode = '42501';
+  end if;
+  body := p_payload::jsonb;
+  if coalesce(body->>'provider', '') not in ('greenhouse', 'lever', 'ashby') then
+    raise exception 'invalid source' using errcode = '23514';
+  end if;
+  if coalesce(body->>'slug', '') !~ '^[a-z0-9:_-]{3,80}$' then
+    raise exception 'invalid source' using errcode = '23514';
+  end if;
+
+  insert into public.job_sources (
+    provider,
+    slug,
+    display_name,
+    source_identifier,
+    region,
+    employer_name,
+    employer_domain,
+    access_method,
+    approved_usage,
+    attribution_requirements,
+    retention_restrictions,
+    allowed_storage_fields,
+    refresh_limit_per_day,
+    approval_status,
+    terms_status,
+    live_ingestion_enabled
+  ) values (
+    body->>'provider',
+    body->>'slug',
+    left(pg_catalog.btrim(body->>'displayName'), 120),
+    nullif(body->>'sourceIdentifier', ''),
+    coalesce(nullif(body->>'region', ''), 'global'),
+    nullif(pg_catalog.btrim(body->>'employerName'), ''),
+    coalesce(nullif(lower(body->>'employerDomain'), ''), ''),
+    pg_catalog.btrim(body->>'accessMethod'),
+    pg_catalog.btrim(body->>'approvedUsage'),
+    pg_catalog.btrim(body->>'attributionRequirements'),
+    pg_catalog.btrim(body->>'retentionRestrictions'),
+    public.job_json_text_array(body->'allowedStorageFields'),
+    0,
+    'draft',
+    'unclear',
+    false
+  )
+  on conflict (slug) do nothing
+  returning id into created;
+
+  if created is null then
+    select id into created from public.job_sources where slug = body->>'slug';
+    return pg_catalog.jsonb_build_object('ok', true, 'created', false, 'id', created);
+  end if;
+  return pg_catalog.jsonb_build_object('ok', true, 'created', true, 'id', created);
+end;
+$$;
+
+create or replace function public.approve_job_source(p_payload text, p_proof text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  body jsonb;
+  updated uuid;
+  v_live boolean;
+begin
+  perform public.assert_job_operation_proof('approve-source', p_payload, p_proof);
+  if not public.job_request_is_fresh(p_payload) then
+    raise exception 'stale request' using errcode = '42501';
+  end if;
+  body := p_payload::jsonb;
+  v_live := coalesce((body->>'liveIngestionEnabled')::boolean, false);
+  if v_live and (
+    body->>'approvalStatus' is distinct from 'approved'
+    or body->>'termsStatus' is distinct from 'permitted'
+    or coalesce((body->>'refreshLimitPerDay')::integer, 0) <= 0
+  ) then
+    raise exception 'live ingestion is not approved' using errcode = '23514';
+  end if;
+
+  update public.job_sources
+  set
+    approval_status = body->>'approvalStatus',
+    terms_status = body->>'termsStatus',
+    live_ingestion_enabled = v_live,
+    refresh_limit_per_day = coalesce((body->>'refreshLimitPerDay')::integer, 0),
+    access_method = pg_catalog.btrim(body->>'accessMethod'),
+    approved_usage = pg_catalog.btrim(body->>'approvedUsage'),
+    attribution_requirements = pg_catalog.btrim(body->>'attributionRequirements'),
+    retention_restrictions = pg_catalog.btrim(body->>'retentionRestrictions'),
+    allowed_storage_fields = public.job_json_text_array(body->'allowedStorageFields'),
+    updated_at = pg_catalog.now()
+  where slug = body->>'slug'
+  returning id into updated;
+
+  if updated is null then
+    raise exception 'source not found' using errcode = 'P0002';
+  end if;
+  return pg_catalog.jsonb_build_object('ok', true, 'id', updated, 'liveIngestionEnabled', v_live);
+end;
+$$;
+
+create or replace function public.record_job_source_failure(p_payload text, p_proof text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  body jsonb;
+  v_source uuid;
+  v_key text;
+  v_active integer;
+begin
+  perform public.assert_job_operation_proof('record-source-failure', p_payload, p_proof);
+  body := p_payload::jsonb;
+  v_key := 'record-source-failure:' || coalesce(body->>'idempotencyKey', '');
+  select id into v_source from public.job_sources where slug = body->>'sourceSlug';
+  if v_source is null then
+    raise exception 'source not found' using errcode = 'P0002';
+  end if;
+  if not exists (
+    select 1 from public.job_sources
+    where id = v_source
+      and approval_status = 'approved'
+      and terms_status = 'permitted'
+      and live_ingestion_enabled
+  ) then
+    return pg_catalog.jsonb_build_object('ok', false, 'reason', 'source_not_live');
+  end if;
+  if exists (select 1 from public.job_source_runs where idempotency_key = v_key) then
+    return pg_catalog.jsonb_build_object('ok', true, 'reason', 'duplicate');
+  end if;
+  insert into public.job_source_runs (source_id, status, error, idempotency_key, finished_at)
+  values (
+    v_source,
+    'failed',
+    left(coalesce(nullif(body->>'error', ''), 'source_request_failed'), 300),
+    v_key,
+    pg_catalog.now()
+  );
+  select count(*) into v_active
+  from public.job_postings
+  where source_id = v_source and listing_status = 'active';
+  return pg_catalog.jsonb_build_object('ok', true, 'activeUnchanged', v_active);
+end;
+$$;

@@ -76,7 +76,11 @@ describe("recommended jobs database", () => {
   }
 
   async function operate(operation: JobOperation, payload: unknown) {
-    const text = JSON.stringify(payload)
+    const stamped =
+      (operation === "register-source" || operation === "approve-source") && payload && typeof payload === "object" && !("now" in payload)
+        ? { ...(payload as Record<string, unknown>), now: new Date().toISOString() }
+        : payload
+    const text = JSON.stringify(stamped)
     const proof = jobOperationProof(SECRET, operation, text)
     const functions: Record<JobOperation, string> = {
       "apply-catalog": "apply_job_catalog",
@@ -170,7 +174,7 @@ describe("recommended jobs database", () => {
       slug: "greenhouse:northwind",
       approvalStatus: "approved",
       termsStatus: "permitted",
-      liveIngestionEnabled: false,
+      liveIngestionEnabled: true,
       refreshLimitPerDay: 4,
       accessMethod: "documented_https_json",
       approvedUsage: "Store normalized public posting fields for signed-in recommendations.",
@@ -347,6 +351,83 @@ describe("recommended jobs database", () => {
       expired: 0,
     })
     expect((await status()).map((row) => row.listing_status)).toEqual(["active", "active"])
+  })
+
+  it("refuses catalog writes for a source that is not approved, permitted, and live", async () => {
+    const activation = {
+      accessMethod: "documented_https_json",
+      approvedUsage: "Store normalized public posting fields.",
+      attributionRequirements: "Name Greenhouse.",
+      retentionRestrictions: "Expire omitted listings.",
+      allowedStorageFields: ["title"],
+    }
+    await operate("register-source", { provider: "greenhouse", slug: "greenhouse:paused", displayName: "Paused", sourceIdentifier: "paused", ...activation })
+    const runs = async () =>
+      (
+        await db.query<{ count: number }>(
+          "select count(*)::int as count from public.job_source_runs r join public.job_sources s on s.id = r.source_id where s.slug = 'greenhouse:paused'",
+        )
+      ).rows[0]?.count
+    const tryWrites = async () => ({
+      apply: await operate("apply-catalog", {
+        sourceSlug: "greenhouse:paused",
+        idempotencyKey: `paused-${Math.random()}`,
+        completeSnapshot: true,
+        postings: [{ sourceJobId: "p1", title: "Role", listingUrl: "https://boards.greenhouse.io/paused/jobs/p1", contentHash: hash() }],
+      }),
+      failure: await operate("record-source-failure", { sourceSlug: "greenhouse:paused", idempotencyKey: `paused-${Math.random()}`, error: "timeout" }),
+    })
+    const notLive = { apply: { ok: false, reason: "source_not_live" }, failure: { ok: false, reason: "source_not_live" } }
+
+    expect(await tryWrites()).toEqual(notLive)
+    await operate("approve-source", { slug: "greenhouse:paused", approvalStatus: "approved", termsStatus: "permitted", liveIngestionEnabled: false, refreshLimitPerDay: 4, ...activation })
+    expect(await tryWrites()).toEqual(notLive)
+    await operate("approve-source", { slug: "greenhouse:paused", approvalStatus: "approved", termsStatus: "restricted", liveIngestionEnabled: false, refreshLimitPerDay: 4, ...activation })
+    expect(await tryWrites()).toEqual(notLive)
+    expect(await runs()).toBe(0)
+    const postings = await db.query<{ count: number }>(
+      "select count(*)::int as count from public.job_postings p join public.job_sources s on s.id = p.source_id where s.slug = 'greenhouse:paused'",
+    )
+    expect(postings.rows[0]?.count).toBe(0)
+    await operate("approve-source", { slug: "greenhouse:paused", approvalStatus: "revoked", termsStatus: "unclear", liveIngestionEnabled: false, refreshLimitPerDay: 0, ...activation })
+  })
+
+  it("rejects source registration and approval without a fresh now", async () => {
+    const signed = (operation: "register-source" | "approve-source", payload: Record<string, unknown>) => {
+      const text = JSON.stringify(payload)
+      const fn = operation === "register-source" ? "register_job_source" : "approve_job_source"
+      return db.query(`select public.${fn}($1, $2)`, [text, jobOperationProof(SECRET, operation, text)])
+    }
+    const register = {
+      provider: "greenhouse",
+      slug: "greenhouse:stale",
+      displayName: "Stale",
+      sourceIdentifier: "stale",
+      accessMethod: "documented_https_json",
+      approvedUsage: "x",
+      attributionRequirements: "x",
+      retentionRestrictions: "x",
+      allowedStorageFields: ["title"],
+    }
+    const approve = { ...register, slug: "greenhouse:northwind", approvalStatus: "revoked", termsStatus: "unclear", liveIngestionEnabled: false, refreshLimitPerDay: 0 }
+    const stamps = {
+      stale: new Date(Date.now() - 6 * 60_000).toISOString(),
+      future: new Date(Date.now() + 6 * 60_000).toISOString(),
+      garbage: "yesterday",
+    }
+    for (const operation of ["register-source", "approve-source"] as const) {
+      const body = operation === "register-source" ? register : approve
+      await expect(signed(operation, body)).rejects.toThrow(/stale request/)
+      for (const now of Object.values(stamps)) {
+        await expect(signed(operation, { ...body, now })).rejects.toThrow(/stale request/)
+      }
+    }
+    const rows = await db.query<{ slug: string; approval_status: string }>(
+      "select slug, approval_status from public.job_sources where slug in ('greenhouse:stale', 'greenhouse:northwind')",
+    )
+    expect(rows.rows).toEqual([{ slug: "greenhouse:northwind", approval_status: "approved" }])
+    const fresh = await signed("register-source", { ...register, slug: "greenhouse:northwind", now: new Date().toISOString() })
+    expect(fresh.rows[0]).toMatchObject({ register_job_source: { ok: true, created: false } })
   })
 
   it("lists approved sources for the runner only with a fresh signed request", async () => {
