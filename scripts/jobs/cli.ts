@@ -9,7 +9,9 @@
  *            --usage --attribution --retention --fields title,location,urls
  *   approve  --slug [--status draft|approved|revoked] [--terms unclear|permitted|restricted]
  *            [--refresh-limit 0-24] [--live] --usage --attribution --retention --fields ...
- *   refresh                                          Run the ingestion runner once. Needs JOB_INGESTION_ENABLED=true in the shell.
+ *   refresh [--fixtures]                             Run the ingestion runner once. Needs JOB_INGESTION_ENABLED=true in the shell.
+ *                                                    --fixtures reads src/lib/jobs/sources/fixtures instead of the network,
+ *                                                    and is refused for --target production.
  *
  * Every database command targets local Supabase (.env.development.local, http://127.0.0.1:54321)
  * unless --target production is passed. Production reads .env.local and asks for the project ref.
@@ -19,7 +21,7 @@ import { readFileSync } from "node:fs"
 import path from "node:path"
 import { createInterface } from "node:readline/promises"
 
-import { catalogCaller, publishableClient } from "../../src/lib/jobs/catalog-rpc"
+import { catalogCaller, publishableClient, type CatalogCaller } from "../../src/lib/jobs/catalog-rpc"
 import { jobIngestionEnabled } from "../../src/lib/jobs/flags"
 import { fetchSourcePages, runIngestion, type IngestionSource } from "../../src/lib/jobs/ingest"
 import { approvePayload, parseArgs, registerPayload, resolveTarget, sourceSlug } from "../../src/lib/jobs/operator"
@@ -47,6 +49,11 @@ async function ask(question: string): Promise<string> {
   } finally {
     prompt.close()
   }
+}
+
+function fixturePayload(provider: string): unknown {
+  if (provider !== "greenhouse" && provider !== "lever" && provider !== "ashby") fail("Unknown provider.")
+  return JSON.parse(readFileSync(path.join(process.cwd(), "src/lib/jobs/sources/fixtures", `${provider}.json`), "utf8"))
 }
 
 function tally(values: Array<string | null>): string {
@@ -93,7 +100,7 @@ async function preview() {
   console.log(`application method: ${tally(jobs.map((job) => job.applicationMethod))}`)
 }
 
-async function catalog(action: string) {
+async function catalog(action: string): Promise<{ call: CatalogCaller; target: "local" | "production" }> {
   const target = await resolveTarget({
     flag: args.flags.target,
     action,
@@ -107,7 +114,7 @@ async function catalog(action: string) {
   if (!secret) fail("JOB_CATALOG_WRITE_SECRET is missing or shorter than 32 characters in the target file.")
   console.warn(`Target: ${target.target} ${target.host}`)
   const client = publishableClient(target.env.NEXT_PUBLIC_SUPABASE_URL ?? "", target.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "")
-  return catalogCaller(client, secret)
+  return { call: catalogCaller(client, secret), target: target.target }
 }
 
 function report(result: { data: unknown; error: { message: string; code?: string } | null }) {
@@ -120,22 +127,31 @@ async function main() {
   if (args.command === "register") {
     const built = registerPayload(args.flags)
     if (!built.ok) fail(built.message)
-    const call = await catalog(`register source ${String(built.payload.slug)} as a draft`)
+    const { call } = await catalog(`register source ${String(built.payload.slug)} as a draft`)
     return report(await call("register-source", JSON.stringify(built.payload)))
   }
   if (args.command === "approve") {
     const built = approvePayload(args.flags)
     if (!built.ok) fail(built.message)
     const { slug, approvalStatus, termsStatus, refreshLimitPerDay, liveIngestionEnabled } = built.payload
-    const call = await catalog(
+    const { call } = await catalog(
       `set ${String(slug)} to ${String(approvalStatus)}, terms ${String(termsStatus)}, refresh ${String(refreshLimitPerDay)}/day, live ${String(liveIngestionEnabled)}`,
     )
     return report(await call("approve-source", JSON.stringify(built.payload)))
   }
   if (args.command === "refresh") {
     if (!jobIngestionEnabled(process.env)) fail("Set JOB_INGESTION_ENABLED=true in the shell for this command.")
-    const call = await catalog("refresh every approved live source once")
-    const summary = await runIngestion({ call, env: process.env })
+    const fixtures = args.flags.fixtures === true
+    if (fixtures && args.flags.target === "production") fail("--fixtures is for local Supabase only.")
+    const { call, target } = await catalog(`refresh every approved live source once${fixtures ? " from fixtures" : ""}`)
+    if (fixtures && target !== "local") fail("--fixtures is for local Supabase only.")
+    const summary = await runIngestion({
+      call,
+      env: process.env,
+      fetchSource: fixtures
+        ? (source, now) => fetchSourcePages(source, now, { permitLiveFetch: false, load: async () => fixturePayload(source.provider) })
+        : undefined,
+    })
     console.log(JSON.stringify(summary, null, 2))
     if (summary.status !== "completed") process.exit(1)
     return

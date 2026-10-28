@@ -11,11 +11,13 @@ All of these are server-only. None belong in a `NEXT_PUBLIC_` variable.
 | Variable | Default | What it controls |
 | --- | --- | --- |
 | `JOB_RECOMMENDATIONS_ENABLED` | On in local development. Off when `NODE_ENV` or `VERCEL_ENV` is `production`. | The `/jobs` and `/jobs/alerts` pages and their form actions. |
-| `JOB_INGESTION_ENABLED` | Off until set to `true`. | Permission to call a live source adapter. An adapter file is not enough. |
-| `JOB_REFRESH_ENABLED` | Off until set to `true`. | `POST /api/jobs/scheduler`. |
+| `JOB_RECOMMENDATIONS_ALLOWED_USER_IDS` | Unset, which keeps the behavior above. | Comma-separated user ids. When set, `/jobs`, `/jobs/alerts`, posting detail, their actions, the nav item, and the Add-to-Tracker prefill are available only to those users. Everyone else sees the normal off state. A malformed entry closes the section to everyone. |
+| `JOB_INGESTION_ENABLED` | Off until set to `true`. | Permission to call a live source adapter, and the ingestion step of the scheduler. An adapter file is not enough. |
+| `JOB_REFRESH_ENABLED` | Off until set to `true`. | The alerts step of the scheduler. |
 | `JOB_EMAIL_DELIVERY_ENABLED` and `JOB_EMAIL_FROM` | Off. Both must be set before the email adapter even considers a message. | Still does not send mail. The sender returns `sender_not_approved`. |
 | `JOB_CATALOG_WRITE_SECRET` | Unset. Must be 32–200 characters and match `job_catalog_gate.secret`. | HMAC for catalog and alert writes. |
-| `JOB_SCHEDULER_SECRET` | Unset. Must be at least 32 characters. A missing, empty, or short secret is rejected even when refresh is enabled. | Bearer token for the scheduler route. |
+| `CRON_SECRET` | Unset. Must be at least 32 characters. | Bearer token for `/api/jobs/scheduler`. Vercel Cron sends it automatically when it is set on the project. A set but short value is rejected and does not fall back. |
+| `JOB_SCHEDULER_SECRET` | Unset. Used only when `CRON_SECRET` is unset, with the same 32 character minimum. | Older name for the scheduler bearer. A missing, empty, or short secret is rejected even when a job flag is on. |
 
 `AI_FEATURES_ENABLED` does not affect jobs. Jobs flags do not enable managed AI.
 
@@ -39,6 +41,8 @@ Private, owned by `auth.uid()`:
 - `job_alert_subscriptions`
 - `job_alert_deliveries` — select and update `read_at` only. A trigger rejects every other change. Users cannot insert deliveries.
 
+The runner has no user session, so it reads approved sources through `list_job_ingestion_sources` from `20261028120000_jobs_activation.sql`. That function checks its own HMAC operation name, `list-ingestion-sources`, and rejects a payload whose `now` is more than five minutes from the database clock. It returns activation fields only.
+
 `job_catalog_gate`, `job_source_runs`, and `job_processing_locks` have no policies and no grants for `anon` or `authenticated`.
 
 Catalog and alert writes go through security-definer functions. Each call checks an HMAC of `operation + newline + exact payload` with `extensions.hmac`, the same construction as `createHmac('sha256', secret)` in Node. `assert_job_operation_proof` is revoked from `public`, `anon`, and `authenticated`. The gate secret ships null, so every write fails until an operator sets it in the database and sets the matching server secret. The app does not use the Supabase service-role key.
@@ -59,7 +63,7 @@ A source row is a company board on a known ATS, not a worldwide search.
 
 Host allowlist: `boards-api.greenhouse.io`, `api.lever.co`, `api.eu.lever.co`, `api.ashbyhq.com`. Requests use HTTPS, no userinfo, no IP hosts, manual redirects, a 10 second timeout, and a 1,000,000 byte cap. Identifiers are `[A-Za-z0-9_-]{1,80}`.
 
-The three adapters normalize fixture payloads in tests. `permitLiveFetch` is required before any HTTP call, and `ingestionAllowed` still has to pass. The scheduler route does not call the adapters.
+The three adapters normalize fixture payloads in tests. `permitLiveFetch` is required before any HTTP call, and `ingestionAllowed` still has to pass. The ingestion runner in `src/lib/jobs/ingest.ts` is the only caller that sets `permitLiveFetch`, and only for sources that pass `ingestionAllowed`.
 
 Seeded rows `provider:greenhouse`, `provider:lever`, and `provider:ashby` are drafts: terms `unclear`, live ingestion false, refresh limit 0. Signed-in users cannot read drafts.
 
@@ -85,18 +89,62 @@ Live ingestion requires every one of these:
 
 `approve_job_source` rejects live ingestion when approval, terms, or the refresh limit are missing. The table constraint rejects the same combination.
 
-### Operator checklist for one board
+### Operator runbook
 
-1. Read the provider docs and the employer's terms. Record what may be stored and for how long.
-2. Confirm the board token or site name from the employer, not by guessing a private API.
-3. Register the source with `register_job_source`. That call always stores a draft.
-4. Approve it with live ingestion still false. Run a fixture or a single reviewed fetch in a non-production database.
-5. Check attribution on the job card and that private company notes were not copied into `catalog_employers`.
-6. Set a refresh limit. Only then consider `liveIngestionEnabled: true`.
-7. Set `JOB_INGESTION_ENABLED` on the server that will fetch. Do not put the catalog secret in the browser.
-8. Keep email and the scheduler off until their own checklists are done.
+The CLI is `scripts/jobs/cli.ts`. Run it from the repository root:
 
-Do not start this checklist against the hosted project from a development session.
+```bash
+npx tsx --conditions=react-server scripts/jobs/cli.ts <command> [flags]
+```
+
+Every database command targets local Supabase. It reads `.env.development.local` and refuses to run unless `NEXT_PUBLIC_SUPABASE_URL` is `http://127.0.0.1:54321`. `--target production` reads `.env.local` instead, prints the project host and the action, and continues only after you type the project ref. The CLI reads the Supabase URL, publishable key, and `JOB_CATALOG_WRITE_SECRET` only from that file, and refuses to run if any of them is exported in the shell. It never prints a secret.
+
+1. Read the provider docs and the employer's terms. Record what may be stored and for how long. Get the board token or site name from the employer, not by guessing.
+2. **Preview** the live board. Nothing is written.
+
+   ```bash
+   JOB_INGESTION_ENABLED=true npx tsx --conditions=react-server scripts/jobs/cli.ts preview greenhouse <board-token>
+   JOB_INGESTION_ENABLED=true npx tsx --conditions=react-server scripts/jobs/cli.ts preview lever <site> --region eu
+   ```
+
+   It prints the posting count, the first titles, and tallies of locations, countries, work arrangement, compensation presence, and application method.
+3. **Register** the board. This always stores a draft with terms `unclear`, refresh limit 0, and live ingestion off. The slug defaults to `<provider>:<identifier>` in lowercase.
+
+   ```bash
+   npx tsx --conditions=react-server scripts/jobs/cli.ts register \
+     --provider greenhouse --identifier <board-token> \
+     --employer-name "Example Co" --employer-domain example.com \
+     --usage "Store normalized public posting fields for signed-in recommendations." \
+     --attribution "Name Greenhouse and link the original posting." \
+     --retention "Expire listings omitted from a successful full refresh." \
+     --fields title,location,country,urls,compensation,plain_text
+   ```
+
+4. **Approve** it. Defaults are `--status draft`, `--terms unclear`, `--refresh-limit 0`, and live off, so each change has to be named. `--live` needs `--status approved`, `--terms permitted`, and `--refresh-limit` from 1 to 24. The usage, attribution, retention, and fields flags are required because approval rewrites them.
+
+   ```bash
+   npx tsx --conditions=react-server scripts/jobs/cli.ts approve --slug greenhouse:<board-token> \
+     --status approved --terms permitted --refresh-limit 1 --live \
+     --usage "..." --attribution "..." --retention "..." --fields title,location,country,urls,compensation,plain_text
+   ```
+
+   To stop a board, approve it again without `--live`, or with `--status revoked`.
+5. **Refresh** once by hand and read the summary.
+
+   ```bash
+   JOB_INGESTION_ENABLED=true npx tsx --conditions=react-server scripts/jobs/cli.ts refresh
+   ```
+
+   Against local Supabase, `refresh --fixtures` reads `src/lib/jobs/sources/fixtures` instead of the network. `--fixtures` is refused with `--target production`.
+6. Check attribution on the job card and that private company notes were not copied into `catalog_employers`.
+
+### Ingestion runner
+
+`runIngestion` lists approved sources, runs `planSourceRefresh` for each one, and calls `apply_job_catalog` or `record_job_source_failure`. The idempotency key is `<slug>:<UTC hour>`, such as `greenhouse:example:2026-10-28T11`, so a second run in the same hour returns `duplicate`. Each source is isolated: a fetch failure or a database error is reported for that source and the run continues.
+
+A failed fetch is recorded and never sends an apply, so it cannot expire listings. Only a complete, non-empty snapshot of at most 500 postings is sent with `completeSnapshot: true`. An empty, partial, or truncated snapshot is applied without expiring anything. `allowEmpty` is never set. Lever pages are followed up to 10 pages.
+
+The summary lists, per source, `applied` (fetched, inserted, updated, expired, rejected), `skipped` with a reason such as `source_not_activated`, `lock_held`, or `rate_limited`, `duplicate`, `failed` with the fetch reason, or `error` with a database code. It has no listing text and no secrets.
 
 ## Normalized listing
 
@@ -145,13 +193,17 @@ The word "Go" is not treated as the Go language. Use `golang` on a verified skil
 
 Alerts default to off. A user can save daily or weekly, pause, or delete. Each subscription has a minimum match, a delivery choice (`in_app`, `email`, or `both`), a timezone, an optional saved search, the last successful run, and the last error.
 
-`POST /api/jobs/scheduler` is not behind the signed-in session check. It returns 503 when refresh is off or the scheduler secret is missing, and 401 when the bearer token does not match. A matching bearer still does nothing useful until `JOB_CATALOG_WRITE_SECRET` matches the database gate.
+`/api/jobs/scheduler` accepts `GET`, which Vercel Cron uses, and `POST`. It is not behind the signed-in session check. It returns 503 when both `JOB_INGESTION_ENABLED` and `JOB_REFRESH_ENABLED` are off or the scheduler secret is missing, and 401 when the bearer token does not match. A matching bearer still does nothing useful until `JOB_CATALOG_WRITE_SECRET` matches the database gate.
+
+A run does ingestion first, only when `JOB_INGESTION_ENABLED` is on, then alerts, only when `JOB_REFRESH_ENABLED` is on, so alerts see the refreshed catalog. An ingestion failure is reported and alerts still run. The response is 500 when either step failed. A duplicate call in the same UTC hour is a no-op for ingestion and an upsert for alerts. A missed day is caught up by the next full refresh.
+
+`vercel.json` schedules one cron, `0 11 * * *` (11:00 UTC daily), on `/api/jobs/scheduler`. The route sets `maxDuration = 300` because ingestion fetches each board in turn. Check that your Vercel plan allows that duration; a lower plan limit cuts the run short, and the next day's run starts over.
 
 The run collects at most 500 active or unverified postings from approved sources, scores them, and records deliveries. The window key is `daily:YYYY-MM-DD` or `weekly:` plus that week's Monday, in the user's timezone. The same subscription, posting, window, and channel cannot insert a second row. A repeated run updates a row only when the existing status is `failed`. An empty match list still marks the subscription successful so the window is not retried. An invalid timezone records a failure and does not mark success.
 
 Email and `both` write an in-app `recorded` row and an email `skipped` row. `deliverJobAlertEmail` never opens a network connection. Supabase Auth SMTP is not used for these messages.
 
-There is no `vercel.json` cron and no hosted scheduler configuration in this repository. A failed source request must be recorded with `record_job_source_failure`. That function does not expire listings.
+A failed source request is recorded with `record_job_source_failure`. That function does not expire listings.
 
 ## Add to tracker
 
@@ -172,22 +224,47 @@ npm run build
 
 Database tests use an in-memory PGlite database and the SQL files in `supabase/migrations`. They do not connect to the hosted project. `src/lib/jobs/local-postgres.integration.test.ts` runs only when `LOCAL_SUPABASE_URL` is exactly `http://127.0.0.1:54321` and the local anon and service-role keys are present. Adapter tests read `src/lib/jobs/sources/fixtures`. They do not call Greenhouse, Lever, or Ashby.
 
-Do not run `supabase db reset` unless you have confirmed the target is a disposable local database. Do not `db push` this migration to the hosted project until the production checklist below is approved.
+Do not run `supabase db reset` unless you have confirmed the target is a disposable local database. The Supabase GitHub integration applies migrations to production when a pull request merges to `main`, so merging is the production deploy for SQL.
 
-`supabase/config.toml` from a local `supabase init` is not part of this feature. Leave it untracked unless you intend to commit a reviewed local stack.
+For a local end-to-end run, generate a local `JOB_CATALOG_WRITE_SECRET` and `CRON_SECRET` into `.env.development.local`, set the same catalog secret in the local `job_catalog_gate`, register and approve a fixture source with the CLI, run `refresh --fixtures`, and call the scheduler with `curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/jobs/scheduler`.
 
-## Production activation
+## Production runbook
 
-Do all of this only when you mean to change the hosted project.
+Do these in order, only when you mean to change the hosted project. `20261021120000_recommended_jobs.sql` is already on `main`, so `job_catalog_gate` exists in production. Merging this branch applies `20261028120000_jobs_activation.sql`.
 
-1. Review the migration diff. Confirm it does not drop tables or grant `service_role` to the app.
-2. `npx supabase db push --dry-run` against the intended project. Stop if it proposes anything other than this additive file.
-3. Apply the migration. Leave `job_catalog_gate.secret` null until a writer is approved.
-4. Deploy the app with jobs flags unset. Production UI stays off.
-5. To show the UI against an empty catalog, set `JOB_RECOMMENDATIONS_ENABLED=true`. Ingestion, refresh, and email stay off.
-6. To allow catalog writes, generate a 32–200 character secret, store it in `job_catalog_gate.secret`, and set the same value as `JOB_CATALOG_WRITE_SECRET` on the server only.
-7. Approve individual boards with the checklist above. Then set `JOB_INGESTION_ENABLED=true`.
-8. To run alerts, set `JOB_REFRESH_ENABLED=true` and `JOB_SCHEDULER_SECRET`, and call `POST /api/jobs/scheduler` with `Authorization: Bearer <secret>` from a scheduler you operate. Do not add that secret to the client.
-9. Email stays inactive until a product sender is chosen and `deliverJobAlertEmail` is implemented for that sender. Setting the email flag does not send mail today.
+1. **Generate secrets** on your machine. Keep them out of chat, commits, and the browser.
+
+   ```bash
+   openssl rand -hex 32   # JOB_CATALOG_WRITE_SECRET
+   openssl rand -hex 32   # CRON_SECRET
+   ```
+
+2. **Set the database gate** in the hosted SQL editor. Paste the catalog secret in place of the placeholder. It must be 32–200 characters.
+
+   ```sql
+   update public.job_catalog_gate
+   set secret = '<JOB_CATALOG_WRITE_SECRET>'
+   where id = 1;
+   ```
+
+3. **Set Vercel Production environment variables**, server-only, none with `NEXT_PUBLIC_`:
+   - `JOB_RECOMMENDATIONS_ENABLED=true`
+   - `JOB_RECOMMENDATIONS_ALLOWED_USER_IDS=<your user id>` for a private first release
+   - `JOB_CATALOG_WRITE_SECRET=<same value as the gate>`
+   - `CRON_SECRET=<cron secret>`
+   - `JOB_INGESTION_ENABLED=true` when you want the daily cron to fetch. Leave it unset until the first manual refresh looks right.
+   - `JOB_REFRESH_ENABLED=true` only when alerts should run. Email stays inactive either way.
+4. **Merge** the pull request. The Supabase integration applies the migration, and Vercel deploys the route and the cron.
+5. **First board.** Add `JOB_CATALOG_WRITE_SECRET` to `.env.local` on your machine, then run `preview`, `register`, and `approve` from the operator runbook with `--target production`. Each command shows the production host and asks for the project ref.
+6. **First manual refresh.**
+
+   ```bash
+   JOB_INGESTION_ENABLED=true npx tsx --conditions=react-server scripts/jobs/cli.ts refresh --target production
+   ```
+
+   Expect `applied` with an inserted count for the board. `skipped` with `source_not_activated` means the approval did not set `--live`.
+7. **Verify `/jobs`** while signed in as an allowlisted user: the board's listings appear with attribution. Sign in as another account and confirm the off state. After the next 11:00 UTC run, check the Vercel cron log for a 200 and a `duplicate` or `applied` outcome.
+
+Email stays inactive until a product sender is chosen and `deliverJobAlertEmail` is implemented for that sender. Setting the email flag does not send mail today.
 
 Missing jobs tables do not block companies, applications, or the rest of the existing tracker.
