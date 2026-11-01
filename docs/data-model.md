@@ -115,6 +115,22 @@ Health tables (`health_goals`, `food_entries`, `water_entries`, `sleep_entries`,
 - Priority companies needing attention: priority A or B, research status not closed, and follow-up date missing or on or before today.
 - Preparation progress: counts of not started, in progress, and completed.
 
+## Resumes and resume versions
+
+From `20261102120000_resume_studio.sql`. See [resume-studio.md](resume-studio.md).
+
+`resumes` holds one uploaded original per user and file hash: `label`, `storage_path` (exactly `<user_id>/<uuid>.pdf|docx`), `mime` (PDF or DOCX), `size_bytes` (up to 5 MB), `sha256`, `extracted_text` (up to 80,000 characters), `parse_status` (`unparsed`, `parsed`, `failed`), the grounded `parsed` sections, and the parse provider, model, mode, prompt and schema versions, dropped counts, and error code. `(user_id, sha256)` is unique, so the same file uploaded twice reuses the row.
+
+`resume_versions` holds one tailoring run: `base_content`, `edits` (at most 40, each `pending`, `accepted`, or `rejected`), `final_content` (the base with accepted edits applied), dropped counts by reason, readability before and after, and the prompt, schema, provider, model, and mode. Links:
+
+- `resume_id` → `resumes (user_id, id)`, `on delete set null (resume_id)`. Deleting a resume keeps the version's content.
+- `application_id` → `applications (user_id, id)`, `on delete set null (application_id)`.
+- `analysis_id` → `job_analyses (id)`, `on delete set null`. The guard trigger requires the analysis to belong to `auth.uid()`.
+
+`guard_resume_version` is `security invoker`. It lets a foreign key clear a link with no session when nothing else in the row changes, and otherwise requires the owner's session and an owned analysis.
+
+Both tables are owner-only for select, insert, update, and delete. `anon` has no grants.
+
 ## Row Level Security
 
 RLS is enabled on every user-owned table. `anon` has no privileges. `authenticated` can select, insert, update, and delete only rows where `auth.uid() = user_id`. Child rows that reference a company or application also require that parent to belong to `auth.uid()`, enforced by composite foreign keys.

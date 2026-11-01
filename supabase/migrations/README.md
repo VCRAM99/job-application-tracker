@@ -22,6 +22,8 @@ SQL migrations for the hosted Supabase project live in this directory.
 
 `20261101120000_jobs_chunked_apply.sql` replaces the body of `apply_job_catalog` again so the runner can send one snapshot in several chunks, each under the 2,000,000 character payload limit. A payload without chunk fields behaves as before. A chunk needs the previous chunk of the same snapshot to have succeeded, only chunk 0 counts toward the daily refresh limit, and only the final chunk of a complete snapshot expires listings, limited to those not verified since chunk 0 started. It changes no table, grant, or policy.
 
+`20261102120000_resume_studio.sql` adds `resumes`, `resume_versions`, and `guard_resume_version` for AI Resume Studio. Both tables are owner-only. Deleting an application, analysis, or resume clears the link on a version and never blocks the delete. It also creates the private `resumes` Storage bucket (5 MB, PDF and DOCX only) and three `storage.objects` policies: insert, read, and delete only under `<auth.uid()>/<uuid>.pdf|docx`, with no update policy. The storage part is skipped on a database without the storage schema. No existing table, row, grant, or policy changes.
+
 Apply pending files to the existing project with `supabase db push` only when you intend to change that database. Do not run `supabase db reset` against the hosted database. Do not push the career or recommended-jobs migrations to production until the matching feature is explicitly approved. The production hardening release does not add a migration.
 
 See the README for the exact link and push commands.
