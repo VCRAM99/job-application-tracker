@@ -80,6 +80,7 @@ Regenerate the fixtures with `npx tsx scripts/fixtures/resume-fixtures.mts`. The
 
 - The PDF template uses the built-in Helvetica font, which covers Latin-1 only. Names or text outside it (for example Polish, Vietnamese, or CJK) do not render correctly in the PDF; the DOCX export is unaffected.
 - An upload that is never registered (a closed tab or a network failure) stays in Storage under the user's own prefix. There is no cleanup job or per-user object limit yet.
+- A version whose resume was deleted while it was linked, and whose application was deleted later, has no resume or application link. It is still reachable at its own URL, where the ⋯ menu deletes it, but nothing lists it.
 - The name and number checks are lexical. They are conservative and can drop an honest rewrite, for example one that starts with an uncommon verb.
 
 ## Out of scope
