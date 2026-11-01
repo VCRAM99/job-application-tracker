@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
 import { prepareAiRun, usageReservationDeps } from "@/lib/ai/run-context"
-import { AI_ERROR_MESSAGES } from "@/lib/ai/types"
+import { AiRequestError, AI_ERROR_MESSAGES } from "@/lib/ai/types"
 import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { fingerprintOf, getAnalysis, loadVerifiedFacts } from "@/lib/analyze/data"
 import { readabilityReport } from "@/lib/analyze/readability"
@@ -56,22 +56,31 @@ export async function tailorResume(_previous: RecordFormState, formData: FormDat
   const facts = await loadVerifiedFacts()
   if (!facts.ok) return fail("Verified career facts could not be loaded.")
 
+  const linkedApplication = isUuid(applicationId) ? applicationId : (analysis.analysis.applicationId ?? null)
+  if (linkedApplication) {
+    const owned = await supabase.from("applications").select("id").eq("id", linkedApplication).eq("user_id", user.id).maybeSingle()
+    if (!owned.data) return fail("That application could not be found.")
+  }
   const prepared = await prepareAiRun(supabase, user.id, mode(formData))
   if (!prepared.ok) return fail(prepared.message)
   const run = prepared.run
-  const idempotencyKey = createHash("sha256")
+  const resumeRow = resume.data
+  const keyFor = (nonce: string) => createHash("sha256")
     .update(
       [
         "resume-tailor",
         user.id,
-        resume.data.sha256,
-        resume.data.parse_prompt_version,
+        resumeId,
+        resumeRow.sha256,
+        resumeRow.parse_prompt_version,
         analysisId,
         fingerprintOf(facts.facts),
         TAILOR_PROMPT_VERSION,
         run.mode,
         run.provider,
         run.model,
+        linkedApplication ?? "",
+        nonce,
       ].join("\n"),
     )
     .digest("hex")
@@ -79,7 +88,7 @@ export async function tailorResume(_previous: RecordFormState, formData: FormDat
   const baseText = contentToText(content)
   let versionId: string | null = null
 
-  const result = await tailorResumeContent({
+  const attempt = (idempotencyKey: string) => tailorResumeContent({
     content,
     requirements: record.requirements,
     matches: record.matches,
@@ -94,7 +103,7 @@ export async function tailorResume(_previous: RecordFormState, formData: FormDat
           user_id: user.id,
           resume_id: resumeId,
           analysis_id: analysisId,
-          application_id: isUuid(applicationId) ? applicationId : (record.applicationId ?? null),
+          application_id: linkedApplication,
           label: [record.title || "Tailored resume", record.company].filter(Boolean).join(" · ").slice(0, 160),
           base_content: content,
           edits: outcome.edits,
@@ -112,12 +121,14 @@ export async function tailorResume(_previous: RecordFormState, formData: FormDat
         .single()
       if (inserted.error) {
         console.error(`Resume version not saved (${inserted.error.code ?? "no code"}).`)
-        throw new Error("persist_failed")
+        // Not retryable: a failed save must not call the model again.
+        throw new AiRequestError("transient", { retryable: false })
       }
       versionId = String(inserted.data.id)
     },
   })
 
+  let result = await attempt(keyFor(""))
   if (!result.ok) return fail(AI_ERROR_MESSAGES[result.code] ?? result.message)
   if (result.kind === "already-complete") {
     const latest = await supabase
@@ -130,8 +141,13 @@ export async function tailorResume(_previous: RecordFormState, formData: FormDat
       .limit(1)
       .maybeSingle()
     versionId = latest.data ? String(latest.data.id) : null
+    if (!versionId) {
+      // The reservation succeeded but no version exists (it was deleted), so run once more under a fresh key.
+      result = await attempt(keyFor(crypto.randomUUID()))
+      if (!result.ok) return fail(AI_ERROR_MESSAGES[result.code] ?? result.message)
+    }
   }
-  if (!versionId) return fail("This tailoring already finished. Open it from the resume page.")
+  if (!versionId) return fail("The tailored version could not be saved.")
   revalidatePath(`/resumes/${resumeId}`)
   redirect(`/resumes/${resumeId}/versions/${versionId}`)
 }

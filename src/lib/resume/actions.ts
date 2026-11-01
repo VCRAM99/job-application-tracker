@@ -5,7 +5,7 @@ import { createHash } from "node:crypto"
 import { revalidatePath } from "next/cache"
 
 import { prepareAiRun, usageReservationDeps } from "@/lib/ai/run-context"
-import { AI_ERROR_MESSAGES } from "@/lib/ai/types"
+import { AiRequestError, AI_ERROR_MESSAGES } from "@/lib/ai/types"
 import { createCareerSource } from "@/lib/career/actions"
 import { requireUser } from "@/lib/auth/session"
 import { initialRecordFormState, isUuid, type RecordFormState } from "@/lib/records/form-state"
@@ -149,12 +149,15 @@ export async function parseResume(_previous: RecordFormState, formData: FormData
   const prepared = await prepareAiRun(supabase, user.id, requestedMode(formData))
   if (!prepared.ok) return { status: "error", message: prepared.message, fieldErrors: {} }
   const run = prepared.run
-  const idempotencyKey = createHash("sha256")
-    .update(["resume-parse", user.id, found.data.sha256, PARSE_PROMPT_VERSION, run.mode, run.provider, run.model].join("\n"))
-    .digest("hex")
+  const row = found.data
+  // The resume id is in the key, so a re-uploaded file is a new parse, not a past reservation.
+  const keyFor = (nonce: string) =>
+    createHash("sha256")
+      .update(["resume-parse", user.id, id, row.sha256, PARSE_PROMPT_VERSION, run.mode, run.provider, run.model, nonce].join("\n"))
+      .digest("hex")
 
-  const result = await parseResumeText({
-    text: String(found.data.extracted_text),
+  const attempt = (idempotencyKey: string) => parseResumeText({
+    text: String(row.extracted_text),
     run,
     reservation: usageReservationDeps(supabase, { userId: user.id, secret: run.secret, idempotencyKey, mode: run.mode, provider: run.provider, model: run.model }),
     persist: async (outcome) => {
@@ -174,9 +177,18 @@ export async function parseResume(_previous: RecordFormState, formData: FormData
         })
         .eq("id", id)
         .eq("user_id", user.id)
-      if (saved.error) throw new Error("persist_failed")
+      // Not retryable: a failed save must not call the model again.
+      if (saved.error) throw new AiRequestError("transient", { retryable: false })
     },
   })
+  let result = await attempt(keyFor(""))
+  if (result.ok && result.kind === "already-complete") {
+    const current = await supabase.from("resumes").select("parse_status, parse_prompt_version").eq("id", id).eq("user_id", user.id).maybeSingle()
+    if (current.data?.parse_status !== "parsed" || current.data.parse_prompt_version !== PARSE_PROMPT_VERSION) {
+      // The reservation succeeded but this row has no parse, so run once more under a fresh key.
+      result = await attempt(keyFor(crypto.randomUUID()))
+    }
+  }
   revalidatePath(`/resumes/${id}`)
   if (result.ok) {
     return {

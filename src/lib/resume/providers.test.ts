@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import type { ReservationRecord } from "@/lib/ai/gateway"
 import { completeWithProvider, type ProviderClients } from "@/lib/ai/providers"
-import type { ProviderId, StructuredRequest } from "@/lib/ai/types"
+import { AiRequestError, type ProviderId, type StructuredRequest } from "@/lib/ai/types"
 import type { VerifiedFact } from "@/lib/analyze/types"
 import type { ResumeContent } from "@/lib/resume/content"
 import { AVERY_TEXT } from "@/lib/resume/fixtures/avery"
@@ -170,5 +170,25 @@ describe.each(["openai", "anthropic", "google"] as const)("%s adapter", (provide
     expect(persist).not.toHaveBeenCalled()
     expect(deps.voidReservation).toHaveBeenCalledWith("evt-1", "invalid_response")
     expect(deps.finalize).not.toHaveBeenCalled()
+  })
+})
+
+describe("a failed save", () => {
+  it("does not call the model again or bill a retry", async () => {
+    const deps = reservation()
+    const create = vi.fn(async () => ({ text: JSON.stringify(parsed), candidates: [{ finishReason: "STOP" }] }))
+    const result = await parseResumeText({
+      text: AVERY_TEXT,
+      run: { provider: "google", model: "gemini-3.8-flash", mode: "byok", apiKey: "k", managedAllowed: false },
+      reservation: deps,
+      persist: async () => {
+        throw new AiRequestError("transient", { retryable: false })
+      },
+      complete: (request) => completeWithProvider("google", request, { google: { models: { generateContent: create } } as never }),
+    })
+    expect(result).toMatchObject({ ok: false, code: "transient" })
+    expect(create).toHaveBeenCalledTimes(1)
+    expect(deps.finalize).not.toHaveBeenCalled()
+    expect(deps.voidReservation).toHaveBeenCalledTimes(1)
   })
 })
