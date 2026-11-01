@@ -13,6 +13,15 @@ type Env = Record<string, string | undefined>
 
 /** apply_job_catalog rejects a batch over 500 postings. */
 export const MAX_BATCH_POSTINGS = 500
+/**
+ * The database rejects a payload over 2,000,000 characters. Chunks stay well
+ * under that and under common 1 MiB gateway body limits.
+ */
+export const MAX_CHUNK_CHARS = 750_000
+/** Postings past this many are dropped and the snapshot is treated as incomplete. */
+export const MAX_SNAPSHOT_POSTINGS = 2_000
+/** apply_job_catalog stores at most this much description text. */
+const MAX_DESCRIPTION_CHARS = 8_000
 const MAX_PAGES = 10
 
 export type IngestionSource = SourceActivation & {
@@ -35,6 +44,7 @@ export type SourceOutcome =
       rejected: number
       completeSnapshot: boolean
       truncated: boolean
+      chunks: number
     }
   | { slug: string; outcome: "skipped"; reason: string }
   | { slug: string; outcome: "duplicate" }
@@ -126,6 +136,29 @@ function parseSource(value: unknown): IngestionSource | null {
   }
 }
 
+function trimDescription(job: NormalizedJob): NormalizedJob {
+  if (!job.descriptionText || job.descriptionText.length <= MAX_DESCRIPTION_CHARS) return job
+  return { ...job, descriptionText: job.descriptionText.slice(0, MAX_DESCRIPTION_CHARS) }
+}
+
+/** Splits postings so each apply payload stays under MAX_CHUNK_CHARS and MAX_BATCH_POSTINGS. Always returns at least one chunk. */
+export function chunkPostings(postings: NormalizedJob[]): NormalizedJob[][] {
+  const chunks: NormalizedJob[][] = [[]]
+  let size = 0
+  for (const posting of postings) {
+    const length = JSON.stringify(posting).length + 1
+    const current = chunks[chunks.length - 1] as NormalizedJob[]
+    if (current.length > 0 && (current.length >= MAX_BATCH_POSTINGS || size + length > MAX_CHUNK_CHARS - 1_000)) {
+      chunks.push([posting])
+      size = length
+    } else {
+      current.push(posting)
+      size += length
+    }
+  }
+  return chunks
+}
+
 async function ingestSource(
   source: IngestionSource,
   now: Date,
@@ -157,30 +190,58 @@ async function ingestSource(
     return { slug, outcome: "failed", reason: plan.reason, recorded: body.reason !== "duplicate" }
   }
 
-  const truncated = plan.jobs.length > MAX_BATCH_POSTINGS
-  const postings = plan.jobs.slice(0, MAX_BATCH_POSTINGS)
+  const truncated = plan.jobs.length > MAX_SNAPSHOT_POSTINGS
+  const postings = plan.jobs.slice(0, MAX_SNAPSHOT_POSTINGS).map(trimDescription)
   // Only a complete, non-empty, untruncated snapshot may expire listings it does not contain.
   const completeSnapshot = plan.complete && !truncated && postings.length > 0
-  const payload = JSON.stringify({ sourceSlug: slug, idempotencyKey, completeSnapshot, allowEmpty: false, postings })
-  const result = await call("apply-catalog", payload)
-  if (result.error) return { slug, outcome: "error", reason: `apply_failed:${result.error.code ?? "unknown"}` }
-  const body = record(result.data)
-  if (body.ok === true && body.reason === "duplicate") return { slug, outcome: "duplicate" }
-  if (body.ok !== true) {
-    return { slug, outcome: "skipped", reason: typeof body.reason === "string" ? body.reason : "apply_rejected" }
+  const chunks = chunkPostings(postings)
+  const totals = { upserted: 0, inserted: 0 as number | null, expired: 0 }
+  let duplicates = 0
+  for (const [index, chunk] of chunks.entries()) {
+    const final = index === chunks.length - 1
+    const payload =
+      chunks.length === 1
+        ? { sourceSlug: slug, idempotencyKey, completeSnapshot, allowEmpty: false, postings: chunk }
+        : {
+            sourceSlug: slug,
+            idempotencyKey: `${idempotencyKey}:c${index}`,
+            snapshotKey: idempotencyKey,
+            chunkIndex: index,
+            finalChunk: final,
+            // The database ignores this on every chunk but the last.
+            completeSnapshot,
+            allowEmpty: false,
+            postings: chunk,
+          }
+    const where = chunks.length === 1 ? "" : `:chunk${index}`
+    const result = await call("apply-catalog", JSON.stringify(payload))
+    if (result.error) return { slug, outcome: "error", reason: `apply_failed:${result.error.code ?? "unknown"}${where}` }
+    const body = record(result.data)
+    if (body.ok === true && body.reason === "duplicate") {
+      duplicates += 1
+      continue
+    }
+    if (body.ok !== true) {
+      // Later chunks are not sent, so the final chunk never runs and nothing is expired.
+      return { slug, outcome: "skipped", reason: `${typeof body.reason === "string" ? body.reason : "apply_rejected"}${where}` }
+    }
+    totals.upserted += count(body.upserted) ?? 0
+    const inserted = count(body.inserted)
+    totals.inserted = inserted == null || totals.inserted == null ? null : totals.inserted + inserted
+    totals.expired += count(body.expired) ?? 0
   }
-  const upserted = count(body.upserted) ?? 0
-  const inserted = count(body.inserted)
+  if (duplicates === chunks.length) return { slug, outcome: "duplicate" }
   return {
     slug,
     outcome: "applied",
     fetched: plan.jobs.length,
-    inserted,
-    updated: inserted == null ? null : upserted - inserted,
-    expired: count(body.expired) ?? 0,
+    inserted: totals.inserted,
+    updated: totals.inserted == null ? null : totals.upserted - totals.inserted,
+    expired: totals.expired,
     rejected,
     completeSnapshot,
     truncated,
+    chunks: chunks.length,
   }
 }
 

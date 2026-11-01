@@ -63,7 +63,7 @@ A source row is a company board on a known ATS, not a worldwide search.
 | Lever | `https://api.lever.co/v0/postings/{site}?mode=json`, or `api.eu.lever.co` when region is `eu` | Site name |
 | Ashby | `https://api.ashbyhq.com/posting-api/job-board/{name}?includeCompensation=true` | Job board name |
 
-Host allowlist: `boards-api.greenhouse.io`, `api.lever.co`, `api.eu.lever.co`, `api.ashbyhq.com`. Requests use HTTPS, no userinfo, no IP hosts, manual redirects, a 10 second timeout, and a 1,000,000 byte cap. Identifiers are `[A-Za-z0-9_-]{1,80}`.
+Host allowlist: `boards-api.greenhouse.io`, `api.lever.co`, `api.eu.lever.co`, `api.ashbyhq.com`. Requests use HTTPS, no userinfo, no IP hosts, manual redirects, a 10 second timeout, and a 10,000,000 byte cap. The cap is enforced while the body streams: a larger `Content-Length` is refused before reading, and a body without one is aborted as soon as it passes 10 MB. A dense Greenhouse board with `content=true` is about 11.5 KB per job, so the cap is roughly 850 jobs. Identifiers are `[A-Za-z0-9_-]{1,80}`.
 
 The three adapters normalize fixture payloads in tests. `permitLiveFetch` is required before any HTTP call, and `ingestionAllowed` still has to pass. The ingestion runner in `src/lib/jobs/ingest.ts` is the only caller that sets `permitLiveFetch`, and only for sources that pass `ingestionAllowed`.
 
@@ -144,9 +144,11 @@ Every database command targets local Supabase. It reads `.env.development.local`
 
 `runIngestion` lists approved sources, runs `planSourceRefresh` for each one, and calls `apply_job_catalog` or `record_job_source_failure`. The idempotency key is `<slug>:<UTC hour>`, such as `greenhouse:example:2026-10-28T11`, so a second run in the same hour returns `duplicate`. Each source is isolated: a fetch failure or a database error is reported for that source and the run continues.
 
-A failed fetch is recorded and never sends an apply, so it cannot expire listings. Only a complete, non-empty snapshot of at most 500 postings is sent with `completeSnapshot: true`. An empty, partial, or truncated snapshot is applied without expiring anything. `allowEmpty` is never set. Lever pages are followed up to 10 pages.
+A failed fetch is recorded and never sends an apply, so it cannot expire listings. Only a complete, non-empty snapshot of at most 2,000 postings is sent with `completeSnapshot: true`. An empty, partial, or truncated snapshot is applied without expiring anything. `allowEmpty` is never set. Lever pages are followed up to 10 pages. Descriptions are trimmed to the 8,000 characters the database keeps before they are sent.
 
-The summary lists, per source, `applied` (fetched, inserted, updated, expired, rejected), `skipped` with a reason such as `source_not_activated`, `lock_held`, or `rate_limited`, `duplicate`, `failed` with the fetch reason, or `error` with a database code. It has no listing text and no secrets.
+`assert_job_operation_proof` rejects a payload over 2,000,000 characters, so a snapshot is split into chunks of at most 500 postings and about 750,000 characters. A snapshot that fits in one chunk is sent exactly as before. Otherwise each chunk carries `snapshotKey` (the hourly key), `chunkIndex`, and `finalChunk`, and its idempotency key is `<snapshotKey>:c<index>`. Chunks are sent in order and the runner stops at the first one that fails. `20261101120000_jobs_chunked_apply.sql` enforces the rest: chunk N needs chunk N-1 of the same snapshot to have succeeded (`chunk_out_of_order` otherwise), only chunk 0 counts toward the daily refresh limit, and only the final chunk of a complete snapshot expires listings, limited to those not verified since chunk 0 started. A failed or missing middle chunk therefore expires nothing. A rerun in the same hour returns `duplicate` for each chunk already applied and resumes at the first one that was not.
+
+The summary lists, per source, `applied` (fetched, inserted, updated, expired, rejected, chunks), `skipped` with a reason such as `source_not_activated`, `lock_held`, or `rate_limited`, `duplicate`, `failed` with the fetch reason, or `error` with a database code. It has no listing text and no secrets.
 
 ## Normalized listing
 

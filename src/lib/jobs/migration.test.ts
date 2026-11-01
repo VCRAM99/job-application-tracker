@@ -41,3 +41,20 @@ describe("jobs activation migration safety", () => {
     expect(activation).toContain("on conflict (source_id, source_job_id) do update")
   })
 })
+
+describe("chunked apply migration safety", () => {
+  const chunked = readFileSync(
+    path.join(process.cwd(), "supabase/migrations/20261101120000_jobs_chunked_apply.sql"),
+    "utf8",
+  ).toLowerCase()
+
+  it("only replaces apply_job_catalog and keeps its proof and live-source gate", () => {
+    expect(chunked).not.toContain("service_role")
+    expect(chunked).not.toMatch(/\b(drop|alter|truncate)\s+(table|policy|function|schema)\b/)
+    expect(chunked).not.toMatch(/^(grant|revoke|create table|create policy)/m)
+    expect(chunked.match(/create or replace function public\.(\w+)/g)).toEqual(["create or replace function public.apply_job_catalog"])
+    expect(chunked).toContain("perform public.assert_job_operation_proof('apply-catalog', p_payload, p_proof)")
+    expect(chunked).toContain("'source_not_live'")
+    expect(chunked).toContain("on conflict (source_id, source_job_id) do update")
+  })
+})

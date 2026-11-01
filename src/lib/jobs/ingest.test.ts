@@ -7,7 +7,9 @@ import type { CatalogCaller, CatalogRpcResult } from "@/lib/jobs/catalog-rpc"
 import {
   fetchSourcePages,
   ingestionKey,
-  MAX_BATCH_POSTINGS,
+  chunkPostings,
+  MAX_CHUNK_CHARS,
+  MAX_SNAPSHOT_POSTINGS,
   runIngestion,
   type FetchedSource,
   type IngestionSource,
@@ -140,6 +142,7 @@ describe("ingestion runner", () => {
           rejected: 0,
           completeSnapshot: true,
           truncated: false,
+          chunks: 1,
         },
         { slug: "greenhouse:paused", outcome: "skipped", reason: "source_not_activated" },
         { slug: "greenhouse:dberror", outcome: "error", reason: "apply_failed:57014" },
@@ -183,11 +186,67 @@ describe("ingestion runner", () => {
     }
     expect(await run(fetched([]))).toMatchObject({ completeSnapshot: false, allowEmpty: false, postings: [] })
     expect(await run(fetched([job("1")], false))).toMatchObject({ completeSnapshot: false })
-    const many = Array.from({ length: MAX_BATCH_POSTINGS + 5 }, (_, index) => job(String(index)))
-    const truncated = await run(fetched(many))
-    expect(truncated).toMatchObject({ completeSnapshot: false })
-    expect((truncated?.postings as unknown[]).length).toBe(MAX_BATCH_POSTINGS)
+    const catalog = fakeCatalog([source("greenhouse:a")])
+    const many = Array.from({ length: MAX_SNAPSHOT_POSTINGS + 5 }, (_, index) => job(String(index)))
+    const summary = await runIngestion({ call: catalog.call, now, env, fetchSource: async () => fetched(many) })
+    const applies = catalog.calls.filter((call) => call.operation === "apply-catalog").map((call) => call.payload)
+    expect(applies.flatMap((payload) => payload.postings as unknown[])).toHaveLength(MAX_SNAPSHOT_POSTINGS)
+    expect(applies.every((payload) => payload.completeSnapshot === false)).toBe(true)
+    expect(summary).toMatchObject({ sources: [{ truncated: true, completeSnapshot: false }] })
     expect(await run(fetched([job("1")]))).toMatchObject({ completeSnapshot: true, allowEmpty: false })
+  })
+
+  describe("chunked snapshots", () => {
+    const big = (id: string) => ({ ...job(id), descriptionText: "d".repeat(7_000) })
+    const bigJobs = Array.from({ length: 250 }, (_, index) => big(String(index)))
+
+    it("keeps every chunk under the size budget and sends chunks in order with one final chunk", async () => {
+      const chunks = chunkPostings(bigJobs)
+      expect(chunks.length).toBeGreaterThan(1)
+      for (const chunk of chunks) expect(JSON.stringify({ postings: chunk }).length).toBeLessThan(MAX_CHUNK_CHARS)
+      expect(chunks.flat()).toHaveLength(250)
+
+      const catalog = fakeCatalog([source("greenhouse:big")], (call) => ({
+        data: { ok: true, upserted: (call.payload.postings as unknown[]).length, inserted: 0, expired: call.payload.finalChunk ? 3 : 0 },
+        error: null,
+      }))
+      const summary = await runIngestion({ call: catalog.call, now, env, fetchSource: async () => fetched(bigJobs) })
+      const applies = catalog.calls.filter((call) => call.operation === "apply-catalog").map((call) => call.payload)
+      expect(applies.map((payload) => [payload.chunkIndex, payload.finalChunk, payload.idempotencyKey, payload.snapshotKey])).toEqual(
+        chunks.map((_, index) => [
+          index,
+          index === chunks.length - 1,
+          `greenhouse:big:2026-10-28T11:c${index}`,
+          "greenhouse:big:2026-10-28T11",
+        ]),
+      )
+      expect(summary).toMatchObject({
+        sources: [{ outcome: "applied", fetched: 250, inserted: 0, updated: 250, expired: 3, chunks: chunks.length }],
+      })
+    })
+
+    it("stops at a failed middle chunk so the final chunk never runs", async () => {
+      const catalog = fakeCatalog([source("greenhouse:big")], (call) =>
+        call.payload.chunkIndex === 1
+          ? { data: null, error: { message: "timeout", code: "57014" } }
+          : { data: { ok: true, upserted: 1, inserted: 1, expired: 0 }, error: null },
+      )
+      const summary = await runIngestion({ call: catalog.call, now, env, fetchSource: async () => fetched(bigJobs) })
+      const sent = catalog.calls.filter((call) => call.operation === "apply-catalog").map((call) => call.payload.chunkIndex)
+      expect(sent).toEqual([0, 1])
+      expect(summary).toMatchObject({ sources: [{ outcome: "error", reason: "apply_failed:57014:chunk1" }] })
+    })
+
+    it("reports a rerun of an applied snapshot as a duplicate and trims long descriptions", async () => {
+      const catalog = fakeCatalog([source("greenhouse:big")], () => ({ data: { ok: true, reason: "duplicate" }, error: null }))
+      const summary = await runIngestion({ call: catalog.call, now, env, fetchSource: async () => fetched(bigJobs) })
+      expect(summary).toMatchObject({ sources: [{ outcome: "duplicate" }] })
+
+      const long = fakeCatalog([source("greenhouse:a")])
+      await runIngestion({ call: long.call, now, env, fetchSource: async () => fetched([{ ...job("1"), descriptionText: "x".repeat(20_000) }]) })
+      const sent = long.calls.find((call) => call.operation === "apply-catalog")?.payload.postings as Array<{ descriptionText: string }>
+      expect(sent[0]?.descriptionText).toHaveLength(8_000)
+    })
   })
 
   it("uses one idempotency key per source and UTC hour", async () => {

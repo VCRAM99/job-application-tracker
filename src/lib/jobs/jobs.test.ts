@@ -309,7 +309,7 @@ describe("source adapters", () => {
     ).rejects.toThrow(/redirect_blocked/)
     await expect(
       fetchApprovedJson(board, {
-        fetchImpl: async () => new Response("{}", { status: 200, headers: { "content-length": "2000000" } }),
+        fetchImpl: async () => new Response("{}", { status: 200, headers: { "content-length": "10000001" } }),
       }),
     ).rejects.toThrow(/oversized/)
     await expect(
