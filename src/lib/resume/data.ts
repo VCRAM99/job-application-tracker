@@ -1,6 +1,7 @@
 import "server-only"
 
 import { requireUser } from "@/lib/auth/session"
+import { listApplications } from "@/lib/records/data"
 import { isUuid } from "@/lib/records/form-state"
 import { PARSE_PROMPT_VERSION } from "@/lib/resume/constants"
 import { resumeContentSchema, type ResumeContent } from "@/lib/resume/content"
@@ -179,19 +180,14 @@ export async function listCompletedAnalyses(): Promise<Array<{ id: string; label
   }))
 }
 
+/** The user's applications for the link picker. Reuses listApplications, which loads company names separately. */
 export async function listApplicationOptions(): Promise<Array<{ id: string; label: string }>> {
-  const user = await requireUser()
-  const supabase = await createClient()
-  const result = await supabase
-    .from("applications")
-    .select("id, job_title, companies(name)")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(200)
-  return (result.data ?? []).map((row) => {
-    const company = (row as { companies?: { name?: string } | null }).companies?.name
-    return { id: String(row.id), label: [String(row.job_title), company].filter(Boolean).join(" · ") }
-  })
+  const result = await listApplications()
+  if (!result.ok) return []
+  return result.data.slice(0, 200).map((application) => ({
+    id: application.id,
+    label: [application.jobTitle, application.companyName].filter(Boolean).join(" · "),
+  }))
 }
 
 /** The saved execution mode, used as the default for the billing picker. */
