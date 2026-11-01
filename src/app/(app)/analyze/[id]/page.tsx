@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { getAnalysis, loadAnalysisContext, loadFactLabels } from "@/lib/analyze/data"
 import { isUuid } from "@/lib/records/form-state"
+import { resumeStudioEnabled } from "@/lib/resume/flags"
 
 export const metadata: Metadata = { title: "Fit result" }
 export const instant = false
@@ -59,9 +60,19 @@ export default async function AnalysisDetailPage({
         title={analysis.title || "Qualification match"}
         description={analysis.company || "Job text compared with verified career facts."}
         action={
-          <Button variant="outline" nativeButton={false} render={<Link href="/analyze" />}>
-            All analyses
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {resumeStudioEnabled() && analysis.status === "complete" ? (
+              <Button
+                nativeButton={false}
+                render={<Link href={`/resumes?analysis=${analysis.id}${analysis.applicationId ? `&application=${analysis.applicationId}` : ""}`} />}
+              >
+                Tailor resume
+              </Button>
+            ) : null}
+            <Button variant="outline" nativeButton={false} render={<Link href="/analyze" />}>
+              All analyses
+            </Button>
+          </div>
         }
       />
       <AnalysisResult analysis={analysis} factLabels={factLabels} executionMode={mode} reused={reused} />

@@ -4,6 +4,7 @@ export const NAV_ITEMS = [
   { href: "/applications", label: "Applications" },
   { href: "/jobs", label: "Jobs" },
   { href: "/analyze", label: "Fit" },
+  { href: "/resumes", label: "Resumes" },
   { href: "/networking", label: "Networking" },
   { href: "/tasks", label: "Tasks" },
   { href: "/daily-tasks", label: "Daily Tasks" },
@@ -16,6 +17,7 @@ export type NavFlags = {
   career: boolean
   jobs: boolean
   analyze: boolean
+  resumes: boolean
 }
 
 export function visibleNavItems(flags: NavFlags) {
@@ -23,6 +25,7 @@ export function visibleNavItems(flags: NavFlags) {
     if (item.href === "/career") return flags.career
     if (item.href === "/jobs") return flags.jobs
     if (item.href === "/analyze") return flags.analyze
+    if (item.href === "/resumes") return flags.resumes
     return true
   })
 }
