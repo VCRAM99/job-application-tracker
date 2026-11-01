@@ -15,6 +15,7 @@ import { isUuid, type RecordFormState } from "@/lib/records/form-state"
 import { TAILOR_PROMPT_VERSION, TAILOR_SCHEMA_VERSION } from "@/lib/resume/constants"
 import { contentToText, resumeContentSchema, type ResumeContent } from "@/lib/resume/content"
 import { resumeStudioEnabled } from "@/lib/resume/flags"
+import { sliceChars } from "@/lib/resume/text"
 import { tailorResumeContent } from "@/lib/resume/run-tailor"
 import { applyEdits, type EditStatus, type ResumeEdit } from "@/lib/resume/tailor"
 import { createClient } from "@/lib/supabase/server"
@@ -104,7 +105,7 @@ export async function tailorResume(_previous: RecordFormState, formData: FormDat
           resume_id: resumeId,
           analysis_id: analysisId,
           application_id: linkedApplication,
-          label: [record.title || "Tailored resume", record.company].filter(Boolean).join(" · ").slice(0, 160),
+          label: sliceChars([record.title || "Tailored resume", record.company].filter(Boolean).join(" · "), 160),
           base_content: content,
           edits: outcome.edits,
           final_content: content,
@@ -208,4 +209,19 @@ export async function linkVersion(_previous: RecordFormState, formData: FormData
   if (saved.error) return fail(saved.error.code === "23503" ? "That application could not be found." : "The link could not be saved.")
   revalidatePath("/applications")
   return { status: "idle", message: applicationId ? "Linked." : "Unlinked.", fieldErrors: {} }
+}
+
+/** Deletes one tailored version. The resume and any linked application are unchanged. */
+export async function deleteVersion(formData: FormData): Promise<RecordFormState> {
+  if (!resumeStudioEnabled()) return fail("Resume Studio is turned off.")
+  const user = await requireUser()
+  const versionId = String(formData.get("versionId") ?? "")
+  if (!isUuid(versionId)) return fail("That version could not be found.")
+  const supabase = await createClient()
+  const removed = await supabase.from("resume_versions").delete().eq("id", versionId).eq("user_id", user.id).select("resume_id")
+  if (removed.error || !removed.data?.length) return fail("That version could not be deleted.")
+  const resumeId = removed.data[0]?.resume_id
+  revalidatePath(resumeId ? `/resumes/${resumeId}` : "/resumes")
+  revalidatePath("/applications")
+  return { status: "idle", message: "Version deleted.", fieldErrors: {} }
 }

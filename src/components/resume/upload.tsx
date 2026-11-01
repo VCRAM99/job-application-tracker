@@ -48,6 +48,7 @@ export function ResumeUpload({ userId }: { userId: string }) {
           type="file"
           accept={ACCEPT}
           className="sr-only"
+          tabIndex={-1}
           aria-label="Resume file"
           aria-describedby={error ? errorId : undefined}
           onChange={(event) => {

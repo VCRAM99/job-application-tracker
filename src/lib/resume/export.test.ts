@@ -58,5 +58,6 @@ describe("resume export", () => {
     )
     expect(contentDisposition('../"evil"\r\n', "docx")).toMatch(/^attachment; filename="evil\.docx"; filename\*=UTF-8''/)
     expect(contentDisposition("", "docx")).toContain('filename="Resume.docx"')
+    expect(contentDisposition("Siobhán O'Brien (2)", "pdf")).toContain("filename*=UTF-8''Siobh%C3%A1n%20O%27Brien%20%282%29.pdf")
   })
 })

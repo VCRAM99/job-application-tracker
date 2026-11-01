@@ -70,7 +70,7 @@ export default async function ApplicationDetailPage({
                 Analyze fit
               </Button>
             ) : null}
-            {resumes && latestAnalysis ? (
+            {resumes && latestAnalysis && jobAnalysisEnabled() ? (
               <Button
                 variant="outline"
                 nativeButton={false}

@@ -13,6 +13,7 @@ import { MIME_BY_KIND, PARSE_PROMPT_VERSION, PARSE_SCHEMA_VERSION, RESUME_BUCKET
 import { extractResumeText } from "@/lib/resume/extract"
 import { checkResumeFile, FILE_ERROR_MESSAGES, isOwnedResumePath, kindFromPath } from "@/lib/resume/files"
 import { resumeStudioEnabled } from "@/lib/resume/flags"
+import { sliceChars } from "@/lib/resume/text"
 import { parseResumeText } from "@/lib/resume/run-parse"
 import { createClient } from "@/lib/supabase/server"
 
@@ -21,7 +22,7 @@ export type RegisterResult = { ok: true; id: string; existing: boolean } | { ok:
 const OFF = "Resume Studio is turned off."
 
 function labelFrom(value: string): string {
-  return value.replace(/\.(pdf|docx)$/i, "").replace(/\s+/g, " ").trim().slice(0, 120) || "Resume"
+  return sliceChars(value.replace(/\.(pdf|docx)$/i, "").replace(/\s+/g, " ").trim(), 120) || "Resume"
 }
 
 /**
@@ -69,11 +70,21 @@ export async function registerResume(input: { path: string; label: string }): Pr
     .select("id")
     .single()
   if (inserted.error) {
-    await discard()
     if (inserted.error.code === "23505") {
-      const existing = await supabase.from("resumes").select("id").eq("user_id", user.id).eq("sha256", sha256).maybeSingle()
-      if (existing.data) return { ok: true, id: String(existing.data.id), existing: true }
+      // Same file or same path already registered. Keep the object if a row points at it.
+      const existing = await supabase
+        .from("resumes")
+        .select("id, storage_path")
+        .eq("user_id", user.id)
+        .or(`sha256.eq.${sha256},storage_path.eq.${path}`)
+        .limit(1)
+        .maybeSingle()
+      if (existing.data) {
+        if (String(existing.data.storage_path) !== path) await discard()
+        return { ok: true, id: String(existing.data.id), existing: true }
+      }
     }
+    await discard()
     console.error(`Resume not registered (${inserted.error.code ?? "no code"}).`)
     return { ok: false, message: "The resume could not be saved." }
   }
@@ -94,6 +105,13 @@ export async function deleteResume(formData: FormData): Promise<RecordFormState>
   const supabase = await createClient()
   const found = await supabase.from("resumes").select("storage_path").eq("id", id).eq("user_id", user.id).maybeSingle()
   if (found.error || !found.data) return { status: "error", message: "That resume could not be found.", fieldErrors: {} }
+  // Versions linked to an application stay as the record of what was sent. Unlinked versions
+  // would be unreachable after the resume is gone, so they are deleted with it.
+  const versions = await supabase.from("resume_versions").delete().eq("user_id", user.id).eq("resume_id", id).is("application_id", null)
+  if (versions.error) {
+    console.error(`Resume versions not deleted (${versions.error.code ?? "no code"}).`)
+    return { status: "error", message: "The resume could not be deleted.", fieldErrors: {} }
+  }
   const removed = await supabase.from("resumes").delete().eq("id", id).eq("user_id", user.id)
   if (removed.error) {
     console.error(`Resume not deleted (${removed.error.code ?? "no code"}).`)

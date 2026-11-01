@@ -36,7 +36,7 @@ export default async function ResumePage({ params }: { params: Promise<{ id: str
         description={`${resume.kind.toUpperCase()} · ${Math.max(1, Math.round(resume.sizeBytes / 1024))} KB`}
         action={<ResumeMenu resumeId={resume.id} label={resume.label} />}
       />
-      <ParseForm resumeId={resume.id} mode={mode.mode} parsed={resume.parseStatus === "parsed"} />
+      {resume.parseStatus !== "parsed" || !resume.parseCurrent ? <ParseForm resumeId={resume.id} mode={mode.mode} /> : null}
       {resume.parseStatus === "failed" && resume.parseError ? (
         <p role="alert" className="text-sm text-destructive">
           {AI_ERROR_MESSAGES[resume.parseError as AiErrorCode] ?? "Parsing failed."}

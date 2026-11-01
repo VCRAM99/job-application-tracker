@@ -18,7 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { HelpTip } from "@/components/ui/help-tip"
 import { initialRecordFormState, type RecordFormState } from "@/lib/records/form-state"
 import { deleteResume, parseResume, saveResumeAsCareerSource } from "@/lib/resume/actions"
-import { decideEdit, linkVersion, tailorResume } from "@/lib/resume/tailor-actions"
+import { decideEdit, deleteVersion, linkVersion, tailorResume } from "@/lib/resume/tailor-actions"
 
 type Mode = "managed" | "byok"
 
@@ -37,14 +37,15 @@ function ModePicker({ mode }: { mode: Mode }) {
   )
 }
 
-export function ParseForm({ resumeId, mode, parsed }: { resumeId: string; mode: Mode; parsed: boolean }) {
+/** Shown only while the resume has no parse under the current prompt version. */
+export function ParseForm({ resumeId, mode }: { resumeId: string; mode: Mode }) {
   const [state, action, pending] = useActionState(parseResume, initialRecordFormState)
   return (
     <form action={action} className="flex flex-col gap-2">
       <input type="hidden" name="resumeId" value={resumeId} />
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" variant={parsed ? "outline" : "default"} disabled={pending}>
-          {pending ? "Parsing…" : parsed ? "Parse again" : "Parse with AI"}
+        <Button type="submit" disabled={pending}>
+          {pending ? "Parsing…" : "Parse with AI"}
         </Button>
         <ModePicker mode={mode} />
         <HelpTip label="About parsing">
@@ -193,14 +194,15 @@ export function EditDecision({ versionId, editId, status }: { versionId: string;
 }
 
 export function AcceptAll({ versionId, disabled }: { versionId: string; disabled: boolean }) {
-  const [, action, pending] = useActionState(decideEdit, initialRecordFormState)
+  const [state, action, pending] = useActionState(decideEdit, initialRecordFormState)
   return (
-    <form action={action}>
+    <form action={action} className="flex items-center gap-2">
       <input type="hidden" name="versionId" value={versionId} />
       <input type="hidden" name="editId" value="all" />
       <Button type="submit" name="status" value="accepted" variant="outline" size="sm" disabled={disabled || pending}>
         Accept all
       </Button>
+      {state.status === "error" ? <span role="alert" className="text-xs text-destructive">{state.message}</span> : null}
     </form>
   )
 }
@@ -231,5 +233,55 @@ export function LinkVersion({
       </Button>
       {state.message ? <span className={state.status === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>{state.message}</span> : null}
     </form>
+  )
+}
+
+export function VersionMenu({ versionId, resumeId }: { versionId: string; resumeId: string | null }) {
+  const router = useRouter()
+  const [confirming, setConfirming] = useState(false)
+  const [message, setMessage] = useState<RecordFormState>(initialRecordFormState)
+  const [pending, start] = useTransition()
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button variant="outline" aria-label="More actions" />}>⋯</DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem variant="destructive" onClick={() => setConfirming(true)}>
+            Delete version
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <FormStatus state={message} />
+      <Dialog open={confirming} onOpenChange={setConfirming}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete this version?</DialogTitle>
+            <DialogDescription>The tailored content and its edits are removed. The resume and any linked application stay.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+            <Button
+              variant="destructive"
+              disabled={pending}
+              onClick={() =>
+                start(async () => {
+                  const form = new FormData()
+                  form.set("versionId", versionId)
+                  const result = await deleteVersion(form)
+                  if (result.status === "error") {
+                    setMessage(result)
+                    setConfirming(false)
+                    return
+                  }
+                  router.push(resumeId ? `/resumes/${resumeId}` : "/resumes")
+                })
+              }
+            >
+              {pending ? "Deleting…" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }

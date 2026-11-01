@@ -2,6 +2,7 @@ import { extractText, getDocumentProxy } from "unpdf"
 
 import { MAX_RESUME_TEXT, MIN_PDF_TEXT, type ResumeKind } from "@/lib/resume/constants"
 import { docxParts } from "@/lib/resume/files"
+import { sliceChars } from "@/lib/resume/text"
 
 export type Extraction = { ok: true; text: string; truncated: boolean } | { ok: false; reason: string }
 
@@ -91,7 +92,7 @@ function capped(text: string): Extraction {
   const normalized = normalizeResumeText(text)
   if (!normalized) return { ok: false, reason: "no_text" }
   if (normalized.length <= MAX_RESUME_TEXT) return { ok: true, text: normalized, truncated: false }
-  return { ok: true, text: normalized.slice(0, MAX_RESUME_TEXT).trimEnd(), truncated: true }
+  return { ok: true, text: sliceChars(normalized, MAX_RESUME_TEXT).trimEnd(), truncated: true }
 }
 
 export async function extractResumeText(kind: ResumeKind, bytes: Uint8Array): Promise<Extraction> {

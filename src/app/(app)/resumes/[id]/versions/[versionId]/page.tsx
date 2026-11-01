@@ -4,7 +4,7 @@ import { notFound } from "next/navigation"
 import { connection } from "next/server"
 
 import { PageHeader } from "@/components/records/fields"
-import { AcceptAll, LinkVersion } from "@/components/resume/forms"
+import { AcceptAll, LinkVersion, VersionMenu } from "@/components/resume/forms"
 import { ResumeStudioOff } from "@/components/resume/off"
 import { EditCard, ReadabilityCompare, ResumePreview } from "@/components/resume/view"
 import { Button } from "@/components/ui/button"
@@ -57,6 +57,7 @@ export default async function VersionPage({ params }: { params: Promise<{ id: st
             <Button variant="outline" nativeButton={false} render={<a href={`/api/resumes/versions/${version.id}/export?format=pdf`} />}>
               PDF
             </Button>
+            <VersionMenu versionId={version.id} resumeId={version.resumeId} />
           </div>
         }
       />

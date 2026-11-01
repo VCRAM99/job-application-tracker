@@ -164,6 +164,9 @@ export function contentDisposition(base: string, extension: "docx" | "pdf"): str
       .replace(/[^A-Za-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 80) || "Resume"
-  const utf8 = encodeURIComponent(`${base.replace(/[\\/:*?"<>|\r\n]+/g, " ").trim().slice(0, 120) || "Resume"}.${extension}`)
+  const utf8 = encodeURIComponent(`${base.replace(/[\\/:*?"<>|\r\n]+/g, " ").trim().slice(0, 120) || "Resume"}.${extension}`).replace(
+    /['()*!]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  )
   return `attachment; filename="${ascii}.${extension}"; filename*=UTF-8''${utf8}`
 }

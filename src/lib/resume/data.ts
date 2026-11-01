@@ -2,6 +2,7 @@ import "server-only"
 
 import { requireUser } from "@/lib/auth/session"
 import { isUuid } from "@/lib/records/form-state"
+import { PARSE_PROMPT_VERSION } from "@/lib/resume/constants"
 import { resumeContentSchema, type ResumeContent } from "@/lib/resume/content"
 import type { ParseDropped } from "@/lib/resume/parse"
 import type { ResumeEdit, TailorDropped } from "@/lib/resume/tailor"
@@ -25,6 +26,8 @@ export type ResumeDetail = ResumeSummary & {
   parseModel: string | null
   parseProvider: string | null
   parseMode: string | null
+  /** Parsed with the current prompt version, so parsing again would not call the model. */
+  parseCurrent: boolean
 }
 
 export type VersionSummary = {
@@ -114,6 +117,7 @@ export async function getResume(id: string): Promise<{ resume: ResumeDetail; ver
       parseModel: row.parse_model ? String(row.parse_model) : null,
       parseProvider: row.parse_provider ? String(row.parse_provider) : null,
       parseMode: row.parse_execution_mode ? String(row.parse_execution_mode) : null,
+      parseCurrent: row.parse_prompt_version === PARSE_PROMPT_VERSION,
     },
     versions: (versions.data ?? []).map((item) => versionSummary(item as Row)),
   }

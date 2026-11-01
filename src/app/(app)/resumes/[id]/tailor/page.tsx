@@ -21,7 +21,10 @@ export default async function TailorPage({
   params: Promise<{ id: string }>
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  if (!resumeStudioEnabled() || !jobAnalysisEnabled()) return <ResumeStudioOff />
+  if (!resumeStudioEnabled()) return <ResumeStudioOff />
+  if (!jobAnalysisEnabled()) {
+    return <RecordState title="Tailoring needs fit analysis" description="Set JOB_ANALYSIS_ENABLED=true on the server to tailor a resume to an analysis." />
+  }
   await connection()
   const [{ id }, query] = await Promise.all([params, searchParams])
   const analysisId = typeof query.analysis === "string" && isUuid(query.analysis) ? query.analysis : null

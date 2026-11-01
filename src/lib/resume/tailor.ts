@@ -6,6 +6,7 @@ import type { GroundedRequirement, RequirementMatch, VerifiedFact } from "@/lib/
 import type { ResumeContent } from "@/lib/resume/content"
 import { newNumbers } from "@/lib/resume/numbers"
 import { groundingKey } from "@/lib/resume/parse"
+import { sliceChars } from "@/lib/resume/text"
 
 export const EDIT_OPS = ["rewrite_bullet", "reorder_bullets", "add_skill", "remove_item", "edit_summary"] as const
 export type EditOp = (typeof EDIT_OPS)[number]
@@ -288,7 +289,7 @@ export function validateEdits(
     const cited = factIds.map((id) => factText(factsById.get(id) as VerifiedFact))
     const before = edit.before.trim()
     const after = edit.after.replace(/\s+/g, " ").trim()
-    const base = { ...edit, before, after, factIds, order: [] as number[], rationale: edit.rationale.trim().slice(0, 400) }
+    const base = { ...edit, before, after, factIds, order: [] as number[], rationale: sliceChars(edit.rationale.trim(), 400) }
 
     if (edit.op === "rewrite_bullet" || edit.op === "remove_item" || edit.op === "edit_summary") {
       const valid =

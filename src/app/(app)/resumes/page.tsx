@@ -6,6 +6,7 @@ import { ResumeStudioOff } from "@/components/resume/off"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { ResumeUpload } from "@/components/resume/upload"
 import { Button } from "@/components/ui/button"
+import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { requireUser } from "@/lib/auth/session"
 import { isUuid } from "@/lib/records/form-state"
 import { listResumes } from "@/lib/resume/data"
@@ -25,7 +26,7 @@ export default async function ResumesPage({ searchParams }: { searchParams: Prom
   }
   const analysis = typeof query.analysis === "string" && isUuid(query.analysis) ? query.analysis : null
   const application = typeof query.application === "string" && isUuid(query.application) ? query.application : null
-  const tailorQuery = analysis ? `?analysis=${analysis}${application ? `&application=${application}` : ""}` : null
+  const tailorQuery = analysis && jobAnalysisEnabled() ? `?analysis=${analysis}${application ? `&application=${application}` : ""}` : null
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">

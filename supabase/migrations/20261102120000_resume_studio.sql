@@ -229,7 +229,15 @@ begin
     5242880,
     array['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
   )
-  on conflict (id) do nothing;
+  -- A pre-existing bucket with this id is brought to the same private settings.
+  on conflict (id) do update set
+    public = false,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
+  drop policy if exists "insert own resume files" on storage.objects;
+  drop policy if exists "read own resume files" on storage.objects;
+  drop policy if exists "delete own resume files" on storage.objects;
 
   -- Object keys are exactly <auth.uid()>/<uuid>.pdf or .docx. No update policy:
   -- an original upload is never overwritten.
