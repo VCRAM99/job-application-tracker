@@ -430,6 +430,89 @@ describe("recommended jobs database", () => {
     expect(fresh.rows[0]).toMatchObject({ register_job_source: { ok: true, created: false } })
   })
 
+  it("applies a chunked snapshot and expires only absent postings, once, on the final chunk", async () => {
+    const activation = {
+      accessMethod: "documented_https_json",
+      approvedUsage: "Store normalized public posting fields.",
+      attributionRequirements: "Name Greenhouse.",
+      retentionRestrictions: "Expire omitted listings.",
+      allowedStorageFields: ["title"],
+    }
+    await operate("register-source", { provider: "greenhouse", slug: "greenhouse:chunks", displayName: "Chunks", sourceIdentifier: "chunks", ...activation })
+    await operate("approve-source", { slug: "greenhouse:chunks", approvalStatus: "approved", termsStatus: "permitted", liveIngestionEnabled: true, refreshLimitPerDay: 1, ...activation })
+    const posting = (id: string) => ({
+      sourceJobId: id,
+      title: `Role ${id}`,
+      listingUrl: `https://boards.greenhouse.io/chunks/jobs/${id}`,
+      contentHash: hash(),
+      listingStatus: "active",
+    })
+    const chunk = (snapshot: string, index: number, final: boolean, ids: string[], extra: Record<string, unknown> = {}) =>
+      operate("apply-catalog", {
+        sourceSlug: "greenhouse:chunks",
+        idempotencyKey: `${snapshot}:c${index}`,
+        snapshotKey: snapshot,
+        chunkIndex: index,
+        finalChunk: final,
+        completeSnapshot: true,
+        allowEmpty: false,
+        postings: ids.map(posting),
+        ...extra,
+      })
+    const statuses = async () =>
+      Object.fromEntries(
+        (
+          await db.query<{ source_job_id: string; listing_status: string }>(
+            `select p.source_job_id, p.listing_status from public.job_postings p
+             join public.job_sources s on s.id = p.source_id where s.slug = 'greenhouse:chunks'`,
+          )
+        ).rows.map((row) => [row.source_job_id, row.listing_status]),
+      )
+
+    // Day 1, one chunk. Refresh limit is 1 per day.
+    expect(await chunk("snap-1", 0, true, ["a", "b", "c", "d"])).toMatchObject({ ok: true, inserted: 4, expired: 0 })
+    // Allow a second snapshot today, then move day 1's run outside the 24 hour window.
+    await db.exec("update public.job_source_runs set started_at = started_at - interval '2 days' where idempotency_key = 'apply-catalog:snap-1:c0'")
+    await db.exec("update public.job_postings set last_verified_at = last_verified_at - interval '2 days' where source_job_id in ('a','b','c','d')")
+
+    // Day 2: d is gone. Three chunks; earlier chunks never expire.
+    expect(await chunk("snap-2", 0, false, ["a"])).toMatchObject({ ok: true, upserted: 1, expired: 0 })
+    expect(await chunk("snap-2", 1, false, ["b"])).toMatchObject({ ok: true, upserted: 1, expired: 0 })
+    expect(await statuses()).toEqual({ a: "active", b: "active", c: "active", d: "active" })
+    expect(await chunk("snap-2", 2, true, ["c", "e"])).toMatchObject({ ok: true, upserted: 2, inserted: 1, expired: 1 })
+    expect(await statuses()).toEqual({ a: "active", b: "active", c: "active", d: "expired", e: "active" })
+    expect(await chunk("snap-2", 2, true, ["c", "e"])).toMatchObject({ ok: true, reason: "duplicate" })
+
+    // Chunks 1+ do not count toward the daily limit, so only chunk 0 of a new snapshot is limited.
+    expect(await chunk("snap-3", 0, false, ["a"])).toMatchObject({ ok: false, reason: "rate_limited" })
+  })
+
+  it("expires nothing when a middle chunk is missing and rejects malformed chunk metadata", async () => {
+    await db.exec("update public.job_source_runs set started_at = started_at - interval '2 days' where idempotency_key like 'apply-catalog:snap-%'")
+    const posting = (id: string) => ({ sourceJobId: id, title: id, listingUrl: `https://boards.greenhouse.io/chunks/jobs/${id}`, contentHash: hash(), listingStatus: "active" })
+    const send = (body: Record<string, unknown>) => operate("apply-catalog", { sourceSlug: "greenhouse:chunks", completeSnapshot: true, ...body })
+    const before = await db.query("select count(*)::int as count from public.job_postings where listing_status = 'expired'")
+
+    expect(await send({ idempotencyKey: "snap-4:c0", snapshotKey: "snap-4", chunkIndex: 0, finalChunk: false, postings: [posting("a")] })).toMatchObject({ ok: true, expired: 0 })
+    // Chunk 1 failed and was never applied; the final chunk 2 is refused and expires nothing.
+    expect(await send({ idempotencyKey: "snap-4:c2", snapshotKey: "snap-4", chunkIndex: 2, finalChunk: true, postings: [posting("b")] })).toEqual({
+      ok: false,
+      reason: "chunk_out_of_order",
+    })
+    const after = await db.query("select count(*)::int as count from public.job_postings where listing_status = 'expired'")
+    expect(after.rows).toEqual(before.rows)
+
+    await expect(send({ idempotencyKey: "other:c1", snapshotKey: "snap-4", chunkIndex: 1, finalChunk: true, postings: [] })).rejects.toThrow(/invalid catalog batch/)
+    await expect(send({ idempotencyKey: "snap-4:c1", chunkIndex: 1, finalChunk: true, postings: [] })).rejects.toThrow(/invalid catalog batch/)
+    await expect(send({ idempotencyKey: "snap-4:cx", snapshotKey: "snap-4", chunkIndex: "x", postings: [] })).rejects.toThrow(/invalid catalog batch/)
+    const locks = await db.query("select count(*)::int as count from public.job_processing_locks where name = 'catalog:greenhouse:chunks'")
+    expect(locks.rows[0]).toEqual({ count: 0 })
+    await operate("approve-source", {
+      slug: "greenhouse:chunks", approvalStatus: "revoked", termsStatus: "unclear", liveIngestionEnabled: false, refreshLimitPerDay: 0,
+      accessMethod: "documented_https_json", approvedUsage: "x", attributionRequirements: "x", retentionRestrictions: "x", allowedStorageFields: ["title"],
+    })
+  })
+
   it("lists approved sources for the runner only with a fresh signed request", async () => {
     const list = (payload: string, proof: string) =>
       asUser(null, () =>

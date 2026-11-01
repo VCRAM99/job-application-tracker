@@ -38,7 +38,8 @@ export function assertApprovedSourceUrl(value: string): URL {
   return parsed
 }
 
-export const MAX_SOURCE_BYTES = 1_000_000
+/** Hard cap on one provider response. A dense Greenhouse board is about 11.5 KB per job, so this is roughly 850 jobs. */
+export const MAX_SOURCE_BYTES = 10_000_000
 
 export function greenhouseJobsUrl(boardToken: string): string {
   const token = assertSourceIdentifier(boardToken)
