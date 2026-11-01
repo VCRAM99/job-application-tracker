@@ -4,13 +4,16 @@ import { createHash } from "node:crypto"
 
 import { revalidatePath } from "next/cache"
 
+import { prepareAiRun, usageReservationDeps } from "@/lib/ai/run-context"
+import { AI_ERROR_MESSAGES } from "@/lib/ai/types"
 import { createCareerSource } from "@/lib/career/actions"
 import { requireUser } from "@/lib/auth/session"
 import { initialRecordFormState, isUuid, type RecordFormState } from "@/lib/records/form-state"
-import { MIME_BY_KIND, RESUME_BUCKET } from "@/lib/resume/constants"
+import { MIME_BY_KIND, PARSE_PROMPT_VERSION, PARSE_SCHEMA_VERSION, RESUME_BUCKET } from "@/lib/resume/constants"
 import { extractResumeText } from "@/lib/resume/extract"
 import { checkResumeFile, FILE_ERROR_MESSAGES, isOwnedResumePath, kindFromPath } from "@/lib/resume/files"
 import { resumeStudioEnabled } from "@/lib/resume/flags"
+import { parseResumeText } from "@/lib/resume/run-parse"
 import { createClient } from "@/lib/supabase/server"
 
 export type RegisterResult = { ok: true; id: string; existing: boolean } | { ok: false; message: string }
@@ -115,4 +118,81 @@ export async function saveResumeAsCareerSource(_previous: RecordFormState, formD
   source.set("label", String(found.data.label))
   source.set("body", String(found.data.extracted_text))
   return createCareerSource(initialRecordFormState, source)
+}
+
+function requestedMode(formData: FormData): "managed" | "byok" | "local" {
+  const value = String(formData.get("executionMode") ?? "")
+  return value === "managed" || value === "local" ? value : "byok"
+}
+
+/**
+ * Parses a resume into sections through the AI gateway. The result is cached
+ * on the resume row by prompt version; the reservation is keyed by user,
+ * file hash, prompt version, mode, provider, and model.
+ */
+export async function parseResume(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
+  if (!resumeStudioEnabled()) return { status: "error", message: OFF, fieldErrors: {} }
+  const user = await requireUser()
+  const id = String(formData.get("resumeId") ?? "")
+  if (!isUuid(id)) return { status: "error", message: "That resume could not be found.", fieldErrors: {} }
+  const supabase = await createClient()
+  const found = await supabase
+    .from("resumes")
+    .select("id, sha256, extracted_text, parse_status, parse_prompt_version")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle()
+  if (found.error || !found.data) return { status: "error", message: "That resume could not be found.", fieldErrors: {} }
+  if (found.data.parse_status === "parsed" && found.data.parse_prompt_version === PARSE_PROMPT_VERSION) {
+    return { status: "idle", message: "Already parsed. The model was not called again.", fieldErrors: {} }
+  }
+  const prepared = await prepareAiRun(supabase, user.id, requestedMode(formData))
+  if (!prepared.ok) return { status: "error", message: prepared.message, fieldErrors: {} }
+  const run = prepared.run
+  const idempotencyKey = createHash("sha256")
+    .update(["resume-parse", user.id, found.data.sha256, PARSE_PROMPT_VERSION, run.mode, run.provider, run.model].join("\n"))
+    .digest("hex")
+
+  const result = await parseResumeText({
+    text: String(found.data.extracted_text),
+    run,
+    reservation: usageReservationDeps(supabase, { userId: user.id, secret: run.secret, idempotencyKey, mode: run.mode, provider: run.provider, model: run.model }),
+    persist: async (outcome) => {
+      const saved = await supabase
+        .from("resumes")
+        .update({
+          parse_status: "parsed",
+          parsed: outcome.content,
+          parse_dropped: outcome.dropped,
+          parse_provider: run.provider,
+          parse_model: run.model,
+          parse_execution_mode: run.mode,
+          parse_prompt_version: PARSE_PROMPT_VERSION,
+          parse_schema_version: PARSE_SCHEMA_VERSION,
+          parse_error: null,
+          parsed_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .eq("user_id", user.id)
+      if (saved.error) throw new Error("persist_failed")
+    },
+  })
+  revalidatePath(`/resumes/${id}`)
+  if (result.ok) {
+    return {
+      status: "idle",
+      message: result.kind === "already-complete" ? "Already parsed. The model was not called again." : "Parsed. Items not found in your file were dropped.",
+      fieldErrors: {},
+    }
+  }
+  if (result.code !== "in_progress") {
+    await supabase
+      .from("resumes")
+      .update({ parse_status: "failed", parsed: null, parse_error: result.code, parse_provider: null, parse_model: null, parse_execution_mode: null })
+      .eq("id", id)
+      .eq("user_id", user.id)
+      // A failed re-parse keeps an earlier successful parse.
+      .neq("parse_status", "parsed")
+  }
+  return { status: "error", message: AI_ERROR_MESSAGES[result.code] ?? result.message, fieldErrors: {} }
 }

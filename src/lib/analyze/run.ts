@@ -1,9 +1,9 @@
 import "server-only"
 
-import { accountingProof, accountingSecret } from "@/lib/ai/accounting"
-import { decryptSecret, parseKeyRing } from "@/lib/ai/crypto"
+import { accountingSecret } from "@/lib/ai/accounting"
 import { jobAnalysisEnabled, jobAnalysisMockProvider, managedAllowance, readPlatformKey } from "@/lib/ai/flags"
-import { withUsageReservation, type ReservationRecord } from "@/lib/ai/gateway"
+import { withUsageReservation } from "@/lib/ai/gateway"
+import { readByokKey, usageReservationDeps } from "@/lib/ai/run-context"
 import { resolveExecutionMode } from "@/lib/ai/mode"
 import { analysisModelFor, PROMPT_VERSION } from "@/lib/analyze/constants"
 import {
@@ -36,37 +36,6 @@ export type AnalysisRunInput = {
 export type AnalysisRunResult =
   | { ok: true; id: string; reused: boolean }
   | { ok: false; message: string }
-
-function asReservation(value: unknown): ReservationRecord {
-  const record = value && typeof value === "object" ? (value as Record<string, unknown>) : {}
-  const status = record.status
-  if (status !== "reserved" && status !== "succeeded" && status !== "voided" && status !== "failed" && status !== "expired") {
-    throw new AiRequestError("transient")
-  }
-  return { id: String(record.id), status, reused: Boolean(record.reused), reopened: Boolean(record.reopened) }
-}
-
-async function byokKey(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  provider: string,
-): Promise<string | null> {
-  const summary = await supabase
-    .from("ai_credential_summaries")
-    .select("id, status")
-    .eq("provider", provider)
-    .eq("status", "unverified")
-    .maybeSingle()
-  if (summary.error || !summary.data) return null
-  const material = await supabase.rpc("read_own_credential_material", { p_credential_id: summary.data.id })
-  const row = Array.isArray(material.data) ? material.data[0] : null
-  if (material.error || !row) return null
-  const ring = parseKeyRing()
-  if (!ring) throw new AiRequestError("encryption_unconfigured")
-  return decryptSecret(
-    { ciphertext: row.ciphertext, nonce: row.nonce, authTag: row.auth_tag, keyVersion: row.key_version },
-    ring,
-  )
-}
 
 export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisRunResult> {
   if (!jobAnalysisEnabled()) return { ok: false, message: AI_ERROR_MESSAGES.features_disabled }
@@ -116,7 +85,7 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
   let apiKey: string | null = null
   if (!mock) {
     try {
-      apiKey = resolved.mode === "managed" ? (allowance.enabled ? readPlatformKey(provider) : null) : await byokKey(supabase, provider)
+      apiKey = resolved.mode === "managed" ? (allowance.enabled ? readPlatformKey(provider) : null) : await readByokKey(supabase, provider)
     } catch (error) {
       if (error instanceof AiRequestError) return { ok: false, message: error.message }
       return { ok: false, message: AI_ERROR_MESSAGES.transient }
@@ -182,36 +151,7 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
       apiKey,
       managedAllowed: allowance.enabled && Boolean(readPlatformKey(provider)),
     },
-    {
-      reserve: async () => {
-        const reserved = await supabase.rpc("reserve_ai_usage", {
-          p_idempotency_key: idempotencyKey,
-          p_execution_mode: resolved.mode,
-          p_provider: provider,
-          p_model: model,
-          p_proof: accountingProof(secret, ["reserve", user.id, idempotencyKey, resolved.mode, provider, model]),
-        })
-        if (reserved.error) throw new Error(reserved.error.message)
-        return asReservation(reserved.data)
-      },
-      finalize: async (id, usage) => {
-        const finalized = await supabase.rpc("finalize_ai_usage", {
-          p_usage_event_id: id,
-          p_input_tokens: usage.inputTokens,
-          p_output_tokens: usage.outputTokens,
-          p_estimated_cost_micros: null,
-          p_proof: accountingProof(secret, ["finalize", user.id, id, usage.inputTokens, usage.outputTokens]),
-        })
-        if (finalized.error) throw new AiRequestError("transient")
-      },
-      voidReservation: async (id, code) => {
-        await supabase.rpc("void_ai_usage", {
-          p_usage_event_id: id,
-          p_error_class: code,
-          p_proof: accountingProof(secret, ["void", user.id, id, (code || "failed").slice(0, 80)]),
-        })
-      },
-    },
+    usageReservationDeps(supabase, { userId: user.id, secret, idempotencyKey, mode: resolved.mode, provider, model }),
     async () => {
       try {
         const produced = await produce()
