@@ -6,6 +6,7 @@ import { LoadingSpinner } from "@/components/shell/loading-spinner"
 import { aiFeaturesEnabled, jobAnalysisEnabled } from "@/lib/ai/flags"
 import { requireUser } from "@/lib/auth/session"
 import { recommendedJobsAllowedFor } from "@/lib/jobs/flags"
+import { resumeStudioEnabled } from "@/lib/resume/flags"
 import { visibleNavItems } from "@/lib/navigation"
 
 export const instant = false
@@ -35,6 +36,7 @@ async function ProtectedContent({ children }: { children: React.ReactNode }) {
         career: aiFeaturesEnabled(),
         jobs: recommendedJobsAllowedFor(user.id),
         analyze: jobAnalysisEnabled(),
+        resumes: resumeStudioEnabled(),
       })}
     >
       {children}

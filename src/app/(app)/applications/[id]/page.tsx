@@ -17,6 +17,8 @@ import {
 } from "@/lib/records/constants"
 import { getApplication } from "@/lib/records/data"
 import { formatSalary } from "@/lib/records/logic"
+import { latestAnalysisForApplication, listVersionsForApplication } from "@/lib/resume/data"
+import { resumeStudioEnabled } from "@/lib/resume/flags"
 import { isFollowUpDue } from "@/lib/records/query"
 
 export const metadata: Metadata = { title: "Application" }
@@ -51,6 +53,10 @@ export default async function ApplicationDetailPage({
   if (!result.data) notFound()
   const application = result.data
   const date = today()
+  const resumes = resumeStudioEnabled()
+  const [versions, latestAnalysis] = resumes
+    ? await Promise.all([listVersionsForApplication(application.id), latestAnalysisForApplication(application.id)])
+    : [[], null]
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
@@ -62,6 +68,15 @@ export default async function ApplicationDetailPage({
             {jobAnalysisEnabled() ? (
               <Button variant="outline" nativeButton={false} render={<Link href={`/analyze?application=${application.id}`} />}>
                 Analyze fit
+              </Button>
+            ) : null}
+            {resumes && latestAnalysis ? (
+              <Button
+                variant="outline"
+                nativeButton={false}
+                render={<Link href={`/resumes?analysis=${latestAnalysis}&application=${application.id}`} />}
+              >
+                Tailor resume
               </Button>
             ) : null}
             <Button variant="outline" nativeButton={false} render={<Link href={`/applications/${application.id}/edit`} />}>
@@ -128,6 +143,32 @@ export default async function ApplicationDetailPage({
           },
         ]}
       />
+      {versions.length > 0 ? (
+        <section className="space-y-2" aria-labelledby="resume-versions-heading">
+          <h2 id="resume-versions-heading" className="text-sm font-medium">Resume versions</h2>
+          <ul className="grid gap-2">
+            {versions.map((version) => (
+              <li key={version.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
+                {version.resumeId ? (
+                  <Link href={`/resumes/${version.resumeId}/versions/${version.id}`} className="underline-offset-4 hover:underline">
+                    {version.label}
+                  </Link>
+                ) : (
+                  <span>{version.label}</span>
+                )}
+                <span className="flex gap-3">
+                  <a href={`/api/resumes/versions/${version.id}/export?format=docx`} className="underline-offset-4 hover:underline">
+                    DOCX
+                  </a>
+                  <a href={`/api/resumes/versions/${version.id}/export?format=pdf`} className="underline-offset-4 hover:underline">
+                    PDF
+                  </a>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {application.notes ? (
         <section className="space-y-2">
           <h2 className="text-sm font-medium">Notes</h2>
