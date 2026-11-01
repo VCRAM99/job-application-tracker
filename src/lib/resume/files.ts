@@ -73,7 +73,7 @@ export const FILE_ERROR_MESSAGES: Record<string, string> = {
   type_mismatch: "The file contents do not match its extension.",
   not_docx: "That Word file could not be read.",
   macros_not_allowed: "Macro-enabled Word files are not accepted.",
-  too_large_uncompressed: "That Word file expands to more than 20 MB.",
+  too_large_uncompressed: "That Word file expands to more than 2 MB of text.",
   image_only: "This PDF has no selectable text. Scanned resumes are not supported; export a text PDF or upload the Word file.",
   no_text: "No text was found in that file.",
   unreadable_pdf: "That PDF could not be read.",

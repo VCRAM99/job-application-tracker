@@ -44,6 +44,15 @@ describe("resume text extraction", () => {
     expect(normalizeResumeText(docxXmlToText(xml))).toBe("Lead & mentor\nLine\ntwo")
   })
 
+  it("reads unclosed and malformed tags in linear time", () => {
+    for (const piece of ["<w:del ", "<w:p ", "<w:t>", "<", "<w:p><w:t>x"]) {
+      const started = performance.now()
+      docxXmlToText(piece.repeat(200_000))
+      expect(performance.now() - started).toBeLessThan(500)
+    }
+    expect(docxXmlToText("<w:p><w:r><w:t>kept</w:t></w:r><w:del><w:r><w:delText>gone")).toBe("kept")
+  })
+
   it("caps extracted text at the career source limit", async () => {
     const long = Array.from({ length: 9_000 }, (_, index) => `<w:p><w:r><w:t>Bullet ${index} shipped work</w:t></w:r></w:p>`).join("")
     const result = await extractResumeText("docx", docxWith({ "[Content_Types].xml": CONTENT_TYPES, "word/document.xml": `<w:body>${long}</w:body>` }))
@@ -73,8 +82,8 @@ describe("resume file checks", () => {
     expect(checkResumeFile(fixture("avery.docx"), "docx")).toEqual({ ok: true, kind: "docx" })
   })
 
-  it("refuses a DOCX whose parts claim more than 20 MB uncompressed", () => {
-    const bomb = zipSync({ "[Content_Types].xml": strToU8(CONTENT_TYPES), "word/document.xml": new Uint8Array(21 * 1024 * 1024) })
+  it("refuses a DOCX whose parts claim more than 2 MB uncompressed", () => {
+    const bomb = zipSync({ "[Content_Types].xml": strToU8(CONTENT_TYPES), "word/document.xml": new Uint8Array(3 * 1024 * 1024) })
     expect(checkResumeFile(bomb, "docx")).toEqual({ ok: false, reason: "too_large_uncompressed" })
   })
 

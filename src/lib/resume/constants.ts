@@ -4,8 +4,8 @@ export const MAX_RESUME_BYTES = 5 * 1024 * 1024
 export const MAX_RESUME_TEXT = 80_000
 /** A PDF with less selectable text than this is treated as image-only. */
 export const MIN_PDF_TEXT = 200
-/** Total uncompressed size allowed for the DOCX parts we read. */
-export const MAX_DOCX_XML_BYTES = 20 * 1024 * 1024
+/** Total uncompressed size allowed for the DOCX parts we read. A resume's document.xml is far smaller. */
+export const MAX_DOCX_XML_BYTES = 2 * 1024 * 1024
 
 export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 export const PDF_MIME = "application/pdf"

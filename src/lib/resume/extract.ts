@@ -33,17 +33,58 @@ export function normalizeResumeText(text: string): string {
     .trim()
 }
 
-/** Paragraph text from word/document.xml: w:t runs, w:tab as a space, w:br and w:cr as line breaks. */
+const SKIPPED = new Set(["w:del", "w:instrText", "w:delText"])
+
+/**
+ * Paragraph text from word/document.xml: w:t runs, w:tab as a space, w:br and
+ * w:cr as line breaks, deleted and field-code text skipped. One left-to-right
+ * pass with indexOf, so unclosed or malformed tags cannot make it slow.
+ */
 export function docxXmlToText(xml: string): string {
-  const body = xml.replace(/<w:(?:del|instrText|delText)\b[\s\S]*?<\/w:(?:del|instrText|delText)>/g, "")
-  const paragraphs = body.match(/<w:p[\s>][\s\S]*?<\/w:p>|<w:p\/>/g) ?? []
-  return paragraphs
-    .map((paragraph) =>
-      [...paragraph.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>|<w:(tab|br|cr)\b[^>]*\/>/g)]
-        .map((match) => (match[2] ? (match[2] === "tab" ? " " : "\n") : decodeXml(match[1] ?? "")))
-        .join(""),
-    )
-    .join("\n")
+  const paragraphs: string[] = []
+  let current: string[] | null = null
+  let skipDepth = 0
+  let inText = false
+  let index = 0
+  while (index < xml.length) {
+    const open = xml.indexOf("<", index)
+    if (open === -1) break
+    if (inText && skipDepth === 0 && current && open > index) current.push(decodeXml(xml.slice(index, open)))
+    const close = xml.indexOf(">", open + 1)
+    if (close === -1) break
+    const tag = xml.slice(open + 1, close)
+    index = close + 1
+    const closing = tag.startsWith("/")
+    const selfClosing = tag.endsWith("/")
+    const name = (closing ? tag.slice(1) : tag).split(/[\s/]/, 1)[0] ?? ""
+    if (SKIPPED.has(name)) {
+      if (closing) skipDepth = Math.max(0, skipDepth - 1)
+      else if (!selfClosing) skipDepth += 1
+      continue
+    }
+    if (name === "w:p") {
+      if (closing) {
+        if (current) paragraphs.push(current.join(""))
+        current = null
+      } else if (selfClosing) {
+        paragraphs.push("")
+      } else {
+        if (current) paragraphs.push(current.join(""))
+        current = []
+      }
+      inText = false
+      continue
+    }
+    if (name === "w:t") {
+      inText = !closing && !selfClosing
+      continue
+    }
+    if (skipDepth === 0 && current && !closing && (name === "w:tab" || name === "w:br" || name === "w:cr")) {
+      current.push(name === "w:tab" ? " " : "\n")
+    }
+  }
+  if (current) paragraphs.push(current.join(""))
+  return paragraphs.join("\n")
 }
 
 function capped(text: string): Extraction {
