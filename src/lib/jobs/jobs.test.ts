@@ -79,7 +79,7 @@ describe("recommended jobs flags", () => {
     expect(isProtectedPath("/api/jobs/scheduler")).toBe(false)
     expect(authorizeScheduler(null, { JOB_REFRESH_ENABLED: "false" })).toMatchObject({
       ok: false,
-      reason: "refresh_disabled",
+      reason: "scheduler_disabled",
     })
     expect(authorizeScheduler("Bearer secret", { JOB_REFRESH_ENABLED: "true" })).toMatchObject({
       ok: false,

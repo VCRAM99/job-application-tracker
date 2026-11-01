@@ -43,3 +43,6 @@ supabase/.temp/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local Claude Code session config (dev-server launch). Nothing here is meant to be committed.
+.claude/

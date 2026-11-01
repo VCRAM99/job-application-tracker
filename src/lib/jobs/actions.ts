@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { requireUser } from "@/lib/auth/session"
-import { recommendedJobsEnabled } from "@/lib/jobs/flags"
+import { recommendedJobsAllowed } from "@/lib/jobs/access"
 import { isTimeZone } from "@/lib/jobs/query"
 import { nextPostingFlags, type PostingCommand } from "@/lib/jobs/state"
 import { type JobActionState } from "@/lib/jobs/action-state"
@@ -55,7 +55,7 @@ async function mutatePosting(postingId: string, command: PostingCommand): Promis
 }
 
 async function postingCommand(formData: FormData, command: PostingCommand): Promise<JobActionState> {
-  if (!recommendedJobsEnabled()) return disabled()
+  if (!(await recommendedJobsAllowed())) return disabled()
   const postingId = formText(formData, "postingId")
   if (!isUuid(postingId)) return { status: "error", message: "That job could not be found." }
   try {
@@ -90,7 +90,7 @@ export async function clearJobFeedback(_previous: JobActionState, formData: Form
 }
 
 export async function setEmployerStance(_previous: JobActionState, formData: FormData): Promise<JobActionState> {
-  if (!recommendedJobsEnabled()) return disabled()
+  if (!(await recommendedJobsAllowed())) return disabled()
   const user = await requireUser()
   const employerId = formText(formData, "employerId")
   const stance = formText(formData, "stance")
@@ -118,7 +118,7 @@ export async function saveJobPreferences(
   _previous: JobActionState,
   formData: FormData,
 ): Promise<JobActionState> {
-  if (!recommendedJobsEnabled()) return disabled()
+  if (!(await recommendedJobsAllowed())) return disabled()
   const user = await requireUser()
   const timezone = formText(formData, "timezone") || "UTC"
   if (!isTimeZone(timezone)) return { status: "error", message: "Enter a valid timezone, such as America/Toronto." }
@@ -159,7 +159,7 @@ export async function saveJobPreferences(
 }
 
 export async function saveSearch(_previous: JobActionState, formData: FormData): Promise<JobActionState> {
-  if (!recommendedJobsEnabled()) return disabled()
+  if (!(await recommendedJobsAllowed())) return disabled()
   const user = await requireUser()
   const name = formText(formData, "name")
   if (name.length < 1 || name.length > 80) return { status: "error", message: "Name this search in 80 characters or fewer." }
@@ -196,7 +196,7 @@ export async function saveAlertSubscription(
   _previous: JobActionState,
   formData: FormData,
 ): Promise<JobActionState> {
-  if (!recommendedJobsEnabled()) return disabled()
+  if (!(await recommendedJobsAllowed())) return disabled()
   const user = await requireUser()
   const cadence = formText(formData, "cadence")
   const delivery = formText(formData, "delivery")
@@ -235,7 +235,7 @@ export async function saveAlertSubscription(
 }
 
 export async function deleteAlertSubscription(formData: FormData): Promise<void> {
-  if (!recommendedJobsEnabled()) return
+  if (!(await recommendedJobsAllowed())) return
   const user = await requireUser()
   const id = formText(formData, "id")
   if (!isUuid(id)) return
@@ -245,7 +245,7 @@ export async function deleteAlertSubscription(formData: FormData): Promise<void>
 }
 
 export async function markAlertRead(formData: FormData): Promise<void> {
-  if (!recommendedJobsEnabled()) return
+  if (!(await recommendedJobsAllowed())) return
   const user = await requireUser()
   const id = formText(formData, "id")
   if (!isUuid(id)) return

@@ -1,7 +1,7 @@
 import "server-only"
 
 import { requireUser } from "@/lib/auth/session"
-import { recommendedJobsEnabled } from "@/lib/jobs/flags"
+import { recommendedJobsAllowed } from "@/lib/jobs/access"
 import { jobsErrorKind, searchPayload, type JobSearchState } from "@/lib/jobs/query"
 import { scorePosting, type MatchSignals } from "@/lib/jobs/score"
 import { textTokens } from "@/lib/jobs/text"
@@ -117,7 +117,7 @@ async function preferredEmployers(userId: string): Promise<Set<string>> {
 }
 
 export async function searchJobs(state: JobSearchState): Promise<JobsResult<{ listings: JobListing[]; total: number }>> {
-  if (!recommendedJobsEnabled()) return { ok: false, error: "disabled" }
+  if (!(await recommendedJobsAllowed())) return { ok: false, error: "disabled" }
   const user = await requireUser()
   const supabase = await createClient()
   const result = await supabase.rpc("search_recommended_jobs", { p_query: searchPayload(state) })
@@ -196,7 +196,7 @@ export type StoredJobPreferences = {
 }
 
 export async function loadJobPreferences(): Promise<JobsResult<StoredJobPreferences | null>> {
-  if (!recommendedJobsEnabled()) return { ok: false, error: "disabled" }
+  if (!(await recommendedJobsAllowed())) return { ok: false, error: "disabled" }
   const user = await requireUser()
   const supabase = await createClient()
   const result = await supabase.from("job_preferences").select("*").eq("user_id", user.id).maybeSingle()
@@ -253,6 +253,7 @@ export type TrackerPosting = {
 }
 
 export async function loadTrackerPosting(id: string): Promise<JobsResult<TrackerPosting | null>> {
+  if (!(await recommendedJobsAllowed())) return { ok: false, error: "disabled" }
   const user = await requireUser()
   const supabase = await createClient()
   const result = await supabase
@@ -335,6 +336,7 @@ export async function loadTrackerPosting(id: string): Promise<JobsResult<Tracker
 }
 
 export async function linkedApplicationId(postingId: string): Promise<string | null> {
+  if (!(await recommendedJobsAllowed())) return null
   const user = await requireUser()
   const supabase = await createClient()
   const result = await supabase
@@ -373,7 +375,7 @@ export type AlertDeliveryView = {
 export async function loadAlertDesk(): Promise<
   JobsResult<{ subscriptions: AlertSubscriptionView[]; deliveries: AlertDeliveryView[]; searches: Array<{ id: string; name: string }> }>
 > {
-  if (!recommendedJobsEnabled()) return { ok: false, error: "disabled" }
+  if (!(await recommendedJobsAllowed())) return { ok: false, error: "disabled" }
   const user = await requireUser()
   const supabase = await createClient()
   const [subscriptions, deliveries, searches] = await Promise.all([

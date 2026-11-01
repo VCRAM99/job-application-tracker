@@ -6,13 +6,13 @@ import { PageHeader, RecordState } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
 import { deleteAlertSubscription, markAlertRead, saveAlertSubscription } from "@/lib/jobs/actions"
 import { loadAlertDesk, loadJobPreferences } from "@/lib/jobs/data"
-import { recommendedJobsEnabled } from "@/lib/jobs/flags"
+import { recommendedJobsAllowed } from "@/lib/jobs/access"
 import { jobEmailDeliveryEnabled } from "@/lib/jobs/flags"
 
 export const metadata: Metadata = { title: "Job alerts" }
 
 export default async function JobAlertsPage() {
-  if (!recommendedJobsEnabled()) {
+  if (!(await recommendedJobsAllowed())) {
     return (
       <RecordState
         title="Recommended jobs are off"

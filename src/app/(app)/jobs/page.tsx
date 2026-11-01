@@ -7,7 +7,7 @@ import { PageHeader, RecordState } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
 import { saveJobPreferences, saveSearch } from "@/lib/jobs/actions"
 import { loadJobPreferences, searchJobs } from "@/lib/jobs/data"
-import { recommendedJobsEnabled } from "@/lib/jobs/flags"
+import { recommendedJobsAllowed } from "@/lib/jobs/access"
 import { emptyJobSearch, JOB_PAGE_SIZE, jobSearchParams, parseJobSearch, type JobSearchState } from "@/lib/jobs/query"
 
 export const metadata: Metadata = { title: "Recommended jobs" }
@@ -36,7 +36,7 @@ export default async function JobsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  if (!recommendedJobsEnabled()) {
+  if (!(await recommendedJobsAllowed())) {
     return (
       <RecordState
         title="Recommended jobs are off"

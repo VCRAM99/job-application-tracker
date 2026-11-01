@@ -18,6 +18,8 @@ SQL migrations for the hosted Supabase project live in this directory.
 
 `20261023120000_preserve_historical_application_duplicates.sql` lets a preexisting duplicate stay editable. A later row whose key was left null keeps that null when another row already owns the key, including status changes. New inserts with the same key are still rejected. `import_applications` skips a row whose normalized title and URL already belong to that user, and it does not delete or merge applications.
 
+`20261028120000_jobs_activation.sql` replaces the body of `apply_job_catalog` so a source can refresh more than once: an existing posting is updated instead of failing on the `(source_id, source_job_id)` key, and a posting that reappears after it expired becomes active again. The signature, proof check, lock, rate limit, and empty-snapshot rules are unchanged. It also adds `list_job_ingestion_sources`, an HMAC-gated read of approved source activation records for the server runner, which rejects a request whose `now` is more than five minutes off. It creates, alters, and drops no table, grant, or policy.
+
 Apply pending files to the existing project with `supabase db push` only when you intend to change that database. Do not run `supabase db reset` against the hosted database. Do not push the career or recommended-jobs migrations to production until the matching feature is explicitly approved. The production hardening release does not add a migration.
 
 See the README for the exact link and push commands.

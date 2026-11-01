@@ -8,7 +8,7 @@ import { PageHeader, RecordState } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
 import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { loadAnalysisContext, loadPostingText } from "@/lib/analyze/data"
-import { recommendedJobsEnabled } from "@/lib/jobs/flags"
+import { recommendedJobsAllowed } from "@/lib/jobs/access"
 import { validateJobDescription } from "@/lib/analyze/text"
 import { isUuid } from "@/lib/records/form-state"
 
@@ -20,7 +20,7 @@ export default async function JobPostingPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  if (!recommendedJobsEnabled()) {
+  if (!(await recommendedJobsAllowed())) {
     return (
       <RecordState
         title="Recommended jobs are off"

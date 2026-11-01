@@ -5,7 +5,7 @@ import { AppShell } from "@/components/shell/app-shell"
 import { LoadingSpinner } from "@/components/shell/loading-spinner"
 import { aiFeaturesEnabled, jobAnalysisEnabled } from "@/lib/ai/flags"
 import { requireUser } from "@/lib/auth/session"
-import { recommendedJobsEnabled } from "@/lib/jobs/flags"
+import { recommendedJobsAllowedFor } from "@/lib/jobs/flags"
 import { visibleNavItems } from "@/lib/navigation"
 
 export const instant = false
@@ -33,7 +33,7 @@ async function ProtectedContent({ children }: { children: React.ReactNode }) {
       user={user}
       items={visibleNavItems({
         career: aiFeaturesEnabled(),
-        jobs: recommendedJobsEnabled(),
+        jobs: recommendedJobsAllowedFor(user.id),
         analyze: jobAnalysisEnabled(),
       })}
     >
