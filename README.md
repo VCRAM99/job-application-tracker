@@ -96,6 +96,8 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+`npm run dev` refuses to start unless `NEXT_PUBLIC_SUPABASE_URL` is the local Supabase stack (`http://127.0.0.1:54321` from `npx supabase start`), so a dev session cannot write to a hosted project by accident. Put the local URL and key in `.env.development.local`, which overrides `.env.local` in development. To point a dev server at a hosted project on purpose, set `ALLOW_REMOTE_SUPABASE_IN_DEV=true`. Builds and production servers are not affected.
+
 A Supabase project with email confirmation, plus the SQL migrations in `supabase/migrations`, is required before companies, applications, and the other signed-in tools will load. Deploying the Next.js app does not apply those migrations. Setup for auth redirects, mail, and `npx supabase db push` is in [docs/setup.md](docs/setup.md). Column rules are in [docs/data-model.md](docs/data-model.md). Career AI configuration is in [docs/ai.md](docs/ai.md). Recommended jobs configuration is in [docs/jobs.md](docs/jobs.md). Server-only AI and jobs variables are commented in `.env.example`. Do not commit real keys.
 
 | Command | Purpose |
@@ -103,8 +105,12 @@ A Supabase project with email confirmation, plus the SQL migrations in `supabase
 | `npm run dev` | Development server |
 | `npm run typecheck` | TypeScript |
 | `npm run lint` | ESLint |
-| `npm test` | Vitest |
+| `npm test` | Vitest (unit, component, and in-memory database tests) |
+| `npm run test:e2e` | Playwright end-to-end suite against local Supabase |
 | `npm run build` | Production build |
+| `npm run perf:seed`, `npm run perf:measure` | Local performance dataset and measurements |
+
+How the code is layered, how data is read, and what may be cached are in [docs/architecture.md](docs/architecture.md). Test layers and how to run them are in [docs/testing.md](docs/testing.md). Performance results are in [docs/perf/baseline.md](docs/perf/baseline.md) and [docs/perf/after.md](docs/perf/after.md).
 
 ## Security and privacy
 
