@@ -11,16 +11,9 @@ import {
 } from "@/components/career/forms"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  acceptCareerSuggestion,
-  addManualFact,
-  createCareerSource,
-  extractCareerFacts,
-  rejectCareerSuggestion,
-  reviewSuggestedFact,
-  saveCareerProfile,
-  supersedeCareerFact,
-} from "@/lib/career/actions"
+import { createCareerSource, saveCareerProfile } from "@/lib/career/actions"
+import { extractCareerFacts } from "@/lib/career/extract-action"
+import { acceptCareerSuggestion, addManualFact, rejectCareerSuggestion, reviewSuggestedFact, supersedeCareerFact } from "@/lib/career/fact-actions"
 import { loadCareer, type CareerWorkspace } from "@/lib/career/data"
 
 export const metadata: Metadata = { title: "Career" }

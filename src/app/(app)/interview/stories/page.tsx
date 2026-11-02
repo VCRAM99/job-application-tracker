@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { connection } from "next/server"
 
-import { BuildStoriesForm } from "@/components/coach/forms"
+import { BuildStoriesForm } from "@/components/coach/interview-forms"
 import { Badge, CoachOff, CoachUnavailable, DroppedNote } from "@/components/coach/view"
 import { PageHeader } from "@/components/records/fields"
 import { loadFactLabels, loadVerifiedFacts } from "@/lib/analyze/data"

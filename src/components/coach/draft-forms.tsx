@@ -1,8 +1,9 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useActionState, useState, useTransition } from "react"
+import { useActionState, useOptimistic, useState, useTransition } from "react"
 
+import { CopyButton, Run, type Mode } from "@/components/coach/controls"
 import { FormStatus, NativeSelect } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,111 +19,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { HelpTip } from "@/components/ui/help-tip"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { addQuestionToPrep, buildStoryBank, deleteQuestionSet, generateQuestionSet, practiceAnswer } from "@/lib/coach/actions"
-import { createDraft, createResearchBrief, deleteBrief, deleteDraft, markDraftSent, regenerateDraft, setDraftArchived } from "@/lib/coach/draft-actions"
+import {
+  createDraft,
+  createResearchBrief,
+  deleteDraft,
+  markDraftSent,
+  regenerateDraft,
+  setDraftArchived,
+} from "@/lib/coach/draft-actions"
 import { createSuggestionTask, dismissSuggestion } from "@/lib/coach/follow-up-actions"
 import { initialRecordFormState, type RecordFormState } from "@/lib/records/form-state"
-
-type Mode = "managed" | "byok"
-
-/** Billing mode stays visible next to every AI action. */
-export function ModePicker({ mode }: { mode: Mode }) {
-  return (
-    <fieldset className="flex flex-wrap items-center gap-3 text-sm">
-      <legend className="sr-only">Billing</legend>
-      <label className="flex items-center gap-1.5">
-        <input type="radio" name="executionMode" value="byok" defaultChecked={mode !== "managed"} /> Your key
-      </label>
-      <label className="flex items-center gap-1.5">
-        <input type="radio" name="executionMode" value="managed" defaultChecked={mode === "managed"} /> Managed
-      </label>
-    </fieldset>
-  )
-}
-
-function Run({ label, pending, pendingLabel, mode, help }: { label: string; pending: boolean; pendingLabel: string; mode: Mode; help: string }) {
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <Button type="submit" disabled={pending}>
-        {pending ? pendingLabel : label}
-      </Button>
-      <ModePicker mode={mode} />
-      <HelpTip label={`About ${label.toLowerCase()}`}>{help}</HelpTip>
-    </div>
-  )
-}
-
-export function GenerateQuestionsForm({ analysisId, mode, nonce }: { analysisId: string; mode: Mode; nonce: string }) {
-  const [state, action, pending] = useActionState(generateQuestionSet, initialRecordFormState)
-  return (
-    <form action={action} className="flex flex-col gap-3">
-      <input type="hidden" name="analysisId" value={analysisId} />
-      <input type="hidden" name="nonce" value={nonce} />
-      <Run
-        label="Generate questions"
-        pendingLabel="Generating…"
-        pending={pending}
-        mode={mode}
-        help="AI writes likely questions from this analysis. Questions tagged to unknown requirements, or that add claims not in your verified facts, are dropped and counted."
-      />
-      <FormStatus state={state} />
-    </form>
-  )
-}
-
-export function AddToPrep({ setId, questionId, added }: { setId: string; questionId: string; added: boolean }) {
-  const [state, action, pending] = useActionState(addQuestionToPrep, initialRecordFormState)
-  const done = added || (state.status === "idle" && Boolean(state.message))
-  return (
-    <form action={action} className="flex items-center gap-2">
-      <input type="hidden" name="setId" value={setId} />
-      <input type="hidden" name="questionId" value={questionId} />
-      <Button type="submit" size="sm" variant="outline" disabled={pending || done}>
-        {done ? "In prep" : pending ? "Adding…" : "Add to prep"}
-      </Button>
-      {state.status === "error" ? <span role="alert" className="text-xs text-destructive">{state.message}</span> : null}
-    </form>
-  )
-}
-
-export function BuildStoriesForm({ mode, nonce, rebuild }: { mode: Mode; nonce: string; rebuild: boolean }) {
-  const [state, action, pending] = useActionState(buildStoryBank, initialRecordFormState)
-  return (
-    <form action={action} className="flex flex-col gap-3">
-      <input type="hidden" name="nonce" value={nonce} />
-      <Run
-        label={rebuild ? "Rebuild story bank" : "Build story bank"}
-        pendingLabel="Building…"
-        pending={pending}
-        mode={mode}
-        help="Maps your verified employment, project, and accomplishment facts to six competencies as STAR outlines. Outlines that add anything not in the cited facts are dropped."
-      />
-      <FormStatus state={state} />
-    </form>
-  )
-}
-
-export function PracticeForm({ setId, questionId, mode, nonce }: { setId: string; questionId: string; mode: Mode; nonce: string }) {
-  const [state, action, pending] = useActionState(practiceAnswer, initialRecordFormState)
-  const id = `answer-${questionId}`
-  return (
-    <form action={action} className="flex flex-col gap-3">
-      <input type="hidden" name="setId" value={setId} />
-      <input type="hidden" name="questionId" value={questionId} />
-      <input type="hidden" name="nonce" value={nonce} />
-      <Label htmlFor={id} className="sr-only">Your answer</Label>
-      <Textarea id={id} name="answer" rows={6} maxLength={6000} required placeholder="Type your answer" />
-      <Run
-        label="Get coaching notes"
-        pendingLabel="Reviewing…"
-        pending={pending}
-        mode={mode}
-        help="Notes on structure, relevance, specificity, and one improvement. Length is counted in code. There is no score."
-      />
-      <FormStatus state={state} />
-    </form>
-  )
-}
 
 export function ResearchForm({ applicationId, mode, nonce }: { applicationId: string; mode: Mode; nonce: string }) {
   const [state, action, pending] = useActionState(createResearchBrief, initialRecordFormState)
@@ -272,29 +178,6 @@ export function AnswerForm({ applicationId, mode, nonce }: { applicationId: stri
   )
 }
 
-function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle")
-  return (
-    <Button
-      type="button"
-      size="sm"
-      variant="outline"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text)
-          setCopied("copied")
-        } catch {
-          // The browser can refuse clipboard access; say so instead of failing silently.
-          setCopied("failed")
-        }
-        setTimeout(() => setCopied("idle"), 2000)
-      }}
-    >
-      {copied === "copied" ? "Copied" : copied === "failed" ? "Copy blocked: select the text" : label}
-    </Button>
-  )
-}
-
 export function DraftActions({
   draftId,
   status,
@@ -317,9 +200,12 @@ export function DraftActions({
   const [message, setMessage] = useState<RecordFormState>(initialRecordFormState)
   const [pending, start] = useTransition()
   const [regenState, regenerate, regenerating] = useActionState(regenerateDraft, initialRecordFormState)
+  // "Mark as sent" hides the draft-only buttons at once; a rejected request brings them back.
+  const [shown, showStatus] = useOptimistic(status)
 
-  const call = (run: (form: FormData) => Promise<RecordFormState>, extra: Record<string, string> = {}) =>
+  const call = (run: (form: FormData) => Promise<RecordFormState>, extra: Record<string, string> = {}, next?: typeof status) =>
     start(async () => {
+      if (next) showStatus(next)
       const form = new FormData()
       form.set("draftId", draftId)
       for (const [key, value] of Object.entries(extra)) form.set(key, value)
@@ -338,12 +224,12 @@ export function DraftActions({
             Open in email
           </Button>
         ) : null}
-        {status === "draft" ? (
+        {shown === "draft" ? (
           <Button size="sm" onClick={() => setConfirming("sent")} disabled={pending}>
             Mark as sent
           </Button>
         ) : null}
-        {status === "draft" ? (
+        {shown === "draft" ? (
           <form action={regenerate}>
             <input type="hidden" name="draftId" value={draftId} />
             <input type="hidden" name="nonce" value={nonce} />
@@ -356,10 +242,10 @@ export function DraftActions({
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="outline" size="sm" aria-label="More actions" />}>⋯</DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            {status === "draft" ? (
+            {shown === "draft" ? (
               <DropdownMenuItem onClick={() => call((form) => setDraftArchived(initialRecordFormState, form), { archive: "true" })}>Archive</DropdownMenuItem>
             ) : null}
-            {status === "archived" ? (
+            {shown === "archived" ? (
               <DropdownMenuItem onClick={() => call((form) => setDraftArchived(initialRecordFormState, form), { archive: "false" })}>Restore</DropdownMenuItem>
             ) : null}
             <DropdownMenuItem variant="destructive" onClick={() => setConfirming("delete")}>Delete</DropdownMenuItem>
@@ -380,7 +266,7 @@ export function DraftActions({
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
             {confirming === "sent" ? (
-              <Button disabled={pending} onClick={() => call((form) => markDraftSent(initialRecordFormState, form), { confirm: "sent" })}>
+              <Button disabled={pending} onClick={() => call((form) => markDraftSent(initialRecordFormState, form), { confirm: "sent" }, "marked_sent")}>
                 {pending ? "Saving…" : "Mark as sent"}
               </Button>
             ) : (
@@ -404,62 +290,6 @@ export function DraftActions({
                 {pending ? "Deleting…" : "Delete"}
               </Button>
             )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
-}
-
-export function CopyText({ text }: { text: string }) {
-  return <CopyButton text={text} />
-}
-
-export function DeleteMenu({ kind, id, redirectTo }: { kind: "set" | "brief"; id: string; redirectTo: string }) {
-  const router = useRouter()
-  const [confirming, setConfirming] = useState(false)
-  const [message, setMessage] = useState<RecordFormState>(initialRecordFormState)
-  const [pending, start] = useTransition()
-  return (
-    <div className="flex flex-col items-end gap-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="outline" aria-label="More actions" />}>⋯</DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem variant="destructive" onClick={() => setConfirming(true)}>
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <FormStatus state={message} />
-      <Dialog open={confirming} onOpenChange={setConfirming}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete this {kind === "set" ? "question set" : "brief"}?</DialogTitle>
-            <DialogDescription>
-              {kind === "set" ? "Its practice answers are removed too. Preparation items stay." : "Drafts that used it keep their text."}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-            <Button
-              variant="destructive"
-              disabled={pending}
-              onClick={() =>
-                start(async () => {
-                  const form = new FormData()
-                  form.set(kind === "set" ? "setId" : "briefId", id)
-                  const result = kind === "set" ? await deleteQuestionSet(form) : await deleteBrief(form)
-                  if (result.status === "error") {
-                    setMessage(result)
-                    setConfirming(false)
-                    return
-                  }
-                  router.push(redirectTo)
-                })
-              }
-            >
-              {pending ? "Deleting…" : "Delete"}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

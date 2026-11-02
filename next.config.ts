@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 
+import { devSupabaseGuardError } from "./src/lib/dev-guard";
 import { securityHeaders } from "./src/lib/security-headers";
 
 const nextConfig: NextConfig = {
@@ -29,4 +31,14 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * `next dev` refuses to start unless it points at local Supabase (src/lib/dev-guard.ts).
+ * Every other phase, including `next build` and `next start`, gets the config unchanged.
+ */
+export default function config(phase: string): NextConfig {
+  if (phase === PHASE_DEVELOPMENT_SERVER) {
+    const error = devSupabaseGuardError(process.env);
+    if (error) throw new Error(error);
+  }
+  return nextConfig;
+}

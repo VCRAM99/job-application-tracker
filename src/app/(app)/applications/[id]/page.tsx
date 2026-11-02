@@ -1,17 +1,18 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { Suspense } from "react"
 
 import { ApplicationCoach } from "@/components/coach/entry-points"
 import { DeleteRecordButton } from "@/components/records/delete-record-button"
 import { DetailList, PageHeader, RecordState } from "@/components/records/fields"
-import { StatusForm } from "@/components/records/status-form"
+import { ApplicationStatusLabel, ApplicationStatusScope, StatusForm } from "@/components/records/status-form"
+import { SectionSkeleton } from "@/components/shell/section-skeleton"
 import { Button } from "@/components/ui/button"
 import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { careerCoachEnabled } from "@/lib/coach/flags"
 import { deleteApplication } from "@/lib/records/actions"
 import {
-  APPLICATION_STATUS_LABELS,
   EMPLOYMENT_TYPE_LABELS,
   WORK_ARRANGEMENT_LABELS,
   isEmploymentType,
@@ -38,7 +39,14 @@ export default async function ApplicationDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const result = await getApplication(id)
+  const resumes = resumeStudioEnabled()
+  // Versions and the latest analysis need only the id, so they load alongside the application.
+  const [result, [versions, latestAnalysis]] = await Promise.all([
+    getApplication(id),
+    resumes
+      ? Promise.all([listVersionsForApplication(id), latestAnalysisForApplication(id)])
+      : Promise.resolve([[], null] as [Awaited<ReturnType<typeof listVersionsForApplication>>, string | null]),
+  ])
   if (!result.ok) {
     return (
       <RecordState
@@ -55,10 +63,6 @@ export default async function ApplicationDetailPage({
   if (!result.data) notFound()
   const application = result.data
   const date = today()
-  const resumes = resumeStudioEnabled()
-  const [versions, latestAnalysis] = resumes
-    ? await Promise.all([listVersionsForApplication(application.id), latestAnalysisForApplication(application.id)])
-    : [[], null]
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
@@ -94,6 +98,7 @@ export default async function ApplicationDetailPage({
           </div>
         }
       />
+      <ApplicationStatusScope status={application.status}>
       <StatusForm id={application.id} status={application.status} />
       <DetailList
         items={[
@@ -105,7 +110,7 @@ export default async function ApplicationDetailPage({
               </Link>
             ),
           },
-          { label: "Status", value: APPLICATION_STATUS_LABELS[application.status] },
+          { label: "Status", value: <ApplicationStatusLabel status={application.status} /> },
           { label: "Source", value: application.source ?? "—" },
           {
             label: "Job posting",
@@ -145,6 +150,7 @@ export default async function ApplicationDetailPage({
           },
         ]}
       />
+      </ApplicationStatusScope>
       {versions.length > 0 ? (
         <section className="space-y-2" aria-labelledby="resume-versions-heading">
           <h2 id="resume-versions-heading" className="text-sm font-medium">Resume versions</h2>
@@ -177,7 +183,11 @@ export default async function ApplicationDetailPage({
           <p className="text-sm leading-6 whitespace-pre-wrap">{application.notes}</p>
         </section>
       ) : null}
-      {careerCoachEnabled() ? <ApplicationCoach applicationId={application.id} /> : null}
+      {careerCoachEnabled() ? (
+        <Suspense fallback={<SectionSkeleton label="Loading follow-ups and drafts…" />}>
+          <ApplicationCoach applicationId={application.id} />
+        </Suspense>
+      ) : null}
     </div>
   )
 }

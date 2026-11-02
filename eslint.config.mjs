@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local e2e and perf output.
+    "e2e/.state/**",
+    "test-results/**",
+    "playwright-report/**",
+    "perf-results/**",
   ]),
 ]);
 

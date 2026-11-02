@@ -3,9 +3,9 @@ import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 
 import { contactFormSchema, preparationFormSchema, taskFormSchema } from "@/lib/records/schemas"
+import { buildDashboard } from "@/lib/records/dashboard"
 import { completedAtForStatus, referenceDecision } from "@/lib/records/logic"
 import {
-  buildDashboard,
   filterContacts,
   filterTasks,
   isOverdue,

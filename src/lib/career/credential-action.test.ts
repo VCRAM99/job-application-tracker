@@ -6,7 +6,7 @@ vi.mock("@/lib/auth/session", () => ({ requireUser: vi.fn(async () => ({ id: "us
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ rpc })) }))
 
 import { decryptSecret, parseKeyRing } from "@/lib/ai/crypto"
-import { saveProviderCredential } from "@/lib/career/actions"
+import { saveProviderCredential } from "@/lib/career/settings-actions"
 import { initialRecordFormState } from "@/lib/records/form-state"
 
 const GEMINI_KEY = "AIzaFictionalGeminiKeyForTests0123456789"

@@ -4,7 +4,6 @@ export const PROTECTED_PATHS = NAV_ITEMS.map((item) => item.href)
 
 export const GUEST_ONLY_PATHS = ["/login", "/signup", "/forgot-password"] as const
 
-const PROTECTED_PATH_SET = new Set<string>(PROTECTED_PATHS)
 const GUEST_ONLY_PATH_SET = new Set<string>(GUEST_ONLY_PATHS)
 
 export function isAuthConfirmPath(pathname: string): boolean {
@@ -100,6 +99,3 @@ export function sessionGate(
   return { type: "continue" }
 }
 
-export function isKnownProtectedPath(pathname: string): boolean {
-  return PROTECTED_PATH_SET.has(pathname)
-}

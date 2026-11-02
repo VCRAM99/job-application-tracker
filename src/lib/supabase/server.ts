@@ -4,6 +4,7 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 
 import { getPublicEnv } from "@/lib/env"
+import { timingOptions } from "@/lib/supabase/timing"
 
 export async function createClient() {
   const env = getPublicEnv()
@@ -13,6 +14,7 @@ export async function createClient() {
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     {
+      ...timingOptions(),
       cookies: {
         getAll() {
           return cookieStore.getAll()

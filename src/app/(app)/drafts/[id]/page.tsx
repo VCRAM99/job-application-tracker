@@ -3,7 +3,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { connection } from "next/server"
 
-import { DraftActions } from "@/components/coach/forms"
+import { DraftActions } from "@/components/coach/draft-forms"
 import { CoachOff, DraftStatus, DroppedNote, MetaLine } from "@/components/coach/view"
 import { PageHeader } from "@/components/records/fields"
 import { HelpTip } from "@/components/ui/help-tip"

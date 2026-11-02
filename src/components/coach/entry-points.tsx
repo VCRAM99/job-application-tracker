@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { AnswerForm } from "@/components/coach/forms"
+import { AnswerForm } from "@/components/coach/draft-forms"
 import { DraftList, FollowUpList, Section } from "@/components/coach/view"
 import { Button } from "@/components/ui/button"
 import { latestCoachAnalysisId, listBriefs, listDrafts, listQuestionSets } from "@/lib/coach/data"
@@ -89,8 +89,9 @@ export async function ContactCoach({ contactId }: { contactId: string }) {
   )
 }
 
-export async function DashboardFollowUps() {
-  const followUps = await loadFollowUps()
+/** `followUps` lets the page start the query before its own data, so they load together. */
+export async function DashboardFollowUps({ followUps: started }: { followUps?: ReturnType<typeof loadFollowUps> } = {}) {
+  const followUps = await (started ?? loadFollowUps())
   if (!followUps.ok) return null
   return (
     <Section id="dashboard-follow-ups" title="Suggested follow-ups" help="From fixed timing rules: a week in Applied with no change, a thank-you within a day of an interview stage, and contact follow-up dates.">

@@ -179,13 +179,6 @@ export async function questionSetForPreparation(preparationId: string): Promise<
   return result.data ? { setId: String(result.data.id), applicationId: result.data.application_id ? String(result.data.application_id) : null } : null
 }
 
-/** Whether the coach tables exist yet, so pages can show an unavailable state instead of failing. */
-export async function coachTablesReady(): Promise<boolean> {
-  const supabase = await createClient()
-  const result = await supabase.from("coach_drafts").select("id").limit(1)
-  return !result.error
-}
-
 export type BriefRecord = {
   id: string
   label: string

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { HelpTip } from "@/components/ui/help-tip"
 import { registerResume } from "@/lib/resume/actions"
 import { DOCX_MIME, MAX_RESUME_BYTES, PDF_MIME, RESUME_BUCKET } from "@/lib/resume/constants"
-import { createClient } from "@/lib/supabase/client"
 
 const ACCEPT = `.pdf,.docx,${PDF_MIME},${DOCX_MIME}`
 
@@ -27,6 +26,8 @@ export function ResumeUpload({ userId }: { userId: string }) {
     setBusy(true)
     try {
       const path = `${userId}/${crypto.randomUUID()}.${extension}`
+      // The Supabase browser client loads on the first upload, not with the page.
+      const { createClient } = await import("@/lib/supabase/client")
       const uploaded = await createClient()
         .storage.from(RESUME_BUCKET)
         .upload(path, file, { contentType: extension === "pdf" ? PDF_MIME : DOCX_MIME, upsert: false })

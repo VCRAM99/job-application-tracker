@@ -2,10 +2,13 @@ import type { Metadata } from "next"
 import Link from "next/link"
 
 import { PageHeader, RecordState } from "@/components/records/fields"
+import { ListPager } from "@/components/records/pagination"
 import { ApplicationFilters, ApplicationTable } from "@/components/records/tables"
 import { Button } from "@/components/ui/button"
 import { listApplications, listCompanyOptions } from "@/lib/records/data"
+import { paginate, parsePage } from "@/lib/records/pagination"
 import {
+  applicationQueryRecord,
   filterApplications,
   parseApplicationListQuery,
   searchParamsToURL,
@@ -26,7 +29,8 @@ export default async function ApplicationsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const query = parseApplicationListQuery(searchParamsToURL(await searchParams))
+  const params = searchParamsToURL(await searchParams)
+  const query = parseApplicationListQuery(params)
   const [result, companies] = await Promise.all([listApplications(), listCompanyOptions()])
 
   const sources = result.ok
@@ -68,7 +72,15 @@ export default async function ApplicationsPage({
                   action={<Button variant="outline" nativeButton={false} render={<Link href="/applications" />}>Clear filters</Button>}
                 />
               ) : (
-                <ApplicationTable applications={visible} query={query} today={today()} />
+                (() => {
+                  const paged = paginate(visible, parsePage(params))
+                  return (
+                    <>
+                      <ApplicationTable applications={paged.items} query={query} today={today()} />
+                      <ListPager pathname="/applications" current={applicationQueryRecord(query)} paged={paged} noun="applications" />
+                    </>
+                  )
+                })()
               )
             })()
           )}

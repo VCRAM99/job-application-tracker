@@ -1,8 +1,5 @@
 import {
-  COMPANY_SIZES,
   PRIORITY_RANK,
-  PRIORITY_TIERS,
-  RESEARCH_STATUSES,
   isApplicationStatus,
   isCompanySize,
   isPriorityTier,
@@ -288,12 +285,6 @@ export function applicationQueryRecord(query: ApplicationListQuery): Record<stri
 
 export function isFollowUpDue(date: string | null, today: string): boolean {
   return Boolean(date && date <= today)
-}
-
-export const companyFilterOptions = {
-  sizes: COMPANY_SIZES,
-  researchStatuses: RESEARCH_STATUSES,
-  priorities: PRIORITY_TIERS,
 }
 
 export function searchParamsToURL(

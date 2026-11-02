@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { FollowUpActions } from "@/components/coach/forms"
+import { FollowUpActions } from "@/components/coach/draft-forms"
 import { RecordState } from "@/components/records/fields"
 import { HelpTip } from "@/components/ui/help-tip"
 import { DRAFT_KIND_LABELS, type DraftKind } from "@/lib/coach/constants"

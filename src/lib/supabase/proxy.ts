@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { isConfirmedAccount } from "@/lib/auth/access"
 import { sessionGate } from "@/lib/auth/paths"
 import { getPublicEnv } from "@/lib/env"
+import { timingOptions } from "@/lib/supabase/timing"
 
 function withSession(from: NextResponse, to: NextResponse) {
   for (const cookie of from.headers.getSetCookie()) {
@@ -26,6 +27,7 @@ export async function updateSession(request: NextRequest) {
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     {
+      ...timingOptions(),
       cookies: {
         getAll() {
           return request.cookies.getAll()

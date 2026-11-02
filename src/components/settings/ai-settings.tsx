@@ -2,7 +2,7 @@ import { AiSettingsForm } from "@/components/career/forms"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { aiFeaturesEnabled, managedAllowance, platformKeyConfigured } from "@/lib/ai/flags"
 import { credentialConfigError } from "@/lib/ai/crypto"
-import { revokeProviderCredential, saveAiSettings, saveProviderCredential } from "@/lib/career/actions"
+import { revokeProviderCredential, saveAiSettings, saveProviderCredential } from "@/lib/career/settings-actions"
 import { loadCareer } from "@/lib/career/data"
 
 export async function AiSettingsSection() {

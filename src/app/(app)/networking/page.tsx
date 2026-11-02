@@ -1,13 +1,17 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { Suspense } from "react"
 
 import { RecentDrafts } from "@/components/coach/entry-points"
 import { PageHeader, RecordState } from "@/components/records/fields"
+import { ListPager } from "@/components/records/pagination"
 import { ContactFilters, ContactTable } from "@/components/tracker/lists"
+import { SectionSkeleton } from "@/components/shell/section-skeleton"
 import { Button } from "@/components/ui/button"
 import { careerCoachEnabled } from "@/lib/coach/flags"
 import { listContacts } from "@/lib/records/tracker-data"
 import { todayDate } from "@/lib/records/logic"
+import { paginate, parsePage } from "@/lib/records/pagination"
 import { isOverdue, isUpcoming } from "@/lib/records/tracker"
 import { filterContacts, parseContactListQuery, sortContacts } from "@/lib/records/tracker"
 import { searchParamsToURL } from "@/lib/records/query"
@@ -22,7 +26,8 @@ export default async function NetworkingPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const query = parseContactListQuery(searchParamsToURL(await searchParams))
+  const params = searchParamsToURL(await searchParams)
+  const query = parseContactListQuery(params)
   const result = await listContacts()
   const today = todayDate()
 
@@ -33,7 +38,11 @@ export default async function NetworkingPage({
         description="Contacts and follow-ups. Nothing here sends email or LinkedIn messages."
         action={<Button nativeButton={false} render={<Link href="/networking/new" />}>Add contact</Button>}
       />
-      {careerCoachEnabled() ? <RecentDrafts /> : null}
+      {careerCoachEnabled() ? (
+        <Suspense fallback={<SectionSkeleton label="Loading drafts…" />}>
+          <RecentDrafts />
+        </Suspense>
+      ) : null}
       {result.ok ? (
         result.data.length === 0 ? (
           <RecordState
@@ -54,7 +63,16 @@ export default async function NetworkingPage({
                   action={<Button variant="outline" nativeButton={false} render={<Link href="/networking" />}>Clear filters</Button>}
                 />
               ) : (
-                <ContactTable contacts={visible} today={today} />
+                (() => {
+                  const paged = paginate(visible, parsePage(params))
+                  const current = Object.fromEntries([...params.entries()].filter(([key]) => key !== "page"))
+                  return (
+                    <>
+                      <ContactTable contacts={paged.items} today={today} />
+                      <ListPager pathname="/networking" current={current} paged={paged} noun="contacts" />
+                    </>
+                  )
+                })()
               )
             })()}
           </>
