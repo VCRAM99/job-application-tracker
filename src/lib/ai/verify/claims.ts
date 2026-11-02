@@ -101,6 +101,9 @@ const ALWAYS_PLAIN = new Set(["I'm", "I've", "I'd", "I'll", "OK", "STAR"])
 /** Text after "at", "for", or "with" reads as the user's employer when one of these comes before it. */
 const EMPLOYMENT_CUE = /\b(worked|joined|employed|interned|tenure|served|spent|while|during|previously|formerly|former|ex|was|been)\b/
 
+/** A sentence about the user or the user's team. */
+export const FIRST_PERSON = /\b(i|i'm|i've|i'd|i'll|me|my|mine|myself|we|we've|we're|our|ours|us)\b/i
+
 const SELF_TITLE = /\b(i am|i'm|im|i was|i've been|i have been|i'll be|i will be)\s+(?:an?\s+|the\s+|your\s+)?$|\b(?:i|my)\b(?:\s+\S+){0,3}\s+as\s+(?:an?\s+|the\s+)?$/
 const TITLE_AFTER = /^\s*(role|position|opening|job|posting|req|requisition|team|interview|opportunity|opening)s?\b/
 const TITLE_BEFORE = /\b(your|the|this|that|a|an)\s+$/
@@ -206,9 +209,12 @@ export function checkSentence(sentence: string, policy: ClaimPolicy): ClaimDropR
     const key = word.toLowerCase()
     if (evidenceWords.has(key) || evidenceSkills.has(canonicalSkill(word))) continue
     if (!allWords.has(key) && !allSkills.has(canonicalSkill(word))) return "new_name"
+    // A technology or employer from the job cannot become part of a sentence about the user.
+    if (FIRST_PERSON.test(sentence) && ENTITY_NAMES.has(canonicalSkill(word))) return "new_name"
     // Known only from the job or contact: it must not read as the user's employer.
     const before = lower.slice(Math.max(0, index - 60), index)
     if (/\b(at|for|with)\s+(the\s+)?$/.test(before) && EMPLOYMENT_CUE.test(before)) return "new_name"
+    if (/\b(i|we)\s+(\w+\s+)?work(s|ing)?\s+(at|for|with)\s+(the\s+)?$/.test(before)) return "new_name"
     if (/^\s*at\s+$/.test(lower.slice(0, index)) && /^[^,]*,\s*(i|we)\b/.test(lower.slice(index))) return "new_name"
   }
   return null

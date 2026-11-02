@@ -7,6 +7,16 @@ import { completeWithProvider } from "@/lib/ai/providers"
 import type { AiRun } from "@/lib/ai/run-context"
 import type { StructuredRequest, StructuredResponse } from "@/lib/ai/types"
 import type { GroundedRequirement, VerifiedFact } from "@/lib/analyze/types"
+import {
+  DRAFT_JSON_SCHEMA,
+  draftOutputSchema,
+  draftSystemPrompt,
+  draftUserMessage,
+  validateDraft,
+  type DraftContext,
+  type DraftOutcome,
+  type RawDraft,
+} from "@/lib/coach/drafts"
 import type { CountMap } from "@/lib/coach/input"
 import {
   PRACTICE_JSON_SCHEMA,
@@ -26,6 +36,16 @@ import {
   type InterviewQuestion,
   type RawQuestion,
 } from "@/lib/coach/questions"
+import {
+  RESEARCH_JSON_SCHEMA,
+  RESEARCH_SYSTEM_PROMPT,
+  researchOutputSchema,
+  researchUserMessage,
+  validateClaims,
+  type RawClaim,
+  type ResearchClaim,
+  type ResearchSource,
+} from "@/lib/coach/research"
 import {
   STORIES_JSON_SCHEMA,
   STORIES_SYSTEM_PROMPT,
@@ -123,5 +143,33 @@ export function coachAnswer(
     jsonSchema: PRACTICE_JSON_SCHEMA,
     schema: practiceOutputSchema as never,
     persist: (raw) => base.persist(validateFeedback(raw, base)),
+  })
+}
+
+export function generateBrief(
+  base: CoachCallBase & {
+    company: string | null
+    sources: ResearchSource[]
+    persist: (outcome: { claims: ResearchClaim[]; dropped: CountMap }) => Promise<void>
+  },
+) {
+  return runCoachCall<{ claims: RawClaim[] }>(base, {
+    system: RESEARCH_SYSTEM_PROMPT,
+    user: researchUserMessage(base),
+    schemaName: "research_brief",
+    jsonSchema: RESEARCH_JSON_SCHEMA,
+    schema: researchOutputSchema as never,
+    persist: (raw) => base.persist(validateClaims(raw.claims, base.sources)),
+  })
+}
+
+export function generateDraft(base: CoachCallBase & { context: DraftContext; persist: (outcome: DraftOutcome) => Promise<void> }) {
+  return runCoachCall<RawDraft>(base, {
+    system: draftSystemPrompt(base.context),
+    user: draftUserMessage(base.context),
+    schemaName: "coach_draft",
+    jsonSchema: DRAFT_JSON_SCHEMA,
+    schema: draftOutputSchema as never,
+    persist: (raw) => base.persist(validateDraft(raw, base.context)),
   })
 }
