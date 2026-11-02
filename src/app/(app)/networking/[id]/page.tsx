@@ -2,9 +2,11 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
+import { ContactCoach } from "@/components/coach/entry-points"
 import { DeleteRecordButton } from "@/components/records/delete-record-button"
 import { DetailList, PageHeader, RecordState } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
+import { careerCoachEnabled } from "@/lib/coach/flags"
 import { OUTREACH_LABELS, RELATIONSHIP_LABELS } from "@/lib/records/constants"
 import { deleteContact } from "@/lib/records/tracker-actions"
 import { getContact } from "@/lib/records/tracker-data"
@@ -40,6 +42,9 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
         description={[contact.roleTitle, contact.organization].filter(Boolean).join(" · ") || "Contact"}
         action={
           <div className="flex flex-wrap gap-2">
+            {careerCoachEnabled() ? (
+              <Button nativeButton={false} render={<Link href={`/drafts/new?contact=${contact.id}`} />}>Draft outreach</Button>
+            ) : null}
             <Button variant="outline" nativeButton={false} render={<Link href={`/networking/${contact.id}/edit`} />}>Edit</Button>
             <DeleteRecordButton
               action={deleteContact}
@@ -94,6 +99,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
           <p className="text-sm leading-6 whitespace-pre-wrap">{contact.notes}</p>
         </section>
       ) : null}
+      {careerCoachEnabled() ? <ContactCoach contactId={contact.id} /> : null}
     </div>
   )
 }

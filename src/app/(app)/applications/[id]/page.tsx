@@ -2,11 +2,13 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
+import { ApplicationCoach } from "@/components/coach/entry-points"
 import { DeleteRecordButton } from "@/components/records/delete-record-button"
 import { DetailList, PageHeader, RecordState } from "@/components/records/fields"
 import { StatusForm } from "@/components/records/status-form"
 import { Button } from "@/components/ui/button"
 import { jobAnalysisEnabled } from "@/lib/ai/flags"
+import { careerCoachEnabled } from "@/lib/coach/flags"
 import { deleteApplication } from "@/lib/records/actions"
 import {
   APPLICATION_STATUS_LABELS,
@@ -175,6 +177,7 @@ export default async function ApplicationDetailPage({
           <p className="text-sm leading-6 whitespace-pre-wrap">{application.notes}</p>
         </section>
       ) : null}
+      {careerCoachEnabled() ? <ApplicationCoach applicationId={application.id} /> : null}
     </div>
   )
 }

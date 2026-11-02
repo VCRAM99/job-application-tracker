@@ -5,6 +5,8 @@ import { notFound } from "next/navigation"
 import { DeleteRecordButton } from "@/components/records/delete-record-button"
 import { DetailList, PageHeader, RecordState } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
+import { questionSetForPreparation } from "@/lib/coach/data"
+import { careerCoachEnabled } from "@/lib/coach/flags"
 import { PREPARATION_CATEGORY_LABELS, PREPARATION_STATUS_LABELS } from "@/lib/records/constants"
 import { deletePreparation } from "@/lib/records/tracker-actions"
 import { getPreparation } from "@/lib/records/tracker-data"
@@ -19,6 +21,7 @@ export default async function PreparationDetailPage({ params }: { params: Promis
   }
   if (!result.data) notFound()
   const item = result.data
+  const fromPrep = careerCoachEnabled() ? await questionSetForPreparation(item.id) : null
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
       <PageHeader
@@ -26,6 +29,9 @@ export default async function PreparationDetailPage({ params }: { params: Promis
         description={PREPARATION_CATEGORY_LABELS[item.category]}
         action={
           <div className="flex flex-wrap gap-2">
+            {fromPrep ? (
+              <Button variant="outline" nativeButton={false} render={<Link href={`/interview/${fromPrep.setId}`} />}>Interview prep</Button>
+            ) : null}
             <Button variant="outline" nativeButton={false} render={<Link href={`/preparation/${item.id}/edit`} />}>Edit</Button>
             <DeleteRecordButton
               action={deletePreparation}

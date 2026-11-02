@@ -1,9 +1,11 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 
+import { RecentDrafts } from "@/components/coach/entry-points"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { ContactFilters, ContactTable } from "@/components/tracker/lists"
 import { Button } from "@/components/ui/button"
+import { careerCoachEnabled } from "@/lib/coach/flags"
 import { listContacts } from "@/lib/records/tracker-data"
 import { todayDate } from "@/lib/records/logic"
 import { isOverdue, isUpcoming } from "@/lib/records/tracker"
@@ -31,6 +33,7 @@ export default async function NetworkingPage({
         description="Contacts and follow-ups. Nothing here sends email or LinkedIn messages."
         action={<Button nativeButton={false} render={<Link href="/networking/new" />}>Add contact</Button>}
       />
+      {careerCoachEnabled() ? <RecentDrafts /> : null}
       {result.ok ? (
         result.data.length === 0 ? (
           <RecordState
