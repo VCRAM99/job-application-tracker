@@ -280,6 +280,22 @@ async function main() {
 
   // Second pass for plans: auto_explain on for PostgREST's role, one visit per page, then restored.
   const since = new Date().toISOString()
+  const restorePlans = () =>
+    psql(
+      [
+        ...EXPLAIN_SETTINGS.map((setting) => `alter role ${PLAN_ROLE} reset ${setting};`),
+        `select pg_terminate_backend(pid) from pg_stat_activity where usename = '${PLAN_ROLE}' and pid <> pg_backend_pid();`,
+      ].join("\n"),
+      false,
+      "supabase_admin",
+    )
+  // An interrupted run still turns auto_explain off.
+  const onSignal = () => {
+    restorePlans()
+    process.exit(130)
+  }
+  process.once("SIGINT", onSignal)
+  process.once("SIGTERM", onSignal)
   psql(
     [
       `alter role ${PLAN_ROLE} set auto_explain.log_min_duration = 0;`,
@@ -321,14 +337,9 @@ async function main() {
     }
     await new Promise((resolve) => setTimeout(resolve, 1000))
   } finally {
-    psql(
-      [
-        ...EXPLAIN_SETTINGS.map((setting) => `alter role ${PLAN_ROLE} reset ${setting};`),
-        `select pg_terminate_backend(pid) from pg_stat_activity where usename = '${PLAN_ROLE}' and pid <> pg_backend_pid();`,
-      ].join("\n"),
-      false,
-      "supabase_admin",
-    )
+    restorePlans()
+    process.off("SIGINT", onSignal)
+    process.off("SIGTERM", onSignal)
   }
   // Postgres logs to stderr, and `docker logs` keeps the container's streams apart.
   const logged = spawnSync("docker", ["logs", "--since", since, "supabase_db_job-application-tracker"], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 })

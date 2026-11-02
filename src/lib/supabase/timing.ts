@@ -1,13 +1,13 @@
 /**
  * Opt-in request timing for performance work. Off unless PERF_TIMING is
- * exactly "1" outside a Vercel deployment. Each Supabase request logs its
+ * exactly "1" outside any Vercel environment. Each Supabase request logs its
  * method, path, status, and duration. The query string, headers, and bodies
  * are never logged: they can hold ids, search text, or tokens.
  */
 type Env = Record<string, string | undefined>
 
 export function perfTimingEnabled(env: Env = process.env): boolean {
-  return env.PERF_TIMING === "1" && !env.VERCEL_ENV
+  return env.PERF_TIMING === "1" && !env.VERCEL_ENV && !env.VERCEL
 }
 
 /** `/rest/v1/applications?select=*&user_id=eq.…` → `/rest/v1/applications`. */

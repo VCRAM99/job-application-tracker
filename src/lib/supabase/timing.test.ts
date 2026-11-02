@@ -9,6 +9,7 @@ describe("perf timing", () => {
     expect(perfTimingEnabled({ PERF_TIMING: "1" })).toBe(true)
     expect(perfTimingEnabled({ PERF_TIMING: "1", VERCEL_ENV: "production" })).toBe(false)
     expect(perfTimingEnabled({ PERF_TIMING: "1", VERCEL_ENV: "preview" })).toBe(false)
+    expect(perfTimingEnabled({ PERF_TIMING: "1", VERCEL: "1" })).toBe(false)
     expect(timingOptions({})).toEqual({})
     expect(timingOptions({ PERF_TIMING: "1" }).global?.fetch).toBeTypeOf("function")
   })

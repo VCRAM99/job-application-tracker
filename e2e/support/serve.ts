@@ -21,12 +21,21 @@ function files(dir: string): string[] {
   })
 }
 
-/** The browser bundle must name the local stack and nothing hosted. */
+/**
+ * Next inlines NEXT_PUBLIC_SUPABASE_URL into client and server bundles at build time, so a
+ * build made with `npm run build` (which reads `.env.local`) would talk to the hosted project.
+ * The browser bundle must name the local stack, and no bundle may name a hosted project.
+ */
 function checkBundle() {
-  const chunks = files(path.join(ROOT, ".next/static")).filter((file) => file.endsWith(".js"))
-  const text = chunks.map((file) => readFileSync(file, "utf8")).join("\n")
-  if (!text.includes(LOCAL_SUPABASE_URL)) throw new Error("Build check failed: the client bundle does not reference the local Supabase URL.")
-  if (/https:\/\/[a-z0-9-]+\.supabase\.co/.test(text)) throw new Error("Build check failed: the client bundle references a hosted Supabase project.")
+  const read = (dir: string) =>
+    files(path.join(ROOT, dir))
+      .filter((file) => file.endsWith(".js"))
+      .map((file) => readFileSync(file, "utf8"))
+      .join("\n")
+  const client = read(".next/static")
+  const server = read(".next/server")
+  if (!client.includes(LOCAL_SUPABASE_URL)) throw new Error("Build check failed: the client bundle does not reference the local Supabase URL. Rebuild with `npx tsx e2e/support/serve.ts build`.")
+  if (/https:\/\/[a-z0-9-]+\.supabase\.co/.test(client + server)) throw new Error("Build check failed: the build references a hosted Supabase project. Rebuild with `npx tsx e2e/support/serve.ts build`.")
 }
 
 const [command, variant] = process.argv.slice(2)
@@ -36,6 +45,8 @@ if (command === "build") {
   checkBundle()
   console.log("e2e build ready.")
 } else if (command === "start" && (variant === "on" || variant === "off")) {
+  // `test:e2e:nobuild` and `perf:measure` reuse whatever build is in .next.
+  checkBundle()
   const port = variant === "on" ? APP_PORT : FLAGS_OFF_PORT
   const child = spawn(NEXT, ["start", "-p", String(port), "-H", "127.0.0.1"], { cwd: ROOT, env: serverEnv(variant) as NodeJS.ProcessEnv, stdio: "inherit" })
   for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => child.kill(signal))

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { startTransition, useOptimistic } from "react"
+import { useOptimistic, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
 import { TASK_PRIORITY_LABELS, TASK_STATUS_LABELS } from "@/lib/records/constants"
@@ -11,10 +11,12 @@ import { isOverdue, type TaskRecord } from "@/lib/records/tracker"
 /**
  * One task row. "Mark complete" shows Done at once; the saved status replaces
  * it when the server answers, so a failed update returns to the saved status.
+ * The button is disabled while saving, so a double click sends one change.
  * Without JavaScript the form posts the server action as before.
  */
 export function TaskRow({ task, today }: { task: TaskRecord; today: string }) {
   const [status, setStatus] = useOptimistic(task.status)
+  const [pending, startTransition] = useTransition()
   const overdue = status !== "done" && isOverdue(task.dueDate, today)
   const completing = status !== "done"
 
@@ -38,6 +40,7 @@ export function TaskRow({ task, today }: { task: TaskRecord; today: string }) {
           action={setTaskCompletion}
           onSubmit={(event) => {
             event.preventDefault()
+            if (pending) return
             const data = new FormData(event.currentTarget)
             startTransition(async () => {
               setStatus(completing ? "done" : "todo")
@@ -47,7 +50,7 @@ export function TaskRow({ task, today }: { task: TaskRecord; today: string }) {
         >
           <input type="hidden" name="id" value={task.id} />
           <input type="hidden" name="completed" value={completing ? "true" : "false"} />
-          <Button type="submit" variant="outline" size="sm">
+          <Button type="submit" variant="outline" size="sm" disabled={pending}>
             {completing ? "Mark complete" : "Mark incomplete"}
           </Button>
         </form>

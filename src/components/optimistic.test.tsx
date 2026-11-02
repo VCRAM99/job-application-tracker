@@ -60,6 +60,20 @@ describe("optimistic updates roll back when the server rejects them", () => {
     expect(actions.updateApplicationStatus.mock.calls[0]![1].get("status")).toBe("recruiter_screen")
   })
 
+  it("puts the status select back on the saved status after a rejected change", async () => {
+    const user = userEvent.setup()
+    actions.updateApplicationStatus.mockResolvedValue({ status: "error", message: "Choose a valid status.", fieldErrors: {} })
+    render(
+      <ApplicationStatusScope status="applied">
+        <StatusForm id={ID} status="applied" />
+      </ApplicationStatusScope>,
+    )
+    await user.selectOptions(screen.getByLabelText("Status"), "offer")
+    await user.click(screen.getByRole("button", { name: "Update status" }))
+    expect(await screen.findByText("Choose a valid status.")).toBeTruthy()
+    expect((screen.getByLabelText("Status") as HTMLSelectElement).value).toBe("applied")
+  })
+
   it("a task shows Done while saving and returns when the saved status did not change", async () => {
     const user = userEvent.setup()
     const reply = deferred<void>()
@@ -95,6 +109,22 @@ describe("optimistic updates roll back when the server rejects them", () => {
     expect(screen.getByRole("button", { name: "Mark complete" })).toBeTruthy()
     const sent = actions.setTaskCompletion.mock.calls[0]![0] as FormData
     expect([sent.get("id"), sent.get("completed")]).toEqual([ID, "true"])
+  })
+
+  it("a double click on a task sends one change", async () => {
+    const user = userEvent.setup()
+    const reply = deferred<void>()
+    actions.setTaskCompletion.mockReturnValue(reply.promise)
+    render(
+      <table>
+        <tbody>
+          <TaskRow task={{ id: ID, userId: "u", title: "Call back", description: null, status: "todo", priority: "low", dueDate: null, companyId: null, companyName: null, applicationId: null, applicationTitle: null, completedAt: null, createdAt: "", updatedAt: "" }} today="2026-11-02" />
+        </tbody>
+      </table>,
+    )
+    await user.dblClick(screen.getByRole("button", { name: "Mark complete" }))
+    expect(actions.setTaskCompletion).toHaveBeenCalledTimes(1)
+    await act(async () => reply.resolve())
   })
 
   it("a job action shows the next label while saving and the original label with the error after", async () => {

@@ -23,7 +23,7 @@ export function readEnvFile(file: string): Record<string, string> {
   if (!existsSync(full)) return {}
   const out: Record<string, string> = {}
   for (const line of readFileSync(full, "utf8").split(/\r?\n/)) {
-    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/.exec(line)
+    const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/.exec(line)
     if (match) out[match[1]!] = match[2]!.trim().replace(/^["']|["']$/g, "")
   }
   return out

@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, startTransition, useActionState, useContext, useOptimistic } from "react"
+import { createContext, startTransition, useActionState, useContext, useOptimistic, useState } from "react"
 
 import { FormStatus, NativeSelect } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
@@ -31,6 +31,13 @@ export function ApplicationStatusLabel({ status }: { status: ApplicationStatus }
 export function StatusForm({ id, status }: { id: string; status: ApplicationStatus }) {
   const [state, formAction, pending] = useActionState(updateApplicationStatus, initialRecordFormState)
   const scope = useContext(StatusScope)
+  // A rejected change puts the select back on the saved status, as the form reset did before.
+  const [seen, setSeen] = useState(state)
+  const [resets, setResets] = useState(0)
+  if (state !== seen) {
+    setSeen(state)
+    if (state.status === "error") setResets((count) => count + 1)
+  }
 
   return (
     <form
@@ -53,7 +60,7 @@ export function StatusForm({ id, status }: { id: string; status: ApplicationStat
           <label htmlFor="status-change" className="text-sm font-medium">
             Status
           </label>
-          <NativeSelect id="status-change" name="status" defaultValue={status}>
+          <NativeSelect key={`${status}-${resets}`} id="status-change" name="status" defaultValue={status}>
             {APPLICATION_STATUSES.map((value) => (
               <option key={value} value={value}>
                 {APPLICATION_STATUS_LABELS[value]}

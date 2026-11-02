@@ -20,6 +20,7 @@ Recommended jobs uses a separate set of server-only variables, also listed in `.
 
 1. Create a project at [supabase.com/dashboard](https://supabase.com/dashboard).
 2. Open **Connect** (or **Project Settings → API**) and copy the project URL and publishable key into `.env.local`. If the dashboard shows only the legacy anon key, paste that into `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Do not paste the service-role or secret key.
+   `npm run dev` only starts against the local stack (`npx supabase start`, `http://127.0.0.1:54321`), so put the local URL and key in `.env.development.local`. To run a dev server against this hosted project on purpose, set `ALLOW_REMOTE_SUPABASE_IN_DEV=true`.
 3. Open **Authentication → Sign In / Providers → Email**.
    - Enable the Email provider.
    - Turn **Confirm email** on.
