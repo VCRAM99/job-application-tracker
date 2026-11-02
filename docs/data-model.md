@@ -131,6 +131,25 @@ From `20261102120000_resume_studio.sql`. See [resume-studio.md](resume-studio.md
 
 Both tables are owner-only for select, insert, update, and delete. `anon` has no grants.
 
+## Career coach
+
+From `20261103120000_career_coach.sql`. See [career-coach.md](career-coach.md).
+
+`applications.status_changed_at timestamptz` (nullable) is set by the `applications_40_status_changed_at` trigger whenever an existing row's `status` changes. Inserts, including CSV imports, leave it null, so an imported row does not look like a fresh change. A client value is ignored. Rows from before this migration keep null.
+
+- `research_briefs`: `label`, `sources` (1–6 `{id, kind, label, text, sha256}`), `claims` (up to 40 `{id, topic, text, sourceId, quote, start, end}`), `dropped` counts, and the prompt, schema, provider, model, and mode. Links: `company_id` and `application_id` (composite to the user's rows, `on delete set null (column)`), `posting_id` → `job_postings`, `on delete set null`.
+- `interview_question_sets`: `label`, `questions` (up to 20 `{id, text, kind, requirementIds, rationale, factIds, preparationItemId}`), `dropped`, versions. Links: `application_id` (composite), `analysis_id` → `job_analyses`, `on delete set null`.
+- `practice_answers`: `set_id` (composite to the user's set, `on delete cascade`), `question_id` (`q-N`), `answer` (1–6,000 characters), `feedback` (`structure`, `relevance`, `specificity`, `improvement`, `length`, `factIds`; no score), `dropped`, versions.
+- `story_bank_entries`: one row per user and `competency` (ownership, conflict, failure, leadership, ambiguity, impact), `fact_ids` (1–8), `outline` (`situation`, `task`, `action`, `result`), `dropped`, versions.
+- `coach_drafts`: `kind`, `format` (`connection_note`, `message`, `email`, or `answer`; an application answer is always `answer`), `prompt_text` (the application question), `subject`, `body` (capped at 300, 1,200, or 2,500 characters by format), `fact_ids`, `validation`, `status` (`draft`, `marked_sent`, `archived`), `marked_sent_at` (set exactly when marked sent), versions. Links: `contact_id` → `contacts`, `analysis_id` → `job_analyses`, both `on delete set null`; `application_id` and `brief_id` composite, `on delete set null (column)`.
+- `follow_up_suggestion_states`: `suggestion_key` (unique per user, `rule:<uuid>:<anchor>`), `dismissed_at`, `task_id` → `tasks`, `on delete set null`.
+
+`guard_coach_row` (`security invoker`) runs before insert and update on all six. Its trigger arguments name the row's link columns. It lets a foreign key clear links with no session when nothing else changes. Otherwise it requires the owner's session, keeps `user_id` fixed, and rejects a new or changed link to a row the caller does not own (or a posting the caller cannot read).
+
+`mark_coach_draft_sent(p_draft_id, p_local_date)`, `create_follow_up_task(p_key, p_title, p_description, p_due, p_application_id)`, and `add_question_to_preparation(p_set_id, p_question_id, p_title, p_category, p_notes)` are `security invoker` with an empty `search_path`, and only `authenticated` can execute them. The first marks the caller's own draft sent and updates only the caller's linked contact. The second locks the caller's suggestion state row and creates at most one live task per key. The third locks the caller's question set and creates at most one Preparation item per question.
+
+All six tables are owner-only for select, insert, update, and delete. `anon` has no grants.
+
 ## Row Level Security
 
 RLS is enabled on every user-owned table. `anon` has no privileges. `authenticated` can select, insert, update, and delete only rows where `auth.uid() = user_id`. Child rows that reference a company or application also require that parent to belong to `auth.uid()`, enforced by composite foreign keys.

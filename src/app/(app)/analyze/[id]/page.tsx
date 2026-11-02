@@ -10,6 +10,7 @@ import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { getAnalysis, loadAnalysisContext, loadFactLabels } from "@/lib/analyze/data"
 import { isUuid } from "@/lib/records/form-state"
 import { resumeStudioEnabled } from "@/lib/resume/flags"
+import { careerCoachEnabled } from "@/lib/coach/flags"
 
 export const metadata: Metadata = { title: "Fit result" }
 export const instant = false
@@ -67,6 +68,11 @@ export default async function AnalysisDetailPage({
                 render={<Link href={`/resumes?analysis=${analysis.id}${analysis.applicationId ? `&application=${analysis.applicationId}` : ""}`} />}
               >
                 Tailor resume
+              </Button>
+            ) : null}
+            {careerCoachEnabled() && analysis.status === "complete" ? (
+              <Button variant="outline" nativeButton={false} render={<Link href={`/interview/new?analysis=${analysis.id}`} />}>
+                Prepare for interview
               </Button>
             ) : null}
             <Button variant="outline" nativeButton={false} render={<Link href="/analyze" />}>

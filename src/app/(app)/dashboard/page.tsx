@@ -1,7 +1,9 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 
+import { DashboardFollowUps } from "@/components/coach/entry-points"
 import { PageHeader, RecordState } from "@/components/records/fields"
+import { careerCoachEnabled } from "@/lib/coach/flags"
 import { APPLICATION_STATUS_LABELS } from "@/lib/records/constants"
 import { todayDate } from "@/lib/records/logic"
 import { buildDashboard } from "@/lib/records/tracker"
@@ -52,6 +54,11 @@ export default async function DashboardPage() {
           <Stat label="Submitted, last 7 days" value={metrics.submittedLast7Days} />
         </dl>
       )}
+      {careerCoachEnabled() ? (
+        <div className="surface p-4">
+          <DashboardFollowUps />
+        </div>
+      ) : null}
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title="Upcoming follow-ups">
           {sources.contacts.ok || sources.companies.ok ? (
