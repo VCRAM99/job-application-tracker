@@ -41,7 +41,7 @@ export default async function DashboardPage() {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
       <PageHeader
         title="Dashboard"
-        description="Counts come from your records. Active applications are Applied, Recruiter Screen, Technical Interview, and Final Interview. Interviews are those three interview stages. Offers are separate. Submitted counts an applied date in the last 7 days, including today."
+        help="Counts come from your records. Active applications are Applied, Recruiter Screen, Technical Interview, and Final Interview. Interviews are those three interview stages. Offers are separate. Submitted counts an applied date in the last 7 days, including today."
       />
       {migrationNeeded ? (
         <RecordState

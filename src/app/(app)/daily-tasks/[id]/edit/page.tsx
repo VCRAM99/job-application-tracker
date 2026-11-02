@@ -27,7 +27,7 @@ export default async function EditDailyTaskPage({ params }: { params: Promise<{ 
   if (!data) notFound()
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
-      <PageHeader title="Edit daily task" description="Changing weekdays or dates keeps old completion records. Weekly insights follow the current schedule." />
+      <PageHeader title="Edit daily task" help="Changing weekdays or dates keeps old completion records. Weekly insights follow the current schedule." />
       <RecurringTaskForm
         task={{
           id: data.id,

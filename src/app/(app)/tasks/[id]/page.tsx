@@ -33,7 +33,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
       <PageHeader
         title={task.title}
-        description={TASK_STATUS_LABELS[task.status]}
+        subtitle={TASK_STATUS_LABELS[task.status]}
         action={
           <div className="flex flex-wrap gap-2">
             <form action={setTaskCompletion}>

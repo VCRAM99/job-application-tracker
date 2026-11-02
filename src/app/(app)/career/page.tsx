@@ -25,7 +25,7 @@ export default async function CareerPage() {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <PageHeader
         title="Career profile"
-        description="Verified career facts stay separate from AI suggestions. A pasted source is text for review, not an exported resume file."
+        help="Verified career facts stay separate from AI suggestions. A pasted source is text for review, not an exported resume file."
       />
       {loaded.state === "disabled" ? (
         <RecordState

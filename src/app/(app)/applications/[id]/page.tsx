@@ -68,7 +68,7 @@ export default async function ApplicationDetailPage({
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
       <PageHeader
         title={application.jobTitle}
-        description={application.companyName}
+        subtitle={application.companyName}
         action={
           <div className="flex flex-wrap gap-2">
             {jobAnalysisEnabled() ? (

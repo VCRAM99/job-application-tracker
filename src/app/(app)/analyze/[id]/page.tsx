@@ -59,7 +59,7 @@ export default async function AnalysisDetailPage({
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <PageHeader
         title={analysis.title || "Qualification match"}
-        description={analysis.company || "Job text compared with verified career facts."}
+        subtitle={analysis.company || "Job text compared with verified career facts."}
         action={
           <div className="flex flex-wrap gap-2">
             {resumeStudioEnabled() && analysis.status === "complete" ? (

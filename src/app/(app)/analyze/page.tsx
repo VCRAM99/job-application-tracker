@@ -85,7 +85,7 @@ export default async function AnalyzePage({
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
       <PageHeader
         title="Qualification match"
-        description="Compare a job description with career facts you have verified. The estimate is calculated in the app."
+        help="Compare a job description with career facts you have verified. The estimate is calculated in the app."
       />
       <Card>
         <CardHeader>

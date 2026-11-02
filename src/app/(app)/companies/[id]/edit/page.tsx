@@ -33,7 +33,7 @@ export default async function EditCompanyPage({
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <PageHeader title={`Edit ${company.name}`} description="Update the research record for this company." />
+      <PageHeader title={`Edit ${company.name}`} help="Update the research record for this company." />
       <CompanyForm
         action={updateCompany}
         id={company.id}

@@ -83,7 +83,7 @@ export default async function DailyTasksPage({
       <TimezoneSync timezone={preference.data.timezone} />
       <PageHeader
         title="Daily Tasks"
-        description="Recurring habits for the selected local date. One-time job-search work stays on Tasks."
+        help="Recurring habits for the selected local date. One-time job-search work stays on Tasks."
         action={<Button nativeButton={false} render={<Link href="/daily-tasks/new" />}>Add daily task</Button>}
       />
       {!tasks.ok ? (

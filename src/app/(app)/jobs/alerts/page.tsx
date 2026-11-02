@@ -41,7 +41,7 @@ export default async function JobAlertsPage() {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <PageHeader
         title="Job alerts"
-        description="Daily and weekly alerts are off until you turn them on. Email is stored as skipped until a sender is approved."
+        help="Daily and weekly alerts are off until you turn them on. Email is stored as skipped until a sender is approved."
         action={
           <Button variant="outline" nativeButton={false} render={<Link href="/jobs" />}>
             Back to jobs

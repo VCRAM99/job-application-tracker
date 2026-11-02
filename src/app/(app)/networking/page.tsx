@@ -35,7 +35,7 @@ export default async function NetworkingPage({
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <PageHeader
         title="Networking"
-        description="Contacts and follow-ups. Nothing here sends email or LinkedIn messages."
+        help="Contacts and follow-ups. Nothing here sends email or LinkedIn messages."
         action={<Button nativeButton={false} render={<Link href="/networking/new" />}>Add contact</Button>}
       />
       {careerCoachEnabled() ? (

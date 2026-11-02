@@ -33,7 +33,7 @@ export default async function NewDraftPage({ searchParams }: { searchParams: Pro
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <PageHeader
         title="New draft"
-        description={person ? `For ${person.name}${person.organization ? ` · ${person.organization}` : ""}` : "You review and send it yourself."}
+        subtitle={person ? `For ${person.name}${person.organization ? ` · ${person.organization}` : ""}` : "You review and send it yourself."}
       />
       <DraftForm
         contactId={person?.id ?? null}

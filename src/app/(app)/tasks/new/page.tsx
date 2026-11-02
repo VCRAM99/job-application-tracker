@@ -17,7 +17,7 @@ export default async function NewTaskPage() {
   }
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <PageHeader title="Add task" description="Mark it done from the list when you finish. A done task stores the completion date." />
+      <PageHeader title="Add task" help="Mark it done from the list when you finish. A done task stores the completion date." />
       <TaskForm
         action={createTask}
         values={emptyTaskForm}

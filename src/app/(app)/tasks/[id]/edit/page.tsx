@@ -23,7 +23,7 @@ export default async function EditTaskPage({ params }: { params: Promise<{ id: s
   const record = task.data
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <PageHeader title={`Edit ${record.title}`} description="Changing the status to Done sets the completion date. Any other status clears it." />
+      <PageHeader title={`Edit ${record.title}`} help="Changing the status to Done sets the completion date. Any other status clears it." />
       <TaskForm
         action={updateTask}
         id={record.id}

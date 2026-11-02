@@ -23,7 +23,7 @@ export default async function NewResearchPage({ searchParams }: { searchParams: 
   if (!application.ok || !application.data) notFound()
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <PageHeader title="Company research" description={`${application.data.companyName} · ${application.data.jobTitle}`} />
+      <PageHeader title="Company research" subtitle={`${application.data.companyName} · ${application.data.jobTitle}`} />
       <ResearchForm applicationId={applicationId} mode={mode.mode} nonce={crypto.randomUUID()} />
     </div>
   )

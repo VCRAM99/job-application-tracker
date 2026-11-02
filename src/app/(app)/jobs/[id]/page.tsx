@@ -51,7 +51,7 @@ export default async function JobPostingPage({
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <PageHeader
         title={posting.title}
-        description={posting.company || "Catalog posting"}
+        subtitle={posting.company || "Catalog posting"}
         action={
           <Button variant="outline" nativeButton={false} render={<Link href="/jobs" />}>
             Back to jobs

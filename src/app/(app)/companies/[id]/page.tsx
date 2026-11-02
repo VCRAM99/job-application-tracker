@@ -65,7 +65,7 @@ export default async function CompanyDetailPage({
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
       <PageHeader
         title={company.name}
-        description={`${company.applicationCount} application${company.applicationCount === 1 ? "" : "s"}`}
+        subtitle={`${company.applicationCount} application${company.applicationCount === 1 ? "" : "s"}`}
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" nativeButton={false} render={<Link href={`/companies/${company.id}/edit`} />}>

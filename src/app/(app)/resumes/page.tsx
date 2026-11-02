@@ -32,7 +32,7 @@ export default async function ResumesPage({ searchParams }: { searchParams: Prom
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
       <PageHeader
         title="Resumes"
-        description={tailorQuery ? "Choose a parsed resume to tailor." : "Upload a resume, parse it, and tailor it to a fit analysis."}
+        help={tailorQuery ? "Choose a parsed resume to tailor." : "Upload a resume, parse it, and tailor it to a fit analysis."}
         action={<ResumeUpload userId={user.id} />}
       />
       {resumes.length === 0 ? (

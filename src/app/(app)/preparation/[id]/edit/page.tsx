@@ -18,7 +18,7 @@ export default async function EditPreparationPage({ params }: { params: Promise<
   const item = result.data
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <PageHeader title={`Edit ${item.title}`} description="Marking this completed stores today's date. Any other status clears that date." />
+      <PageHeader title={`Edit ${item.title}`} help="Marking this completed stores today's date. Any other status clears that date." />
       <PreparationForm
         action={updatePreparation}
         id={item.id}

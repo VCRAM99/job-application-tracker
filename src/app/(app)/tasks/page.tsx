@@ -27,7 +27,7 @@ export default async function TasksPage({
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <PageHeader
         title="Tasks"
-        description="Work tied to a company or application. Due dates before today stay highlighted until the task is done."
+        help="Work tied to a company or application. Due dates before today stay highlighted until the task is done."
         action={<Button nativeButton={false} render={<Link href="/tasks/new" />}>Add task</Button>}
       />
       {result.ok ? (

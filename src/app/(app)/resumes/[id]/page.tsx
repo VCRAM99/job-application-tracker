@@ -33,7 +33,7 @@ export default async function ResumePage({ params }: { params: Promise<{ id: str
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
       <PageHeader
         title={resume.label}
-        description={`${resume.kind.toUpperCase()} · ${Math.max(1, Math.round(resume.sizeBytes / 1024))} KB`}
+        subtitle={`${resume.kind.toUpperCase()} · ${Math.max(1, Math.round(resume.sizeBytes / 1024))} KB`}
         action={<ResumeMenu resumeId={resume.id} label={resume.label} />}
       />
       {resume.parseStatus !== "parsed" || !resume.parseCurrent ? <ParseForm resumeId={resume.id} mode={mode.mode} /> : null}

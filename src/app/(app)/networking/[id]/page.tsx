@@ -41,7 +41,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
       <PageHeader
         title={contact.name}
-        description={[contact.roleTitle, contact.organization].filter(Boolean).join(" · ") || "Contact"}
+        subtitle={[contact.roleTitle, contact.organization].filter(Boolean).join(" · ") || "Contact"}
         action={
           <div className="flex flex-wrap gap-2">
             {careerCoachEnabled() ? (

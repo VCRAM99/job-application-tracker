@@ -72,3 +72,15 @@ describe("career navigation", () => {
     expect(NAV_ITEMS.some((item) => item.href === "/resumes")).toBe(true)
   })
 })
+
+describe("navigation groups", () => {
+  it("groups items in order and drops a group whose items are all hidden", async () => {
+    const { groupedNavItems } = await import("@/lib/navigation")
+    const all = groupedNavItems(NAV_ITEMS)
+    expect(all.map((entry) => entry.group)).toEqual(["Track", "Discover", "Prepare", "You"])
+    expect(all.flatMap((entry) => entry.items).length).toBe(NAV_ITEMS.length)
+    const off = groupedNavItems(visibleNavItems({ career: false, jobs: false, analyze: false, resumes: false }))
+    expect(off.map((entry) => entry.group)).toEqual(["Track", "Prepare", "You"])
+    expect(off.find((entry) => entry.group === "Prepare")!.items.map((item) => item.href)).toEqual(["/preparation"])
+  })
+})

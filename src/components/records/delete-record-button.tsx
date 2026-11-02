@@ -4,6 +4,7 @@ import { cn } from "cn"
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import { moreActionsItemClass } from "@/components/ui/more-actions"
 import {
   Dialog,
   DialogClose,
@@ -24,6 +25,7 @@ export function DeleteRecordButton({
   returnTo,
   fields,
   className,
+  asMenuItem = false,
 }: {
   action: (formData: FormData) => Promise<void>
   id: string
@@ -33,12 +35,24 @@ export function DeleteRecordButton({
   returnTo?: string
   fields?: Record<string, string>
   className?: string
+  /** Render the trigger as an item in a ⋯ menu. The confirmation dialog is the same. */
+  asMenuItem?: boolean
 }) {
   const [pending, setPending] = useState(false)
 
   return (
     <Dialog>
-      <DialogTrigger render={<Button variant="destructive" size="sm" className={cn("pressable", className)} />}>{label}</DialogTrigger>
+      <DialogTrigger
+        render={
+          asMenuItem ? (
+            <button type="button" className={cn(moreActionsItemClass, "text-destructive", className)} />
+          ) : (
+            <Button variant="destructive" size="sm" className={cn("pressable", className)} />
+          )
+        }
+      >
+        {label}
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

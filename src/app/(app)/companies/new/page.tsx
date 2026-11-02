@@ -11,7 +11,7 @@ export default function NewCompanyPage() {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <PageHeader
         title="Add company"
-        description="Keep the same fields you would track on a spreadsheet: size, priority, research, and follow-up."
+        help="Keep the same fields you would track on a spreadsheet: size, priority, research, and follow-up."
       />
       <CompanyForm
         action={createCompany}

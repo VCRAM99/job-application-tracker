@@ -46,7 +46,7 @@ export default async function EditApplicationPage({
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <PageHeader
         title={`Edit ${application.jobTitle}`}
-        description={`Application at ${application.companyName}.`}
+        subtitle={`Application at ${application.companyName}.`}
       />
       <ApplicationForm
         action={updateApplication}

@@ -33,7 +33,7 @@ export default async function NewInterviewPrepPage({ searchParams }: { searchPar
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <PageHeader
         title="Interview prep"
-        description={[analysis.title || "Untitled job", analysis.company].filter(Boolean).join(" · ")}
+        subtitle={[analysis.title || "Untitled job", analysis.company].filter(Boolean).join(" · ")}
       />
       <p className="text-sm text-muted-foreground">{analysis.requirements.length} requirements · questions cite your verified facts only</p>
       <GenerateQuestionsForm analysisId={analysis.id} mode={mode.mode} nonce={crypto.randomUUID()} />
