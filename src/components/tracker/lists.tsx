@@ -17,7 +17,7 @@ import {
   TASK_STATUSES,
   TASK_STATUS_LABELS,
 } from "@/lib/records/constants"
-import { setTaskCompletion } from "@/lib/records/tracker-actions"
+import { TaskRow } from "@/components/tracker/task-row"
 import { isOverdue } from "@/lib/records/tracker"
 import type {
   ContactListQuery,
@@ -165,35 +165,9 @@ export function TaskTable({ tasks, today }: { tasks: TaskRecord[]; today: string
           </tr>
         </thead>
         <tbody>
-          {tasks.map((task) => {
-            const overdue = task.status !== "done" && isOverdue(task.dueDate, today)
-            return (
-              <tr key={task.id} className="border-b last:border-0">
-                <td className="px-3 py-2">
-                  <Link href={`/tasks/${task.id}`} className="font-medium underline-offset-4 hover:underline">{task.title}</Link>
-                </td>
-                <td className="px-3 py-2">{TASK_STATUS_LABELS[task.status]}</td>
-                <td className="px-3 py-2">{TASK_PRIORITY_LABELS[task.priority]}</td>
-                <td className={`px-3 py-2 ${overdue ? "text-destructive" : ""}`}>{task.dueDate ?? "—"}</td>
-                <td className="px-3 py-2">
-                  {task.applicationId ? (
-                    <Link href={`/applications/${task.applicationId}`} className="underline-offset-4 hover:underline">{task.applicationTitle}</Link>
-                  ) : task.companyId ? (
-                    <Link href={`/companies/${task.companyId}`} className="underline-offset-4 hover:underline">{task.companyName}</Link>
-                  ) : "—"}
-                </td>
-                <td className="px-3 py-2">
-                  <form action={setTaskCompletion}>
-                    <input type="hidden" name="id" value={task.id} />
-                    <input type="hidden" name="completed" value={task.status === "done" ? "false" : "true"} />
-                    <Button type="submit" variant="outline" size="sm">
-                      {task.status === "done" ? "Mark incomplete" : "Mark complete"}
-                    </Button>
-                  </form>
-                </td>
-              </tr>
-            )
-          })}
+          {tasks.map((task) => (
+            <TaskRow key={task.id} task={task} today={today} />
+          ))}
         </tbody>
       </table>
     </div>

@@ -28,12 +28,14 @@ function ActionForm({
   action,
   postingId,
   label,
+  optimisticLabel,
 }: {
   action: (previous: JobActionState, formData: FormData) => Promise<JobActionState>
   postingId: string
   label: string
+  optimisticLabel?: string
 }) {
-  return <JobActionForm action={action} fields={{ postingId }} label={label} />
+  return <JobActionForm action={action} fields={{ postingId }} label={label} optimisticLabel={optimisticLabel} />
 }
 
 export function JobCard({ job }: { job: JobListing }) {
@@ -130,14 +132,14 @@ export function JobCard({ job }: { job: JobListing }) {
         </Button>
         <div className="flex flex-wrap gap-2">
           {job.saved ? (
-            <ActionForm action={unsaveJob} postingId={job.id} label="Unsave" />
+            <ActionForm action={unsaveJob} postingId={job.id} label="Unsave" optimisticLabel="Save" />
           ) : (
-            <ActionForm action={saveJob} postingId={job.id} label="Save" />
+            <ActionForm action={saveJob} postingId={job.id} label="Save" optimisticLabel="Unsave" />
           )}
           {job.hidden ? (
-            <ActionForm action={unhideJob} postingId={job.id} label="Unhide" />
+            <ActionForm action={unhideJob} postingId={job.id} label="Unhide" optimisticLabel="Hide" />
           ) : (
-            <ActionForm action={hideJob} postingId={job.id} label="Hide" />
+            <ActionForm action={hideJob} postingId={job.id} label="Hide" optimisticLabel="Unhide" />
           )}
           <ActionForm action={markNotInterested} postingId={job.id} label="Not interested" />
           <ActionForm action={markAlreadyApplied} postingId={job.id} label="Already applied" />
