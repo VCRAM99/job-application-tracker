@@ -92,7 +92,10 @@ export function researchUserMessage(input: { company: string | null; sources: Re
 
 /** Text that reads as an instruction to the model. A claim quoting it is dropped even though the user pasted it. */
 const INSTRUCTION_LIKE =
-  /\b(ignore (all |any )?(previous|prior|above)|disregard|system\s*:|assistant\s*:|you are now|admin mode|developer mode|new instructions|system prompt|jailbreak|add a claim|mark (it|this|every|all)\b.*\bsent)\b/i
+  /\b(ignore (all |any )?(previous|prior|above)|disregard|system\s*:|assistant\s*:|you are now|admin mode|developer mode|new instructions|system prompt|jailbreak|add a claim|from now on|(write|state|say|claim|mention|assert) that|the (user|candidate|applicant)|mark (it|this|every|all)\b.*\bsent)\b/i
+
+/** A brief is about the company. A claim or quote about the reader, the candidate, or the writer is dropped. */
+const ABOUT_A_PERSON = /\b(user|candidate|applicant|job seeker|you|your|yours|i|me|my|i'm|i've)\b/i
 
 function sentenceAround(text: string, start: number, end: number): string {
   const before = text.slice(0, start)
@@ -137,6 +140,10 @@ export function validateClaims(raw: RawClaim[], sources: ResearchSource[]): { cl
       continue
     }
     const text = stripSourceRefs(claim.text)
+    if (ABOUT_A_PERSON.test(text) || /\b(user|candidate|applicant)\b/i.test(grounded.quote)) {
+      add("about_person")
+      continue
+    }
     if (text.length < 10 || text.length > 300) {
       add("length")
       continue

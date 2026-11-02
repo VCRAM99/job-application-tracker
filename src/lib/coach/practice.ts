@@ -87,6 +87,7 @@ export function validateFeedback(
   const policy = {
     evidence: [input.answer, ...cited.ids.map((id) => factEvidence(byId.get(id) as VerifiedFact))],
     context: [input.question.text, ...tagged],
+    secondPersonIsUser: true,
   }
   const notes = {} as Record<NotePart, string | null>
   for (const part of NOTE_PARTS) {

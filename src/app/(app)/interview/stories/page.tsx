@@ -27,13 +27,19 @@ export default async function StoryBankPage() {
       <BuildStoriesForm mode={mode.mode} nonce={crypto.randomUUID()} rebuild={stories.length > 0} />
       {stories.length === 0 ? <p className="text-sm text-muted-foreground">No stories yet.</p> : <DroppedNote counts={stories[0]!.dropped} label="dropped in the last build" />}
       <ul className="grid gap-4 md:grid-cols-2">
-        {stories.map((story) => (
+        {stories.map((story) => staleStory(story, verified) ? (
+          // A cited fact is no longer verified, so the outline is no longer evidence and is not shown.
+          <li key={story.id} className="flex flex-col gap-2 rounded-lg border border-dashed p-4 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-medium">{COMPETENCY_LABELS[story.competency]}</h2>
+              <Badge tone="warn">Facts changed</Badge>
+            </div>
+            <p className="text-muted-foreground">A fact this outline cited is no longer verified. Rebuild to refresh it.</p>
+          </li>
+        ) : (
           <li key={story.id} className="flex flex-col gap-3 rounded-lg border p-4 text-sm">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-medium">{COMPETENCY_LABELS[story.competency]}</h2>
-              <span className="flex items-center gap-2">
-                {staleStory(story, verified) ? <Badge tone="warn">Facts changed</Badge> : null}
-              </span>
             </div>
             <dl className="grid gap-2">
               {STAR_PARTS.map((part) => (

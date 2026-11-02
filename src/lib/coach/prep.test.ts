@@ -149,3 +149,17 @@ describe("practice feedback", () => {
     expect(lengthNote(words(351), "behavioral").note).toMatch(/trimming/)
   })
 })
+
+describe("review regressions: questions", () => {
+  it("#7 a question cannot presume the candidate has what the job asks for", () => {
+    const out = validateQuestions(
+      [
+        { text: "Tell us about your 5+ years building distributed systems in Go and your PhD research.", kind: "behavioral", requirementIds: ["req-0"], rationale: "Checks your PhD.", factIds: [] },
+        { text: "How would you design a Go service for 5+ years of distributed systems growth?", kind: "technical", requirementIds: ["req-0"], rationale: "Checks your PhD.", factIds: [] },
+      ],
+      job,
+    )
+    expect(out.questions.map((item) => item.text)).toEqual(["How would you design a Go service for 5+ years of distributed systems growth?"])
+    expect(out.questions[0]!.rationale).toBe("")
+  })
+})

@@ -166,3 +166,45 @@ describe("rank words in prose", () => {
     expect(checkRewrite("Moved 12 services.", "Moved 12 services, leading the effort.", [])).toBe("new_number")
   })
 })
+
+describe("review regressions: checkSentence bypasses", () => {
+  const evidence = [ROLE]
+  const acme = { evidence, context: ["Acme Robotics", "Software Engineer"], contextTitles: ["Software Engineer"] }
+
+  it("#2 drops lowercase roles, degree words, and lowercase employers about the user", () => {
+    expect(checkSentence("I have been a software scientist for years.", { evidence })).toBe("new_title")
+    expect(checkSentence("I worked as a data scientist before.", { evidence })).toBe("new_title")
+    expect(checkSentence("As a computer science graduate, I cut checkout latency by 40%.", { evidence })).toBe("new_credential")
+    expect(checkSentence("I'm a proud stanford alum.", { evidence })).toBe("new_credential")
+    expect(checkSentence("i spent time at globex before this.", { evidence })).toBe("new_name")
+    // Still fine: the cited role and employer, and role words not about the user.
+    expect(checkSentence("I am a Backend Engineer at Lumen Ridge Labs.", { evidence })).toBeNull()
+    expect(checkSentence("Your team needs a platform engineer.", { evidence })).toBeNull()
+    expect(checkSentence("I worked for years on checkout latency.", { evidence })).toBeNull()
+  })
+
+  it("#3 #4 drops a context company used as the user's former employer", () => {
+    expect(checkSentence("As an Acme Robotics alum, I'd love to reconnect.", acme)).not.toBeNull()
+    expect(checkSentence("Acme Robotics alum re: Software Engineer role", { ...acme, evidence: [] })).not.toBeNull()
+    expect(checkSentence("As an Acme Robotics engineer I cut checkout latency by 40%.", acme)).not.toBeNull()
+    expect(checkSentence("I'd love to learn more about Acme Robotics.", acme)).toBeNull()
+  })
+
+  it("#5 keeps rank claims with first and top", () => {
+    expect(checkSentence("I ranked first in my cohort at Lumen Ridge Labs.", { evidence })).toBe("new_number")
+    expect(checkSentence("Consistently top-rated Backend Engineer at Lumen Ridge Labs.", { evidence })).toBe("new_number")
+    expect(checkSentence("I was first among peers to cut checkout latency.", { evidence })).toBe("new_number")
+    expect(checkSentence("At first I cut checkout latency by 40% at Lumen Ridge Labs.", { evidence })).toBeNull()
+  })
+
+  it("#6 drops a job title without seniority words claimed as the user's own", () => {
+    expect(checkSentence("I worked as a Software Engineer before this.", { ...acme, evidence: [] })).toBe("new_title")
+    expect(checkSentence("I'm applying for the Software Engineer role.", { ...acme, evidence: [] })).toBeNull()
+  })
+
+  it("#8 treats you and your as the user in coaching notes", () => {
+    const notes = { evidence: ["I moved services to new schemas."], context: ["Walk me through a migration."], secondPersonIsUser: true }
+    expect(checkSentence("Mention your data scientist background at globex.", notes)).not.toBeNull()
+    expect(checkSentence("Mention how you moved services to new schemas.", notes)).toBeNull()
+  })
+})

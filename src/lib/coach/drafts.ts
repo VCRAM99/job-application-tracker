@@ -10,7 +10,7 @@ import {
   SUBJECT_MAX,
   type DraftFormat,
 } from "@/lib/ai/verify"
-import { FIRST_PERSON } from "@/lib/ai/verify/claims"
+import { FIRST_PERSON, SECOND_PERSON } from "@/lib/ai/verify/claims"
 import type { VerifiedFact } from "@/lib/analyze/types"
 import { DRAFT_KIND_LABELS, MAX_DRAFT_SENTENCES, type DraftKind } from "@/lib/coach/constants"
 import { counter, taggedInput, UNTRUSTED_RULES, type CountMap } from "@/lib/coach/input"
@@ -145,6 +145,10 @@ export function validateDraft(raw: RawDraft, context: DraftContext): DraftOutcom
   ].filter((value): value is string => Boolean(value))
   const contextTitles = [context.job?.title, context.contact?.roleTitle].filter((value): value is string => Boolean(value))
   const limit = Math.min(context.maxChars ?? FORMAT_LIMITS[context.format], FORMAT_LIMITS[context.format])
+  const companyNames = [context.job?.company, context.contact?.organization]
+    .filter((value): value is string => Boolean(value))
+    .flatMap((name) => [name.toLowerCase(), name.toLowerCase().split(/\s+/)[0]!])
+    .filter((name) => name.length >= 3)
 
   const kept: Array<{ text: string; paragraphEnd: boolean }> = []
   const cited = new Set<string>()
@@ -153,9 +157,11 @@ export function validateDraft(raw: RawDraft, context: DraftContext): DraftOutcom
     if (!text) continue
     const facts = keepVerifiedFactIds(sentence.factIds, context.facts)
     add("unverified_fact", facts.dropped)
-    const aboutUser = FIRST_PERSON.test(text)
     const claimQuotes = sentence.claimIds.map((id) => claimsById.get(id)?.quote).filter((value): value is string => Boolean(value))
-    const evidence = [...facts.ids.map((id) => factEvidence(factsById.get(id) as VerifiedFact)), ...(aboutUser ? [] : claimQuotes)]
+    // A cited company claim supports a sentence only when that sentence is plainly about the company:
+    // it names the company and speaks of neither the user ("I", "we") nor the reader ("you", "your").
+    const aboutCompany = companyNames.some((name) => text.toLowerCase().includes(name)) && !FIRST_PERSON.test(text) && !SECOND_PERSON.test(text)
+    const evidence = [...facts.ids.map((id) => factEvidence(factsById.get(id) as VerifiedFact)), ...(aboutCompany ? claimQuotes : [])]
     const parts = splitSentences(text)
     const reason = parts.map((part) => checkSentence(part, { evidence, context: contextText, contextTitles })).find(Boolean)
     if (reason) {

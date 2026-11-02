@@ -88,3 +88,9 @@ describe("suggestion state", () => {
     expect(followUpSuggestions({ ...base, states: new Map([[key, { dismissed: false, openTask: false }]]) })).toHaveLength(1)
   })
 })
+
+describe("review regressions: follow-up anchors", () => {
+  it("#11 gives no thank-you for an interview-stage row with no observed status change", () => {
+    expect(run([app({ status: "final_interview", statusChangedAt: null, updatedAt: "2026-11-01T10:00:00Z" })], "2026-11-01T12:00:00Z")).toEqual([])
+  })
+})

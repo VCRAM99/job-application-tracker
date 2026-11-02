@@ -297,21 +297,50 @@ describe("career coach database", () => {
     const w = await world(ada)
     const read = async () =>
       (await as(ada, () => db.query<{ s: string | null }>("select status_changed_at::text as s from public.applications where id = $1", [w.application]))).rows[0]!.s
-    const initial = await read()
-    expect(initial).not.toBeNull()
+    // A new or imported row has no observed status change (review #10).
+    expect(await read()).toBeNull()
     await as(ada, () => db.query("update public.applications set status_changed_at = '2000-01-01' where id = $1", [w.application]))
-    expect(await read()).toBe(initial)
+    expect(await read()).toBeNull()
     await as(ada, () => db.query("update public.applications set notes = 'n' where id = $1", [w.application]))
-    expect(await read()).toBe(initial)
-    await db.query("select pg_sleep(0.01)")
+    expect(await read()).toBeNull()
     await as(ada, () => db.query("update public.applications set status = 'recruiter_screen' where id = $1", [w.application]))
-    expect(await read()).not.toBe(initial)
+    const changed = await read()
+    expect(changed).not.toBeNull()
+    await as(ada, () => db.query("update public.applications set status_changed_at = '2000-01-01', notes = 'm' where id = $1", [w.application]))
+    expect(await read()).toBe(changed)
+  })
+
+  it("adds a question to Preparation once, only from the caller's own set", async () => {
+    const w = await world(ada)
+    await as(ada, () =>
+      db.query(
+        `update public.interview_question_sets set questions = '[{"id":"q-0","text":"Q zero"},{"id":"q-1","text":"Q one"}]' where id = $1`,
+        [w.set],
+      ),
+    )
+    const add = (user: string, questionId = "q-1") =>
+      as(user, () =>
+        db.query<{ r: { preparation_id: string; created: boolean } }>(
+          "select public.add_question_to_preparation($1, $2, 'Q one', 'behavioral', 'notes') as r",
+          [w.set, questionId],
+        ),
+      )
+    const first = (await add(ada)).rows[0]!.r
+    const second = (await add(ada)).rows[0]!.r
+    expect(first.created).toBe(true)
+    expect(second).toEqual({ preparation_id: first.preparation_id, created: false })
+    const stored = await as(ada, () => db.query<{ q: Array<Record<string, unknown>> }>("select questions as q from public.interview_question_sets where id = $1", [w.set]))
+    expect(stored.rows[0]!.q[1]).toMatchObject({ id: "q-1", preparationItemId: first.preparation_id })
+    expect(stored.rows[0]!.q[0]).not.toHaveProperty("preparationItemId")
+    await expect(add(grace)).rejects.toThrow(/question set not found/)
+    await expect(add(ada, "q-9")).rejects.toThrow(/question not found/)
+    await expect(as(null, () => db.query("select public.add_question_to_preparation($1, 'q-1', 't', 'other', 'n')", [w.set]))).rejects.toThrow(/permission denied/)
   })
 
   it("does not let anon or public execute the new functions", async () => {
     const grants = await db.query<{ routine_name: string; grantee: string }>(
       `select routine_name, grantee from information_schema.routine_privileges
-       where routine_name in ('guard_coach_row', 'mark_coach_draft_sent', 'create_follow_up_task', 'track_application_status_change')
+       where routine_name in ('guard_coach_row', 'mark_coach_draft_sent', 'create_follow_up_task', 'add_question_to_preparation', 'track_application_status_change')
          and grantee in ('anon', 'PUBLIC')`,
     )
     expect(grants.rows).toEqual([])

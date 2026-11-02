@@ -10,8 +10,10 @@
 -- requires the owner's session and rejects links to rows the caller does not
 -- own (or, for a catalog posting, cannot read).
 
--- When the application's status last changed. Null on rows that existed
--- before this migration; follow-up rules fall back to the applied date.
+-- When the application's status last changed in the app. Null until the
+-- first status change: rows from before this migration, new rows, and
+-- imported rows have no observed change, so follow-up rules fall back to the
+-- applied date and an imported interview-stage row does not look fresh.
 alter table public.applications add column if not exists status_changed_at timestamptz;
 
 create or replace function public.track_application_status_change()
@@ -22,7 +24,7 @@ set search_path = ''
 as $$
 begin
   if tg_op = 'INSERT' then
-    new.status_changed_at := pg_catalog.now();
+    new.status_changed_at := null;
   elsif new.status is distinct from old.status then
     new.status_changed_at := pg_catalog.now();
   else
@@ -498,6 +500,65 @@ $$;
 
 revoke all on function public.mark_coach_draft_sent(uuid, date) from public, anon;
 grant execute on function public.mark_coach_draft_sent(uuid, date) to authenticated;
+
+-- Adds one interview question to Preparation at most once. The question set
+-- row is locked, so a double submit returns the item the first call made.
+create or replace function public.add_question_to_preparation(
+  p_set_id uuid,
+  p_question_id text,
+  p_title text,
+  p_category text,
+  p_notes text
+)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_questions jsonb;
+  v_index integer;
+  v_existing text;
+  v_created uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated' using errcode = '42501';
+  end if;
+
+  select questions into v_questions
+  from public.interview_question_sets
+  where id = p_set_id and user_id = auth.uid()
+  for update;
+  if not found then
+    raise exception 'question set not found' using errcode = 'P0002';
+  end if;
+
+  select ordinality - 1, item ->> 'preparationItemId' into v_index, v_existing
+  from pg_catalog.jsonb_array_elements(v_questions) with ordinality as entries (item, ordinality)
+  where item ->> 'id' = p_question_id;
+  if v_index is null then
+    raise exception 'question not found' using errcode = 'P0002';
+  end if;
+
+  if v_existing is not null
+    and exists (select 1 from public.preparation_items where id = v_existing::uuid and user_id = auth.uid()) then
+    return pg_catalog.jsonb_build_object('preparation_id', v_existing, 'created', false);
+  end if;
+
+  insert into public.preparation_items (title, category, notes)
+  values (p_title, p_category, p_notes)
+  returning id into v_created;
+
+  update public.interview_question_sets
+  set questions = pg_catalog.jsonb_set(v_questions, array[v_index::text, 'preparationItemId'], pg_catalog.to_jsonb(v_created::text))
+  where id = p_set_id and user_id = auth.uid();
+
+  return pg_catalog.jsonb_build_object('preparation_id', v_created, 'created', true);
+end;
+$$;
+
+revoke all on function public.add_question_to_preparation(uuid, text, text, text, text) from public, anon;
+grant execute on function public.add_question_to_preparation(uuid, text, text, text, text) to authenticated;
 
 -- Creates the task for one follow-up suggestion at most once. A second call
 -- for the same key returns the existing task while it exists.

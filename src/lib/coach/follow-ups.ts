@@ -103,7 +103,8 @@ export function followUpSuggestions(input: {
       }
     }
     if ((INTERVIEW_STAGES as readonly string[]).includes(application.status)) {
-      const entered = instant(application.statusChangedAt) ?? instant(application.updatedAt)
+      // Only an observed status change counts. Without one (older or imported rows) there is no thank-you nudge.
+      const entered = instant(application.statusChangedAt)
       if (entered) {
         const hours = (input.now.getTime() - entered.getTime()) / 3_600_000
         if (hours >= 0 && hours <= FOLLOW_UP_RULES.thankYouShowHours) {

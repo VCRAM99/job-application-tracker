@@ -17,7 +17,7 @@ import {
 } from "@/lib/coach/constants"
 import { getQuestionSet, loadCoachAnalysis } from "@/lib/coach/data"
 import { careerCoachEnabled } from "@/lib/coach/flags"
-import { preparationCategory, type InterviewQuestion } from "@/lib/coach/questions"
+import { preparationCategory } from "@/lib/coach/questions"
 import { coachAnswer, generateQuestions, generateStories } from "@/lib/coach/run"
 import { STORY_FACT_TYPES } from "@/lib/coach/stories"
 import { isUuid, type RecordFormState } from "@/lib/records/form-state"
@@ -99,33 +99,25 @@ export async function generateQuestionSet(_previous: RecordFormState, formData: 
 /** Adds one question to Preparation, once. The question records the item it created. */
 export async function addQuestionToPrep(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
   if (!careerCoachEnabled()) return fail(OFF)
-  const user = await requireUser()
+  await requireUser()
   const setId = String(formData.get("setId") ?? "")
   const questionId = String(formData.get("questionId") ?? "")
   const set = await getQuestionSet(setId)
   const question = set?.questions.find((item) => item.id === questionId)
   if (!set || !question) return fail("That question could not be found.")
   const supabase = await createClient()
-  if (question.preparationItemId) {
-    const existing = await supabase.from("preparation_items").select("id").eq("id", question.preparationItemId).eq("user_id", user.id).maybeSingle()
-    if (existing.data) return done("Already in Preparation.")
-  }
-  const inserted = await supabase
-    .from("preparation_items")
-    .insert({
-      title: sliceChars(question.text, 200),
-      category: preparationCategory(question),
-      notes: sliceChars(`Interview prep · ${set.label}`, 400),
-    })
-    .select("id")
-    .single()
-  if (inserted.error) return fail("The preparation item could not be created.")
-  const questions: InterviewQuestion[] = set.questions.map((item) => (item.id === questionId ? { ...item, preparationItemId: String(inserted.data.id) } : item))
-  const saved = await supabase.from("interview_question_sets").update({ questions }).eq("id", set.id).eq("user_id", user.id)
-  if (saved.error) return fail("Added to Preparation, but the link back was not saved.")
+  // One database call locks the set, so a double click cannot create two items.
+  const added = await supabase.rpc("add_question_to_preparation", {
+    p_set_id: set.id,
+    p_question_id: question.id,
+    p_title: sliceChars(question.text, 200),
+    p_category: preparationCategory(question),
+    p_notes: sliceChars(`Interview prep · ${set.label}`, 400),
+  })
+  if (added.error) return fail("The preparation item could not be created.")
   revalidatePath(`/interview/${set.id}`)
   revalidatePath("/preparation")
-  return done("Added to Preparation.")
+  return done((added.data as { created?: boolean } | null)?.created === false ? "Already in Preparation." : "Added to Preparation.")
 }
 
 /** Builds or rebuilds the story bank from verified employment, accomplishment, and project facts. */

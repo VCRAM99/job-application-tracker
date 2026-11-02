@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { checkSentence, factEvidence, keepVerifiedFactIds, splitSentences } from "@/lib/ai/verify"
+import { checkSentence, factEvidence, keepVerifiedFactIds, splitSentences, type ClaimPolicy } from "@/lib/ai/verify"
 import type { GroundedRequirement, VerifiedFact } from "@/lib/analyze/types"
 import { MAX_BEHAVIORAL_QUESTIONS, MAX_TECHNICAL_QUESTIONS, QUESTION_BOUNDS } from "@/lib/coach/constants"
 import { counter, taggedInput, UNTRUSTED_RULES, type CountMap } from "@/lib/coach/input"
@@ -81,6 +81,9 @@ export function questionsUserMessage(input: { title: string | null; company: str
   })
 }
 
+/** A question that presumes something about the candidate ("your PhD", "since you led …"). */
+const PRESUMES = /\byour\b|\byou(?:'ve| have| had| were| was| led| built| ran| managed| worked| did| earned| hold| held| got| spent)\b|\b(?:since|as|given|because|after) you\b/i
+
 /**
  * Keeps a question only when it is tagged to a known requirement, fits the
  * length bounds, is not a repeat, and adds no number, credential, title, or
@@ -119,9 +122,16 @@ export function validateQuestions(
     }
     const facts = keepVerifiedFactIds(question.factIds, input.facts)
     add("unverified_fact", facts.dropped)
-    const evidence = [...allRequirementText, ...facts.ids.map((id) => factEvidence(factsById.get(id) as VerifiedFact))]
-    const policy = { evidence, context, contextIsEvidence: true }
-    const reason = splitSentences(text).map((sentence) => checkSentence(sentence, policy)).find(Boolean)
+    const cited = facts.ids.map((id) => factEvidence(factsById.get(id) as VerifiedFact))
+    // Job text describes the job. A clause about the candidate ("you", "your") may only use the cited facts,
+    // so a question cannot presume the candidate has what the job asks for.
+    const check = (sentence: string) => {
+      const policy: ClaimPolicy = PRESUMES.test(sentence)
+        ? { evidence: cited, context: [...allRequirementText, ...context] }
+        : { evidence: [...allRequirementText, ...cited], context, contextIsEvidence: true }
+      return checkSentence(sentence, policy)
+    }
+    const reason = splitSentences(text).map(check).find(Boolean)
     if (reason) {
       add(reason)
       continue
@@ -131,7 +141,7 @@ export function validateQuestions(
       continue
     }
     const rationale = sliceChars(question.rationale.replace(/\s+/g, " ").trim(), 240)
-    const rationaleOk = rationale && splitSentences(rationale).every((sentence) => !checkSentence(sentence, policy))
+    const rationaleOk = rationale && splitSentences(rationale).every((sentence) => !check(sentence))
     if (rationale && !rationaleOk) add("rationale_dropped")
     seen.add(key)
     perKind[question.kind] += 1
