@@ -174,3 +174,18 @@ describe("mailto links", () => {
     expect(buildMailto("dana@example.com", null, "short")).toBe("mailto:dana@example.com?body=short")
   })
 })
+
+describe("research claim text", () => {
+  it("drops source references so ids are not read as numbers", async () => {
+    const { stripSourceRefs } = await import("@/lib/coach/research")
+    expect(stripSourceRefs("Northwind builds analytics according to S1.")).toBe("Northwind builds analytics.")
+    expect(stripSourceRefs("It serves 400 clinics (S1).")).toBe("It serves 400 clinics.")
+    expect(stripSourceRefs("Founded in Oslo [S2], it grew.")).toBe("Founded in Oslo, it grew.")
+    const out = validateClaims(
+      [{ topic: "overview", text: "Northwind Analytics builds privacy-first product analytics for health clinics according to S1.", sourceId: "S1", quote: "Northwind Analytics builds privacy-first product analytics for health clinics" }],
+      sources,
+    )
+    expect(out.claims).toHaveLength(1)
+    expect(out.claims[0]!.text).not.toContain("S1")
+  })
+})

@@ -102,6 +102,15 @@ function sentenceAround(text: string, start: number, end: number): string {
   return text.slice(from, stop < 0 ? text.length : end + stop + 1)
 }
 
+/** Removes "(S1)", "[S2]", or "according to S1" from claim text; the source is shown beside the claim. */
+export function stripSourceRefs(text: string): string {
+  return text
+    .replace(/\s*,?\s*(?:\(|\[)?\s*(?:(?:according to|based on|as stated in|as noted in|per|from|in|see)\s+)?(?:source\s+)?S\d{1,2}\s*(?:\)|\])?(?=\s*[.;,]?\s*$|\s*[.;,]\s)/gi, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([.;,])/g, "$1")
+    .trim()
+}
+
 /**
  * Keeps a claim only when its source exists, its quote is found in that
  * source, the quote's sentence is not an instruction, and the claim adds no
@@ -127,7 +136,7 @@ export function validateClaims(raw: RawClaim[], sources: ResearchSource[]): { cl
       add("instruction_text")
       continue
     }
-    const text = claim.text.replace(/\s+/g, " ").trim()
+    const text = stripSourceRefs(claim.text)
     if (text.length < 10 || text.length > 300) {
       add("length")
       continue

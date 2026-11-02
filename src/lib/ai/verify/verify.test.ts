@@ -154,3 +154,15 @@ describe("checkSentence false positives from the live eval", () => {
     expect(checkSentence("I moved twelve teams to per-service schemas.", policy)).toBe("new_number")
   })
 })
+
+describe("rank words in prose", () => {
+  const evidence = ["Led the ledger migration \n Moved 12 services from a shared Postgres to per-service schemas with zero downtime."]
+  it("treats leading and first as ordinary words unless they rank something", () => {
+    expect(checkSentence("I enjoy leading database migrations with zero downtime.", { evidence })).toBeNull()
+    expect(checkSentence("I would focus first on the ledger migration.", { evidence })).toBeNull()
+    expect(checkSentence("I built the leading migration tool.", { evidence })).toBe("new_number")
+    expect(checkSentence("I was the first engineer on the ledger migration.", { evidence })).toBe("new_number")
+    // M4 is unchanged: rank words still need a source there.
+    expect(checkRewrite("Moved 12 services.", "Moved 12 services, leading the effort.", [])).toBe("new_number")
+  })
+})

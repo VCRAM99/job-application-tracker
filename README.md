@@ -34,6 +34,10 @@ Career facts, pasted resume text, and AI settings are hidden in production until
 
 Recommended jobs adds a shared catalog, private search preferences, and optional alerts. The page is on in local development and off in production until `JOB_RECOMMENDATIONS_ENABLED` is set. Live source fetches, scheduled runs, and email are separate switches and stay off. See [docs/jobs.md](docs/jobs.md).
 
+### Interview & networking coach (off by default)
+
+Interview questions from a fit analysis, a STAR story bank, typed practice with coaching notes, company research from text you provide, outreach and application-answer drafts, and follow-up suggestions. Drafts are checked against your verified facts, and nothing is sent: you copy a draft or open it in your own mail app. Off until `CAREER_COACH_ENABLED=true`. See [docs/career-coach.md](docs/career-coach.md).
+
 ### Optional health tracking (beta)
 
 Health tracking is off for new accounts. Turn it on in Settings if you want it. Saved entries stay private to your account when the section is hidden.

@@ -96,7 +96,12 @@ const SENTENCE_STARTERS = new Set(
     "tests test checks evaluates evaluate assesses assess probes probe measures gauges verifies explores examines confirms " +
     "reveals shows demonstrates highlights targets covers addresses looks focuses determines asks " +
     "referral request application inquiry following follow-up introduction intro interest interested regarding re fw " +
-    "connecting reaching checking circling writing sharing hoping"
+    "connecting reaching checking circling writing sharing hoping " +
+    "validating assessing probing evaluating testing measuring gauging exploring examining confirming verifying determining " +
+    "successfully quickly carefully effectively proactively collaboratively jointly personally directly eventually consistently " +
+    "address build design drive ensure identify improve migrate move own plan prevent reduce resolve ship write run set align " +
+    "coordinate communicate document mentor incorporate include clarify expand quantify emphasize elaborate connect tie link " +
+    "prepare practice review reflect recall remember spend"
   ).split(" "),
 )
 
@@ -186,12 +191,25 @@ export type ClaimPolicy = {
  * they sit inside a job or contact title phrase. Names may come from either,
  * except that a name only found in context cannot follow an employment cue.
  */
+/**
+ * "leading", "first", and "top" are rank claims only after an article or
+ * possessive ("the leading provider", "my first"). Elsewhere ("leading the
+ * migration", "focus first on") they are ordinary words for checkSentence.
+ * M4's checkRewrite keeps treating them as claims everywhere.
+ */
+function neutralizeRankWords(sentence: string): string {
+  return sentence.replace(/(^|[^\p{L}#-])(leading|first|top)\b/giu, (match, lead: string, word: string, offset: number) => {
+    const before = sentence.slice(0, offset + lead.length).toLowerCase()
+    return /\b(the|a|an|our|my|their|its|his|her|your|world's|industry's)\s+$/.test(before) ? match : `${lead}${"x".repeat(word.length)}`
+  })
+}
+
 export function checkSentence(sentence: string, policy: ClaimPolicy): ClaimDropReason | null {
   const context = policy.context ?? []
   const evidence = policy.contextIsEvidence ? [...policy.evidence, ...context] : policy.evidence
   const evidenceText = evidence.join("\n")
   const allText = [...policy.evidence, ...context].join("\n")
-  if (newNumbers(sentence, evidence).length > 0) return "new_number"
+  if (newNumbers(neutralizeRankWords(sentence), evidence).length > 0) return "new_number"
   const evidenceCredentials = wordsIn(CREDENTIAL, evidenceText)
   if (wordsIn(CREDENTIAL, sentence).some((word) => !evidenceCredentials.includes(word))) return "new_credential"
   const lowerEvidence = evidenceText.toLowerCase()
