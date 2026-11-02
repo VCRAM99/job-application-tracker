@@ -1,8 +1,9 @@
 "use client"
 
-import { useActionState } from "react"
+import { useActionState, useState, useTransition } from "react"
 
 import { Button } from "@/components/ui/button"
+import { MoreActions, MoreActionsButton } from "@/components/ui/more-actions"
 import { initialJobActionState, type JobActionState } from "@/lib/jobs/action-state"
 
 /**
@@ -38,5 +39,43 @@ export function JobActionForm({
         </p>
       ) : null}
     </form>
+  )
+}
+
+type JobAction = (previous: JobActionState, formData: FormData) => Promise<JobActionState>
+
+/**
+ * Less frequent job actions in a ⋯ menu. Each item calls the same server action as its old
+ * button; the result message shows next to the menu, so it stays visible after the menu closes.
+ */
+export function JobMoreActions({ items }: { items: Array<{ label: string; action: JobAction; fields: Record<string, string> }> }) {
+  const [state, setState] = useState<JobActionState>(initialJobActionState)
+  const [pending, start] = useTransition()
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <MoreActions label="More job actions" align="start">
+        {items.map((item) => (
+          <MoreActionsButton
+            key={item.label}
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                const form = new FormData()
+                for (const [key, value] of Object.entries(item.fields)) form.set(key, value)
+                setState(await item.action(initialJobActionState, form))
+              })
+            }
+          >
+            {item.label}
+          </MoreActionsButton>
+        ))}
+      </MoreActions>
+      {pending ? <span className="text-xs text-muted-foreground">Saving…</span> : null}
+      {!pending && state.message ? (
+        <span className="text-xs text-muted-foreground" role="status">
+          {state.message}
+        </span>
+      ) : null}
+    </div>
   )
 }

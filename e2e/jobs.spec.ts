@@ -7,6 +7,8 @@ const card = (page: Page, title: string) => page.locator('[data-slot="card"]').f
 async function search(page: Page, keyword: string, options: { saved?: boolean; hidden?: boolean } = {}) {
   await open(page, "/jobs")
   await page.getByLabel("Role, company, or keyword").fill(keyword)
+  // Advanced filters sit in the "More filters" disclosure.
+  if (options.saved || options.hidden) await page.getByText("More filters", { exact: true }).click()
   if (options.saved) await page.getByRole("checkbox", { name: "Saved jobs" }).check()
   if (options.hidden) await page.getByRole("checkbox", { name: "Include hidden jobs" }).check()
   await page.getByRole("button", { name: "Search", exact: true }).click()
@@ -22,6 +24,12 @@ test("jobs: search, save, hide, add to tracker", async ({ page }) => {
   await search(page, "Account Executive")
   await expect(card(page, "Account Executive")).toBeVisible()
   await expect(card(page, "Senior Backend Engineer")).toHaveCount(0)
+  // Less frequent actions moved into the card's ⋯ menu stay reachable.
+  await card(page, "Account Executive").getByRole("button", { name: "More job actions" }).click()
+  for (const name of ["Not interested", "Already applied", "Prefer company", "Exclude company"]) {
+    await expect(card(page, "Account Executive").getByRole("button", { name })).toBeVisible()
+  }
+  await page.keyboard.press("Escape")
 
   await card(page, "Account Executive").getByRole("button", { name: "Save", exact: true }).click()
   await expect(card(page, "Account Executive").getByRole("button", { name: "Unsave" })).toBeVisible()

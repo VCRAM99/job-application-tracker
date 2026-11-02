@@ -6,6 +6,7 @@ import { connection } from "next/server"
 import { AnalysisResult } from "@/components/analyze/result"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
+import { MoreActions, MoreActionsLink } from "@/components/ui/more-actions"
 import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { getAnalysis, loadAnalysisContext, loadFactLabels } from "@/lib/analyze/data"
 import { isUuid } from "@/lib/records/form-state"
@@ -75,10 +76,12 @@ export default async function AnalysisDetailPage({
                 Prepare for interview
               </Button>
             ) : null}
-            <Button variant="outline" nativeButton={false} render={<Link href="/analyze" />}>
-              All analyses
-            </Button>
           </div>
+        }
+        menu={
+          <MoreActions>
+            <MoreActionsLink href="/analyze">All analyses</MoreActionsLink>
+          </MoreActions>
         }
       />
       <AnalysisResult analysis={analysis} factLabels={factLabels} executionMode={mode} reused={reused} />

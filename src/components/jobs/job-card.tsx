@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-import { JobActionForm } from "@/components/jobs/job-action-form"
+import { JobActionForm, JobMoreActions } from "@/components/jobs/job-action-form"
 import {
   clearJobFeedback,
   hideJob,
@@ -50,7 +50,11 @@ export function JobCard({ job }: { job: JobListing }) {
       <CardHeader className="gap-2">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-1">
-            <CardTitle className="text-base leading-6">{job.title}</CardTitle>
+            <CardTitle className="text-base leading-6">
+              <Link href={`/jobs/${job.id}`} className="underline-offset-4 hover:underline">
+                {job.title}
+              </Link>
+            </CardTitle>
             <p className="text-sm text-muted-foreground">
               {job.employerName ?? "Company not provided"}
               {job.locationText ? ` · ${job.locationText}` : ""}
@@ -101,8 +105,8 @@ export function JobCard({ job }: { job: JobListing }) {
         ) : (
           <p className="text-sm text-muted-foreground">No skills were named on this listing.</p>
         )}
-        <div className="space-y-1 text-sm">
-          <p className="font-medium">Why this estimate</p>
+        <details className="space-y-1 text-sm">
+          <summary className="w-fit cursor-pointer font-medium focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none">Why this estimate</summary>
           {job.reasonsMatchScore ? (
             <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
               {reasons.map((reason) => (
@@ -114,12 +118,9 @@ export function JobCard({ job }: { job: JobListing }) {
               This estimate uses verified skills, target roles, seniority, verified job titles, company preferences, and listing freshness.
             </p>
           )}
-        </div>
+        </details>
       </CardContent>
       <CardFooter className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <Button nativeButton={false} render={<Link href={`/jobs/${job.id}`} />}>
-          Details
-        </Button>
         <Button nativeButton={false} render={<a href={applyUrl} target="_blank" rel="noopener noreferrer" />}>
           Apply
         </Button>
@@ -141,24 +142,20 @@ export function JobCard({ job }: { job: JobListing }) {
           ) : (
             <ActionForm action={hideJob} postingId={job.id} label="Hide" optimisticLabel="Unhide" />
           )}
-          <ActionForm action={markNotInterested} postingId={job.id} label="Not interested" />
-          <ActionForm action={markAlreadyApplied} postingId={job.id} label="Already applied" />
-          {job.feedback ? <ActionForm action={clearJobFeedback} postingId={job.id} label="Clear feedback" /> : null}
-          {job.employerId ? (
-            <>
-              <JobActionForm
-                action={setEmployerStance}
-                fields={{ employerId: job.employerId, stance: "preferred" }}
-                label="Prefer company"
-              />
-              <JobActionForm
-                action={setEmployerStance}
-                fields={{ employerId: job.employerId, stance: "excluded" }}
-                label="Exclude company"
-              />
-            </>
-          ) : null}
         </div>
+        <JobMoreActions
+          items={[
+            { label: "Not interested", action: markNotInterested, fields: { postingId: job.id } },
+            { label: "Already applied", action: markAlreadyApplied, fields: { postingId: job.id } },
+            ...(job.feedback ? [{ label: "Clear feedback", action: clearJobFeedback, fields: { postingId: job.id } }] : []),
+            ...(job.employerId
+              ? [
+                  { label: "Prefer company", action: setEmployerStance, fields: { employerId: job.employerId, stance: "preferred" } },
+                  { label: "Exclude company", action: setEmployerStance, fields: { employerId: job.employerId, stance: "excluded" } },
+                ]
+              : []),
+          ]}
+        />
       </CardFooter>
     </Card>
   )

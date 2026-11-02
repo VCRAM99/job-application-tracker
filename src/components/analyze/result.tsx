@@ -1,6 +1,7 @@
 import Link from "next/link"
 
 import { ClaimButton, RerunButton } from "@/components/analyze/forms"
+import { HelpTip } from "@/components/ui/help-tip"
 import { BLOCKER_NOTE, CONFIRM_NOTE, QUALIFICATION_DISCLAIMER, READABILITY_NOTE } from "@/lib/analyze/copy"
 import type { AnalysisRecord } from "@/lib/analyze/data"
 import type { GroundedRequirement, RequirementCategory, RequirementMatch } from "@/lib/analyze/types"
@@ -130,8 +131,10 @@ export function AnalysisResult({
       </section>
 
       <section className="grid gap-3" aria-labelledby="blocker-heading">
-        <h2 id="blocker-heading" className="text-base font-medium">Separate checks</h2>
-        <p className="text-sm leading-6 text-muted-foreground">{BLOCKER_NOTE}</p>
+        <div className="flex items-center gap-2">
+          <h2 id="blocker-heading" className="text-base font-medium">Separate checks</h2>
+          <HelpTip label="About separate checks">{BLOCKER_NOTE}</HelpTip>
+        </div>
         {toConfirm.length > 0 ? (
           <div className="grid gap-2">
             <h3 className="text-sm font-medium">Confirm before applying</h3>
@@ -213,10 +216,10 @@ export function AnalysisResult({
           )}
         </div>
         <div className="grid gap-2">
-          <h3 className="text-sm font-medium">You may have this</h3>
-          <p className="text-sm text-muted-foreground">
-            A partial match can be saved as a suggested fact. It stays unverified until you accept it on Career.
-          </p>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium">You may have this</h3>
+            <HelpTip label="About partial matches">A partial match can be saved as a suggested fact. It stays unverified until you accept it on Career.</HelpTip>
+          </div>
           {mayHave.length === 0 ? (
             <p className="text-sm text-muted-foreground">No partial matches are waiting.</p>
           ) : (
@@ -231,8 +234,10 @@ export function AnalysisResult({
       </section>
 
       <section className="grid gap-3" aria-labelledby="readability-heading">
-        <h2 id="readability-heading" className="text-base font-medium">Readability heuristics</h2>
-        <p className="text-sm leading-6 text-muted-foreground">{READABILITY_NOTE}</p>
+        <div className="flex items-center gap-2">
+          <h2 id="readability-heading" className="text-base font-medium">Readability heuristics</h2>
+          <HelpTip label="About readability heuristics">{READABILITY_NOTE}</HelpTip>
+        </div>
         {analysis.readability ? (
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <div>
