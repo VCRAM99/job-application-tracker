@@ -162,22 +162,14 @@ export async function getCompany(id: string): Promise<DataResult<CompanyRecord |
   if (!isUuid(id)) notFound()
   const user = await requireUser()
   const supabase = await createClient()
-  const { data, error } = await supabase
-    .from("companies")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("id", id)
-    .maybeSingle()
+  // The application count needs only the id, so both queries run together.
+  const [{ data, error }, applications] = await Promise.all([
+    supabase.from("companies").select("*").eq("user_id", user.id).eq("id", id).maybeSingle(),
+    supabase.from("applications").select("id").eq("user_id", user.id).eq("company_id", id),
+  ])
 
   if (error) return failure(error)
   if (!data) return { ok: true, data: null }
-
-  const applications = await supabase
-    .from("applications")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("company_id", id)
-
   if (applications.error) return failure(applications.error)
   const company = mapCompany(data as CompanyRow, applications.data?.length ?? 0)
   return { ok: true, data: company }
@@ -211,9 +203,10 @@ export async function getApplication(id: string): Promise<DataResult<Application
   if (!isUuid(id)) notFound()
   const user = await requireUser()
   const supabase = await createClient()
+  // One request: the company comes through the owner foreign key, so it is always the caller's own.
   const { data, error } = await supabase
     .from("applications")
-    .select("*")
+    .select("*, company:companies!applications_company_owner_fkey(id, name)")
     .eq("user_id", user.id)
     .eq("id", id)
     .maybeSingle()
@@ -221,21 +214,13 @@ export async function getApplication(id: string): Promise<DataResult<Application
   if (error) return failure(error)
   if (!data) return { ok: true, data: null }
 
-  const mapped = mapApplication(data as ApplicationRow)
+  const { company, ...row } = data as ApplicationRow & { company: { id: string; name: string } | null }
+  const mapped = mapApplication(row as ApplicationRow)
   if (!mapped) return { ok: true, data: null }
-
-  const company = await supabase
-    .from("companies")
-    .select("id, name")
-    .eq("user_id", user.id)
-    .eq("id", mapped.companyId)
-    .maybeSingle()
-
-  if (company.error) return failure(company.error)
 
   return {
     ok: true,
-    data: withCompanyNames(mapped ? [mapped] : [], company.data ? [company.data] : [])[0] ?? null,
+    data: withCompanyNames([mapped], company ? [company] : [])[0] ?? null,
   }
 }
 

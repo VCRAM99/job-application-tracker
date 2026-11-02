@@ -1,10 +1,12 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound } from "next/navigation"
+import { Suspense } from "react"
 
 import { ContactCoach } from "@/components/coach/entry-points"
 import { DeleteRecordButton } from "@/components/records/delete-record-button"
 import { DetailList, PageHeader, RecordState } from "@/components/records/fields"
+import { SectionSkeleton } from "@/components/shell/section-skeleton"
 import { Button } from "@/components/ui/button"
 import { careerCoachEnabled } from "@/lib/coach/flags"
 import { OUTREACH_LABELS, RELATIONSHIP_LABELS } from "@/lib/records/constants"
@@ -99,7 +101,11 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
           <p className="text-sm leading-6 whitespace-pre-wrap">{contact.notes}</p>
         </section>
       ) : null}
-      {careerCoachEnabled() ? <ContactCoach contactId={contact.id} /> : null}
+      {careerCoachEnabled() ? (
+        <Suspense fallback={<SectionSkeleton label="Loading follow-ups and drafts…" />}>
+          <ContactCoach contactId={contact.id} />
+        </Suspense>
+      ) : null}
     </div>
   )
 }

@@ -1,18 +1,28 @@
 "use client"
 
 import { Beef, Flame, Footprints, Moon, Scale } from "lucide-react"
+import dynamic from "next/dynamic"
 
 import { Disclosure } from "@/components/daily/disclosure"
 import { EntryEditor } from "@/components/daily/entry-editor"
-import { HealthChart } from "@/components/daily/health-chart"
 import { MetricTotal } from "@/components/daily/metric"
 import { SubmitButton } from "@/components/daily/controls"
 import { TargetsForm } from "@/components/daily/targets-form"
 import { WaterCard } from "@/components/daily/water-card"
-import { WeightHistoryChart } from "@/components/daily/weight-history"
 import { DeleteRecordButton } from "@/components/records/delete-record-button"
 import { addWaterAmount, deleteOwned, saveFood, saveSleep, saveSteps, saveWeight } from "@/lib/daily/actions"
 import { formatCount, formatSleep, kgToDisplay, sumNumbers, waterTotal, type WeightUnit } from "@/lib/daily/health"
+
+// Charts load on the client only, in their own chunk: recharts stays out of the page's first load.
+// Both sit in collapsed disclosures, and the placeholders keep their height.
+const HealthChart = dynamic(() => import("@/components/daily/health-chart").then((module) => module.HealthChart), {
+  ssr: false,
+  loading: () => <div className="h-80 w-full" aria-hidden="true" />,
+})
+const WeightHistoryChart = dynamic(() => import("@/components/daily/weight-history").then((module) => module.WeightHistoryChart), {
+  ssr: false,
+  loading: () => <div className="h-44 w-full" aria-hidden="true" />,
+})
 
 type Food = { id: string; description: string | null; calories: number; protein: number; entryTime: string | null }
 type Entry = { id: string; amount: number }
