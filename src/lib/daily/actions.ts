@@ -191,16 +191,6 @@ export async function saveFood(formData: FormData) {
   redirect(`/daily-tasks?date=${date}`)
 }
 
-export async function deleteFood(formData: FormData) {
-  const user = await requireUser()
-  const id = String(formData.get("id") ?? "")
-  if (!isUuid(id)) return
-  const supabase = await createClient()
-  const { error } = await supabase.from("food_entries").delete().eq("user_id", user.id).eq("id", id)
-  assertDeleted(error)
-  refresh()
-}
-
 async function dayWater(userId: string, date: string): Promise<number> {
   const supabase = await createClient()
   const { data } = await supabase

@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { connection } from "next/server"
 
-import { DraftForm } from "@/components/coach/forms"
+import { DraftForm } from "@/components/coach/draft-forms"
 import { CoachOff } from "@/components/coach/view"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { careerCoachEnabled } from "@/lib/coach/flags"

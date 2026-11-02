@@ -3,7 +3,7 @@ import Link from "next/link"
 import { connection } from "next/server"
 
 import { CoachOff } from "@/components/coach/view"
-import { GenerateQuestionsForm } from "@/components/coach/forms"
+import { GenerateQuestionsForm } from "@/components/coach/interview-forms"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
 import { listQuestionSets, loadCoachAnalysis } from "@/lib/coach/data"

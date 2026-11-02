@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { connection } from "next/server"
 
-import { ResearchForm } from "@/components/coach/forms"
+import { ResearchForm } from "@/components/coach/draft-forms"
 import { CoachOff } from "@/components/coach/view"
 import { PageHeader } from "@/components/records/fields"
 import { careerCoachEnabled } from "@/lib/coach/flags"

@@ -15,13 +15,12 @@ import {
   isTaskStatus,
 } from "@/lib/records/constants"
 import type { DataResult } from "@/lib/records/data"
+import type { DashboardApplication, DashboardCompany } from "@/lib/records/dashboard"
 import { isUuid } from "@/lib/records/form-state"
 import { isMissingTable } from "@/lib/records/logic"
 import type {
   ApplicationOption,
   ContactRecord,
-  DashboardApplication,
-  DashboardCompany,
   PreparationRecord,
   TaskRecord,
 } from "@/lib/records/tracker"
