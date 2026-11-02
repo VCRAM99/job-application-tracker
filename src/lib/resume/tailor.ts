@@ -1,10 +1,9 @@
 import { z } from "zod"
 
 import { canonicalSkill } from "@/lib/analyze/facts"
-import { MENTIONED_SKILLS } from "@/lib/jobs/normalize"
 import type { GroundedRequirement, RequirementMatch, VerifiedFact } from "@/lib/analyze/types"
 import type { ResumeContent } from "@/lib/resume/content"
-import { newNumbers } from "@/lib/resume/numbers"
+import { checkRewrite } from "@/lib/ai/verify/claims"
 import { groundingKey } from "@/lib/resume/parse"
 import { sliceChars } from "@/lib/resume/text"
 
@@ -47,6 +46,9 @@ export const DROP_REASONS = [
 ] as const
 export type DropReason = (typeof DROP_REASONS)[number]
 export type TailorDropped = Partial<Record<DropReason, number>>
+
+// The rewrite checks moved to the shared verifier in M5; re-exported so M4 callers are unchanged.
+export { checkRewrite }
 
 export const tailorOutputSchema = z.object({
   edits: z
@@ -172,76 +174,6 @@ export function textAt(content: ResumeContent, target: Target): string | null {
   if (target.kind === "summary") return content.summary
   if (target.kind === "skill") return content.skills[target.index] ?? null
   if (target.kind === "bullet") return content[target.section][target.entry]?.bullets[target.bullet] ?? null
-  return null
-}
-
-const CREDENTIAL =
-  /\b(b\.?sc|m\.?sc|b\.?s|m\.?s|b\.?a|m\.?a|b\.?eng|m\.?eng|ph\.?d|mba|bachelor'?s?|master'?s?|doctorate|degree|diploma|certified|certificate|certification|license[ds]?|pmp|cpa|cfa|cissp|cism|cisa|ceh|ccna|ccnp|ckad|cka|cks|comptia|mcse|itil|csm|award|awarded|awards|winner|won|patent|patents|patented|promoted|promotion|published|publication|keynote|fellowship|scholarship)\b/gi
-const TITLE =
-  /\b(senior|sr|staff|principal|lead|manager|director|head|chief|vp|vice president|president|architect|founder|co-?founder|cto|ceo|cfo|coo|supervisor|owner|partner|coordinator|intern|executive|officer|chair|chairman)\b/gi
-
-/** Lowercase employer and technology names: a rewrite cannot slip in "at google" or "kubernetes". */
-const ENTITY_NAMES = new Set([
-  ...MENTIONED_SKILLS.map((skill) => canonicalSkill(skill)),
-  ...["kubernetes", "terraform", "docker", "spark", "snowflake", "salesforce", "sap", "tableau", "figma", "jira", "kafka", "graphql"].map(canonicalSkill),
-  "google", "alphabet", "amazon", "meta", "facebook", "microsoft", "apple", "netflix", "stripe", "uber", "airbnb", "openai", "anthropic",
-  "nvidia", "ibm", "oracle", "shopify", "twitter", "linkedin", "tesla", "spotify", "adobe", "intel", "cisco", "deloitte", "accenture",
-  "mckinsey", "goldman", "jpmorgan", "faang", "fortune",
-])
-
-/** Words a rewritten bullet may start with that are not names. */
-const LEAD_WORDS = new Set(
-  (
-    "a an the as at by for in on to with and or our my we i this that these those over across after before during while when " +
-    "accelerated achieved added advised analyzed architected assessed automated built championed coached collaborated completed " +
-    "configured consolidated contributed coordinated created cut debugged decreased defined delivered deployed designed developed " +
-    "directed documented drove eliminated enabled engineered established evaluated expanded facilitated grew guided handled hardened " +
-    "identified implemented improved increased instrumented integrated introduced launched led lowered maintained managed mentored " +
-    "migrated modernized monitored moved negotiated optimized orchestrated organized owned partnered piloted planned prioritized " +
-    "processed produced profiled prototyped published raised rebuilt redesigned reduced refactored released replaced resolved " +
-    "restructured revamped reviewed scaled secured shipped simplified sped spearheaded standardized streamlined strengthened " +
-    "supported tested trained transformed tuned unified upgraded used validated wrote"
-  ).split(" "),
-)
-const MONTH = /\b(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|jun(e)?|jul(y)?|aug(ust)?|sep(t(ember)?)?|oct(ober)?|nov(ember)?|dec(ember)?)\b/gi
-
-function wordsIn(pattern: RegExp, text: string): string[] {
-  return [...text.matchAll(pattern)].map((match) => match[0].toLowerCase().replace(/\./g, ""))
-}
-
-function words(text: string): string[] {
-  return (text.normalize("NFKC").match(/\p{L}[\p{L}\p{N}+#.&'-]*/gu) ?? []).map((word) => word.replace(/[.'-]+$/, ""))
-}
-
-/**
- * Words that look like names: capitalized words and acronyms after the first
- * word, a first word that is not a common lead word, and any lowercase word
- * that is a known employer or technology.
- */
-function nameCandidates(text: string): string[] {
-  const all = words(text)
-  const names = all.slice(1).filter((word) => /^\p{Lu}/u.test(word) && word.length > 1)
-  const first = all[0]
-  if (first && !LEAD_WORDS.has(first.toLowerCase())) names.push(first)
-  for (const word of all) if (ENTITY_NAMES.has(canonicalSkill(word))) names.push(word)
-  return names
-}
-
-/**
- * The checks for one rewritten text against the original and the cited
- * facts. Returns the first reason it fails, or null when it passes.
- */
-export function checkRewrite(before: string, after: string, citedFacts: string[]): DropReason | null {
-  const sources = [before, ...citedFacts]
-  const sourceText = sources.join("\n")
-  const lowerSources = sourceText.toLowerCase()
-  if (newNumbers(after, sources).length > 0) return "new_number"
-  if (wordsIn(CREDENTIAL, after).some((word) => !wordsIn(CREDENTIAL, sourceText).includes(word))) return "new_credential"
-  if (wordsIn(TITLE, after).some((word) => !wordsIn(TITLE, sourceText).includes(word))) return "new_title"
-  if (wordsIn(MONTH, after).some((word) => !lowerSources.includes(word))) return "new_number"
-  const known = new Set(words(sourceText).map((word) => word.toLowerCase()))
-  const knownSkills = new Set(words(sourceText).map(canonicalSkill))
-  if (nameCandidates(after).some((word) => !known.has(word.toLowerCase()) && !knownSkills.has(canonicalSkill(word)))) return "new_name"
   return null
 }
 
