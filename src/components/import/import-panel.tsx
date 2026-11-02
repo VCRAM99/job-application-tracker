@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useState } from "react"
+import { startTransition, useActionState, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -44,7 +44,17 @@ export function ImportPanel({ kind }: { kind: ImportKind }) {
         </div>
       </section>
       <AcceptedValues kind={kind} />
-      <form action={formAction} className="flex flex-col gap-4">
+      <form
+        action={formAction}
+        onSubmit={(event) => {
+          // A form action resets the form when it finishes, which would empty the file
+          // input after "Check file" and leave "Import" with nothing to send.
+          event.preventDefault()
+          const data = new FormData(event.currentTarget, (event.nativeEvent as SubmitEvent).submitter)
+          startTransition(() => formAction(data))
+        }}
+        className="flex flex-col gap-4"
+      >
         <input type="hidden" name="kind" value={kind} />
         <div className="space-y-2">
           <label htmlFor="import-file" className="text-sm font-medium">Spreadsheet</label>
