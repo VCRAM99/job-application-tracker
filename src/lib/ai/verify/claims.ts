@@ -91,7 +91,12 @@ const SENTENCE_STARTERS = new Set(
     "just quick quickly briefly no not yes sure absolutely appreciate appreciated really truly honestly let let's lets talk tell " +
     "describe walk explain share give imagine suppose consider name think say pick focus start try add keep cut lead state open " +
     "close mention structure strengthen make use avoid aim end follow note being having after before during about across around " +
-    "situation task action result outcome context challenge impact goal role question answer feedback relevance specificity length"
+    "situation task action result outcome context challenge impact goal role question answer feedback relevance specificity length " +
+    "additionally furthermore moreover besides beyond meanwhile ultimately specifically notably together outside instead plus " +
+    "tests test checks evaluates evaluate assesses assess probes probe measures gauges verifies explores examines confirms " +
+    "reveals shows demonstrates highlights targets covers addresses looks focuses determines asks " +
+    "referral request application inquiry following follow-up introduction intro interest interested regarding re fw " +
+    "connecting reaching checking circling writing sharing hoping"
   ).split(" "),
 )
 
@@ -106,7 +111,7 @@ export const FIRST_PERSON = /\b(i|i'm|i've|i'd|i'll|me|my|mine|myself|we|we've|w
 
 const SELF_TITLE = /\b(i am|i'm|im|i was|i've been|i have been|i'll be|i will be)\s+(?:an?\s+|the\s+|your\s+)?$|\b(?:i|my)\b(?:\s+\S+){0,3}\s+as\s+(?:an?\s+|the\s+)?$/
 const TITLE_AFTER = /^\s*(role|position|opening|job|posting|req|requisition|team|interview|opportunity|opening)s?\b/
-const TITLE_BEFORE = /\b(your|the|this|that|a|an)\s+$/
+const TITLE_BEFORE = /(\b(your|the|this|that|a|an|for|about|regarding|re|on|into|to)\s+|^\s*|[:|–—-]\s*)$/
 
 /** Splits on sentence ends and line breaks. Abbreviations can split a sentence early; both halves are still checked. */
 export function splitSentences(text: string): string[] {

@@ -130,3 +130,27 @@ describe("fact ids and grounding", () => {
     expect(groundQuote(source, "short")).toBeNull()
   })
 })
+
+describe("checkSentence false positives from the live eval", () => {
+  const evidence = ["Led the ledger migration \n Moved 12 services from a shared Postgres to per-service schemas with zero downtime."]
+  const policy = { evidence, ...JOB }
+
+  it("accepts common openers, connectors, and rationale verbs", () => {
+    expect(checkSentence("Additionally, I led the ledger migration with zero downtime.", policy)).toBeNull()
+    expect(checkSentence("Evaluates practical experience with schema migrations.", { evidence: [], contextIsEvidence: true })).toBeNull()
+    expect(checkSentence("Tests core concurrency patterns.", { evidence: [], contextIsEvidence: true })).toBeNull()
+  })
+
+  it("accepts the job title as a subject line topic but not as a claim", () => {
+    for (const subject of ["Application for Staff Platform Engineer", "Following up on my application for Staff Platform Engineer", "Re: Staff Platform Engineer", "Staff Platform Engineer"]) {
+      expect(checkSentence(subject, { evidence: [], ...JOB })).toBeNull()
+    }
+    expect(checkSentence("I'm a Staff Platform Engineer", { evidence: [], ...JOB })).toBe("new_title")
+    expect(checkSentence("As Staff Platform Engineer I would lead the pipeline", { evidence: [], ...JOB })).toBe("new_title")
+  })
+
+  it("still treats twelve and 12 as the same number only with the same unit", () => {
+    expect(checkSentence("I moved twelve services to per-service schemas.", policy)).toBeNull()
+    expect(checkSentence("I moved twelve teams to per-service schemas.", policy)).toBe("new_number")
+  })
+})
