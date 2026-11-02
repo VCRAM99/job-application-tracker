@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "tsx e2e/support/serve.ts build && playwright test",
-    "test:e2e:nobuild": "playwright test"
+    "test:e2e:nobuild": "playwright test",
+    "perf:seed": "tsx --conditions=react-server scripts/perf/seed-dataset.ts",
+    "perf:measure": "tsx --conditions=react-server scripts/perf/measure.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.137.0",
@@ -52,6 +54,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
     "jsdom": "^29.1.1",
+    "lighthouse": "^12.8.2",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",

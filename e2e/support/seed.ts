@@ -34,12 +34,12 @@ function supabaseStatus(): { anon: string; service: string } {
 }
 
 /** Runs SQL as the local database owner. Output is discarded so nothing echoes. */
-export function psql(sql: string, capture = false): string {
+export function psql(sql: string, capture = false, role = "postgres"): string {
   const ports = execFileSync("docker", ["port", DB_CONTAINER, "5432"], { encoding: "utf8" })
   if (!ports.split("\n").some((line) => /^(127\.0\.0\.1|0\.0\.0\.0|\[::\]):54322$/.test(line.trim()))) {
     throw new Error("Refusing: the local database container is not bound to port 54322.")
   }
-  const output = execFileSync("docker", ["exec", "-i", DB_CONTAINER, "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-qtA"], {
+  const output = execFileSync("docker", ["exec", "-i", DB_CONTAINER, "psql", "-U", role, "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-qtA"], {
     input: sql,
     encoding: "utf8",
     stdio: ["pipe", capture ? "pipe" : "ignore", "pipe"],

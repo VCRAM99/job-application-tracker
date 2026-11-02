@@ -59,7 +59,7 @@ async function main() {
       name: `Perf Company ${String(index + 1).padStart(3, "0")}`,
       industry: index % 2 ? "Software" : "Health analytics",
       location: CITIES[index % CITIES.length],
-      priority_tier: ["a", "b", "c", "unset"][index % 4],
+      priority_tier: ["A", "B", "C", "unset"][index % 4],
       follow_up_date: index % 5 === 0 ? day(index % 20) : null,
     })),
   })) as Array<{ id: string }>
@@ -106,6 +106,7 @@ async function main() {
     body: Array.from({ length: 150 }, (_, index) => ({
       title: `Perf task ${index + 1}`,
       status: ["todo", "in_progress", "done"][index % 3],
+      completed_at: index % 3 === 2 ? day(index % 10) : null,
       priority: ["low", "medium", "high"][index % 3],
       due_date: day((index % 40) - 20),
       application_id: index % 2 ? applications[index % applications.length]!.id : null,
@@ -120,6 +121,7 @@ async function main() {
       title: `Perf preparation ${index + 1}`,
       category: ["coding", "system_design", "behavioral", "other"][index % 4],
       status: ["not_started", "in_progress", "completed"][index % 3],
+      completed_at: index % 3 === 2 ? day(index % 10) : null,
     })),
   })
 

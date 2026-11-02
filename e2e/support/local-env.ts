@@ -94,5 +94,7 @@ export function serverEnv(variant: "on" | "off"): Record<string, string> {
     AI_PLATFORM_OPENAI_API_KEY: "",
     AI_PLATFORM_ANTHROPIC_API_KEY: "",
     AI_PLATFORM_GOOGLE_API_KEY: "",
+    // scripts/perf/measure.ts turns on request timing for its own server only.
+    PERF_TIMING: process.env.PERF_TIMING === "1" ? "1" : "",
   }
 }
