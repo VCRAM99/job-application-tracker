@@ -9,6 +9,7 @@ import { TimezoneSync } from "@/components/daily/timezone-sync"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { DeleteRecordButton } from "@/components/records/delete-record-button"
 import { Button } from "@/components/ui/button"
+import { HelpTip } from "@/components/ui/help-tip"
 import { SCHEDULE_CHANGE_NOTE, WEEKDAY_LABELS, isIsoDate, isScheduledOn, lastCompletedWeek, localDateInTimeZone, weekContaining, weeklyInsights } from "@/lib/daily/calendar"
 import { deleteRecurringTask, setRecurringStatus } from "@/lib/daily/actions"
 import { getDailyPreference, getHealthBundle, listCompletions, listRecurringTasks } from "@/lib/daily/data"
@@ -148,8 +149,8 @@ export default async function DailyTasksPage({
             title="Weekly Insights"
             summary={`${week.start} – ${week.end}${insights.length ? ` · ${insightCompleted}/${insightScheduled}` : " · Nothing scheduled"}`}
           >
-            <p className="text-sm text-muted-foreground">{SCHEDULE_CHANGE_NOTE}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <HelpTip label="About weekly insights">{SCHEDULE_CHANGE_NOTE}</HelpTip>
               <Link className="pressable pressable-quiet inline-flex h-9 items-center rounded-lg border px-3 text-sm" href={`/daily-tasks?date=${date}&week=${addCalendarDays(week.start, -7)}`}>Previous week</Link>
               <Link className="pressable pressable-quiet inline-flex h-9 items-center rounded-lg border px-3 text-sm" href={`/daily-tasks?date=${date}&week=${addCalendarDays(week.start, 7)}`}>Next week</Link>
             </div>

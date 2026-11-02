@@ -1,6 +1,8 @@
 import * as React from "react"
 import { cn } from "cn"
 
+import { HelpTip } from "@/components/ui/help-tip"
+
 function Card({
   className,
   size = "default",
@@ -32,16 +34,32 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
+/** A section heading (h2 by default) with an optional HelpTip for its explanation. */
+function CardTitle({
+  className,
+  help,
+  as: Heading = "h2",
+  children,
+  ...props
+}: React.ComponentProps<"h2"> & { help?: React.ReactNode; as?: "h2" | "h3" }) {
+  const title = (
+    <Heading
       data-slot="card-title"
       className={cn(
         "font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
         className
       )}
       {...props}
-    />
+    >
+      {children}
+    </Heading>
+  )
+  if (!help) return title
+  return (
+    <div className="flex items-center gap-2">
+      {title}
+      <HelpTip label={`About ${typeof children === "string" ? children.toLowerCase() : "this section"}`}>{help}</HelpTip>
+    </div>
   )
 }
 

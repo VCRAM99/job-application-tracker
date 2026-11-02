@@ -6,6 +6,7 @@ import { useActionState, useOptimistic, useState, useTransition } from "react"
 import { CopyButton, Run, type Mode } from "@/components/coach/controls"
 import { FormStatus, NativeSelect } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
+import { MoreActions, MoreActionsButton, MoreActionsLink } from "@/components/ui/more-actions"
 import {
   Dialog,
   DialogClose,
@@ -313,14 +314,12 @@ export function FollowUpActions({ suggestionKey, draftHref }: { suggestionKey: s
       <Button size="sm" variant="outline" disabled={pending} onClick={() => run(createSuggestionTask)}>
         Create task
       </Button>
-      {draftHref ? (
-        <Button size="sm" variant="outline" nativeButton={false} render={<a href={draftHref} />}>
-          Draft message
-        </Button>
-      ) : null}
-      <Button size="sm" variant="ghost" disabled={pending} onClick={() => run(dismissSuggestion)} aria-label="Dismiss suggestion">
-        Dismiss
-      </Button>
+      <MoreActions label="More follow-up actions" align="start">
+        {draftHref ? <MoreActionsLink href={draftHref} external>Draft message</MoreActionsLink> : null}
+        <MoreActionsButton disabled={pending} onClick={() => run(dismissSuggestion)}>
+          Dismiss suggestion
+        </MoreActionsButton>
+      </MoreActions>
       {state.message ? <span role="status" className={state.status === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>{state.message}</span> : null}
     </div>
   )

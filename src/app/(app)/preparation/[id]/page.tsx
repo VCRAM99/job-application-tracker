@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import { DeleteRecordButton } from "@/components/records/delete-record-button"
 import { DetailList, PageHeader, RecordState } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
+import { MoreActions } from "@/components/ui/more-actions"
 import { questionSetForPreparation } from "@/lib/coach/data"
 import { careerCoachEnabled } from "@/lib/coach/flags"
 import { PREPARATION_CATEGORY_LABELS, PREPARATION_STATUS_LABELS } from "@/lib/records/constants"
@@ -33,14 +34,19 @@ export default async function PreparationDetailPage({ params }: { params: Promis
               <Button variant="outline" nativeButton={false} render={<Link href={`/interview/${fromPrep.setId}`} />}>Interview prep</Button>
             ) : null}
             <Button variant="outline" nativeButton={false} render={<Link href={`/preparation/${item.id}/edit`} />}>Edit</Button>
+          </div>
+        }
+        menu={
+          <MoreActions>
             <DeleteRecordButton
+              asMenuItem
               action={deletePreparation}
               id={item.id}
               label="Delete item"
               title={`Delete ${item.title}?`}
               description="This removes the preparation item."
             />
-          </div>
+          </MoreActions>
         }
       />
       <DetailList

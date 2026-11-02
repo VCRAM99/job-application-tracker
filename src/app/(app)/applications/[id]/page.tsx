@@ -9,6 +9,7 @@ import { DetailList, PageHeader, RecordState } from "@/components/records/fields
 import { ApplicationStatusLabel, ApplicationStatusScope, StatusForm } from "@/components/records/status-form"
 import { SectionSkeleton } from "@/components/shell/section-skeleton"
 import { Button } from "@/components/ui/button"
+import { MoreActions, MoreActionsLink } from "@/components/ui/more-actions"
 import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { careerCoachEnabled } from "@/lib/coach/flags"
 import { deleteApplication } from "@/lib/records/actions"
@@ -70,32 +71,25 @@ export default async function ApplicationDetailPage({
         title={application.jobTitle}
         subtitle={application.companyName}
         action={
-          <div className="flex flex-wrap gap-2">
-            {jobAnalysisEnabled() ? (
-              <Button variant="outline" nativeButton={false} render={<Link href={`/analyze?application=${application.id}`} />}>
-                Analyze fit
-              </Button>
-            ) : null}
+          <Button variant="outline" nativeButton={false} render={<Link href={`/applications/${application.id}/edit`} />}>
+            Edit
+          </Button>
+        }
+        menu={
+          <MoreActions>
+            {jobAnalysisEnabled() ? <MoreActionsLink href={`/analyze?application=${application.id}`}>Analyze fit</MoreActionsLink> : null}
             {resumes && latestAnalysis && jobAnalysisEnabled() ? (
-              <Button
-                variant="outline"
-                nativeButton={false}
-                render={<Link href={`/resumes?analysis=${latestAnalysis}&application=${application.id}`} />}
-              >
-                Tailor resume
-              </Button>
+              <MoreActionsLink href={`/resumes?analysis=${latestAnalysis}&application=${application.id}`}>Tailor resume</MoreActionsLink>
             ) : null}
-            <Button variant="outline" nativeButton={false} render={<Link href={`/applications/${application.id}/edit`} />}>
-              Edit
-            </Button>
             <DeleteRecordButton
+              asMenuItem
               action={deleteApplication}
               id={application.id}
               label="Delete application"
               title={`Delete ${application.jobTitle}?`}
               description="This removes the application. The company stays."
             />
-          </div>
+          </MoreActions>
         }
       />
       <ApplicationStatusScope status={application.status}>

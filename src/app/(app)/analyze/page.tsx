@@ -4,7 +4,7 @@ import { connection } from "next/server"
 
 import { AnalyzeForm } from "@/components/analyze/forms"
 import { PageHeader, RecordState } from "@/components/records/fields"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { jobAnalysisEnabled, jobAnalysisMockProvider } from "@/lib/ai/flags"
 import { analysisBlockedReason } from "@/lib/analyze/readiness"
 import { listAnalyses, loadAnalysisContext, loadApplicationPrefill, loadPostingText } from "@/lib/analyze/data"
@@ -89,10 +89,7 @@ export default async function AnalyzePage({
       />
       <Card>
         <CardHeader>
-          <CardTitle>Job description</CardTitle>
-          <CardDescription>
-            Paste the job text, or open this page from a catalog posting or an application.
-          </CardDescription>
+          <CardTitle help="Paste the job text, or open this page from a catalog posting or an application.">Job description</CardTitle>
         </CardHeader>
         <CardContent>
           <AnalyzeForm

@@ -28,7 +28,10 @@ test("tracking pages still work and hide V2 entry points", async ({ page }) => {
   const first = page.getByRole("table").getByRole("link").first()
   if (await first.count()) {
     await first.click()
-    await expect(page.getByRole("button", { name: "Analyze fit" })).toHaveCount(0)
+    // Analyze fit lives in the ⋯ menu when the flag is on.
+    await page.getByRole("button", { name: "More actions" }).click()
+    await expect(page.getByRole("link", { name: "Analyze fit" })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Delete application" })).toBeVisible()
     await expect(page.getByRole("button", { name: "Research" })).toHaveCount(0)
   }
 })

@@ -10,7 +10,7 @@ import {
   SuggestionCard,
 } from "@/components/career/forms"
 import { PageHeader, RecordState } from "@/components/records/fields"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { createCareerSource, saveCareerProfile } from "@/lib/career/actions"
 import { extractCareerFacts } from "@/lib/career/extract-action"
 import { acceptCareerSuggestion, addManualFact, rejectCareerSuggestion, reviewSuggestedFact, supersedeCareerFact } from "@/lib/career/fact-actions"
@@ -58,8 +58,7 @@ function Workspace({ workspace }: { workspace: CareerWorkspace }) {
     <div className="grid gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Summary and preferences</CardTitle>
-          <CardDescription>Target roles and work preferences belong to this account.</CardDescription>
+          <CardTitle help="Target roles and work preferences belong to this account.">Summary and preferences</CardTitle>
         </CardHeader>
         <CardContent>
           <ProfileForm
@@ -75,10 +74,7 @@ function Workspace({ workspace }: { workspace: CareerWorkspace }) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Resume text sources</CardTitle>
-          <CardDescription>
-            Save more than one source. Extraction uses the provider and model saved in Settings.
-          </CardDescription>
+          <CardTitle help="Save more than one source. Extraction uses the provider and model saved in Settings.">Resume text sources</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-6">
           <SourceForm action={createCareerSource} />
@@ -98,10 +94,7 @@ function Workspace({ workspace }: { workspace: CareerWorkspace }) {
       </Card>
       <Card id="suggestions">
         <CardHeader>
-          <CardTitle>Suggestions</CardTitle>
-          <CardDescription>
-            Accepting one suggestion verifies only that item. Rejected items stay rejected. Facts saved from a fit analysis start here as suggested.
-          </CardDescription>
+          <CardTitle help="Accepting one suggestion verifies only that item. Rejected items stay rejected. Facts saved from a fit analysis start here as suggested.">Suggestions</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3">
           {suggestedFacts.map((fact) => (
@@ -134,8 +127,7 @@ function Workspace({ workspace }: { workspace: CareerWorkspace }) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Verified facts</CardTitle>
-          <CardDescription>Verified records stay unchanged until you supersede them.</CardDescription>
+          <CardTitle help="Verified records stay unchanged until you supersede them.">Verified facts</CardTitle>
         </CardHeader>
         <CardContent>
           <FactList facts={workspace.facts} sources={workspace.sources} supersede={supersedeCareerFact} />
@@ -143,8 +135,7 @@ function Workspace({ workspace }: { workspace: CareerWorkspace }) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Add a verified fact</CardTitle>
-          <CardDescription>Manual entries are verified because you typed them.</CardDescription>
+          <CardTitle help="Manual entries are verified because you typed them.">Add a verified fact</CardTitle>
         </CardHeader>
         <CardContent>
           <ManualFactForm action={addManualFact} />

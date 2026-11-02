@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import { DeleteRecordButton } from "@/components/records/delete-record-button"
 import { DetailList, PageHeader, RecordState } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
+import { MoreActions } from "@/components/ui/more-actions"
 import { deleteCompany, deleteApplication } from "@/lib/records/actions"
 import {
   APPLICATION_STATUS_LABELS,
@@ -74,14 +75,19 @@ export default async function CompanyDetailPage({
             <Button nativeButton={false} render={<Link href={`/applications/new?company=${company.id}`} />}>
               Add application
             </Button>
+          </div>
+        }
+        menu={
+          <MoreActions>
             <DeleteRecordButton
+              asMenuItem
               action={deleteCompany}
               id={company.id}
               label="Delete company"
               title={`Delete ${company.name}?`}
               description={companyDeletionWarning(company.applicationCount)}
             />
-          </div>
+          </MoreActions>
         }
       />
       <DetailList

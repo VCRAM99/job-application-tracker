@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import { DeleteRecordButton } from "@/components/records/delete-record-button"
 import { DetailList, PageHeader, RecordState } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
+import { MoreActions } from "@/components/ui/more-actions"
 import { TASK_PRIORITY_LABELS, TASK_STATUS_LABELS } from "@/lib/records/constants"
 import { todayDate } from "@/lib/records/logic"
 import { deleteTask, setTaskCompletion } from "@/lib/records/tracker-actions"
@@ -42,14 +43,19 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
               <Button type="submit" variant="outline">{task.status === "done" ? "Mark incomplete" : "Mark complete"}</Button>
             </form>
             <Button variant="outline" nativeButton={false} render={<Link href={`/tasks/${task.id}/edit`} />}>Edit</Button>
+          </div>
+        }
+        menu={
+          <MoreActions>
             <DeleteRecordButton
+              asMenuItem
               action={deleteTask}
               id={task.id}
               label="Delete task"
               title={`Delete ${task.title}?`}
               description="This removes the task. Linked companies and applications stay."
             />
-          </div>
+          </MoreActions>
         }
       />
       <DetailList

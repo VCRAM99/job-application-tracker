@@ -8,6 +8,7 @@ import { DeleteRecordButton } from "@/components/records/delete-record-button"
 import { DetailList, PageHeader, RecordState } from "@/components/records/fields"
 import { SectionSkeleton } from "@/components/shell/section-skeleton"
 import { Button } from "@/components/ui/button"
+import { MoreActions } from "@/components/ui/more-actions"
 import { careerCoachEnabled } from "@/lib/coach/flags"
 import { OUTREACH_LABELS, RELATIONSHIP_LABELS } from "@/lib/records/constants"
 import { deleteContact } from "@/lib/records/tracker-actions"
@@ -48,14 +49,19 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
               <Button nativeButton={false} render={<Link href={`/drafts/new?contact=${contact.id}`} />}>Draft outreach</Button>
             ) : null}
             <Button variant="outline" nativeButton={false} render={<Link href={`/networking/${contact.id}/edit`} />}>Edit</Button>
+          </div>
+        }
+        menu={
+          <MoreActions>
             <DeleteRecordButton
+              asMenuItem
               action={deleteContact}
               id={contact.id}
               label="Delete contact"
               title={`Delete ${contact.name}?`}
               description="This removes the contact. Linked companies and applications stay."
             />
-          </div>
+          </MoreActions>
         }
       />
       <DetailList
