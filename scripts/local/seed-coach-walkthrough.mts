@@ -10,7 +10,9 @@
  *
  * Refuses any API_URL other than http://127.0.0.1:54321. Reads the test user
  * and AI_CREDENTIALS_KEY from .env.development.local and GEMINI_API_KEY from
- * .env.local; it never prints either key or the password.
+ * .env.local; it never prints either key or the password. After a local
+ * `supabase db reset`, a database owner must also restore the local
+ * ai_accounting_gate secret (see docs/ai.md) before AI calls work.
  */
 import { readFileSync } from "node:fs"
 import path from "node:path"

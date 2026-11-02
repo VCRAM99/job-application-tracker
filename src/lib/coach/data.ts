@@ -172,7 +172,8 @@ export async function questionSetForPreparation(preparationId: string): Promise<
     .from("interview_question_sets")
     .select("id, application_id")
     .eq("user_id", user.id)
-    .contains("questions", [{ preparationItemId: preparationId }])
+    // A JSON string: supabase-js would send an array as a Postgres array literal, which jsonb containment rejects.
+    .contains("questions", JSON.stringify([{ preparationItemId: preparationId }]))
     .limit(1)
     .maybeSingle()
   return result.data ? { setId: String(result.data.id), applicationId: result.data.application_id ? String(result.data.application_id) : null } : null

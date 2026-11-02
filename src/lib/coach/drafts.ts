@@ -104,7 +104,9 @@ export function draftSystemPrompt(context: Pick<DraftContext, "kind" | "format" 
     "Use only the verified facts for anything about the candidate. Never add numbers, employers, titles, dates, degrees, certifications, or skills that the cited facts do not state.",
     "Do not claim the job title as the candidate's own. Do not invent shared history, meetings, or availability.",
     "Avoid ranking words such as first, top, record, or largest unless a cited fact uses them.",
-    "Do not sign with a name; end with a short sign-off such as 'Best,' only.",
+    context.kind === "application_answer"
+      ? "Write the answer itself: no greeting, no sign-off, no name."
+      : "Do not sign with a name; end with a short sign-off such as 'Best,' only.",
     context.format === "email" ? "Write a short subject line." : "Leave subject empty.",
     `Stay under ${limit} characters in total.`,
   ].join(" ")

@@ -97,9 +97,11 @@ const INSTRUCTION_LIKE =
 /** A brief is about the company. A claim or quote about the reader, the candidate, or the writer is dropped. */
 const ABOUT_A_PERSON = /\b(user|candidate|applicant|job seeker|you|your|yours|i|me|my|i'm|i've)\b/i
 
-function sentenceAround(text: string, start: number, end: number): string {
+export function sentenceAround(text: string, start: number, end: number): string {
   const before = text.slice(0, start)
   const from = Math.max(before.lastIndexOf(". "), before.lastIndexOf("! "), before.lastIndexOf("? "), -1) + 1
+  // A quote that already ends its sentence must not pull in the next one.
+  if (/[.!?]\s*$/.test(text.slice(start, end))) return text.slice(from, end)
   const rest = text.slice(end)
   const stop = rest.search(/[.!?](\s|$)/)
   return text.slice(from, stop < 0 ? text.length : end + stop + 1)
@@ -119,7 +121,7 @@ export function stripSourceRefs(text: string): string {
  * source, the quote's sentence is not an instruction, and the claim adds no
  * number, name, title, date, or credential its quote lacks.
  */
-export function validateClaims(raw: RawClaim[], sources: ResearchSource[]): { claims: ResearchClaim[]; dropped: CountMap } {
+export function validateClaims(raw: RawClaim[], sources: ResearchSource[], company: string | null = null): { claims: ResearchClaim[]; dropped: CountMap } {
   const { counts, add } = counter()
   const byId = new Map(sources.map((source) => [source.id, source]))
   const kept: ResearchClaim[] = []
@@ -148,7 +150,10 @@ export function validateClaims(raw: RawClaim[], sources: ResearchSource[]): { cl
       add("length")
       continue
     }
-    const reason = splitSentences(text).map((sentence) => checkSentence(sentence, { evidence: [grounded.quote] })).find(Boolean)
+    // Numbers, titles, dates, and credentials must be in the quote. Names may also come from the same
+    // source or the company name, so "It serves 400 clinics" can be restated as "Northwind serves 400 clinics".
+    const policy = { evidence: [grounded.quote], context: [source.text, company ?? ""].filter(Boolean) }
+    const reason = splitSentences(text).map((sentence) => checkSentence(sentence, policy)).find(Boolean)
     if (reason) {
       add(reason)
       continue

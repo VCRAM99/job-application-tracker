@@ -273,7 +273,7 @@ export function AnswerForm({ applicationId, mode, nonce }: { applicationId: stri
 }
 
 function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<"idle" | "copied" | "failed">("idle")
   return (
     <Button
       type="button"
@@ -282,14 +282,15 @@ function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) 
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(text)
-          setCopied(true)
-          setTimeout(() => setCopied(false), 1500)
+          setCopied("copied")
         } catch {
-          setCopied(false)
+          // The browser can refuse clipboard access; say so instead of failing silently.
+          setCopied("failed")
         }
+        setTimeout(() => setCopied("idle"), 2000)
       }}
     >
-      {copied ? "Copied" : label}
+      {copied === "copied" ? "Copied" : copied === "failed" ? "Copy blocked: select the text" : label}
     </Button>
   )
 }

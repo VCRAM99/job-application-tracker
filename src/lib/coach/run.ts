@@ -159,7 +159,7 @@ export function generateBrief(
     schemaName: "research_brief",
     jsonSchema: RESEARCH_JSON_SCHEMA,
     schema: researchOutputSchema as never,
-    persist: (raw) => base.persist(validateClaims(raw.claims, base.sources)),
+    persist: (raw) => base.persist(validateClaims(raw.claims, base.sources, base.company)),
   })
 }
 

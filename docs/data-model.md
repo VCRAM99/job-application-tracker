@@ -135,7 +135,7 @@ Both tables are owner-only for select, insert, update, and delete. `anon` has no
 
 From `20261103120000_career_coach.sql`. See [career-coach.md](career-coach.md).
 
-`applications.status_changed_at timestamptz` (nullable) is set by the `applications_40_status_changed_at` trigger on insert and whenever `status` changes. A client value is ignored. Rows from before this migration keep null.
+`applications.status_changed_at timestamptz` (nullable) is set by the `applications_40_status_changed_at` trigger whenever an existing row's `status` changes. Inserts, including CSV imports, leave it null, so an imported row does not look like a fresh change. A client value is ignored. Rows from before this migration keep null.
 
 - `research_briefs`: `label`, `sources` (1–6 `{id, kind, label, text, sha256}`), `claims` (up to 40 `{id, topic, text, sourceId, quote, start, end}`), `dropped` counts, and the prompt, schema, provider, model, and mode. Links: `company_id` and `application_id` (composite to the user's rows, `on delete set null (column)`), `posting_id` → `job_postings`, `on delete set null`.
 - `interview_question_sets`: `label`, `questions` (up to 20 `{id, text, kind, requirementIds, rationale, factIds, preparationItemId}`), `dropped`, versions. Links: `application_id` (composite), `analysis_id` → `job_analyses`, `on delete set null`.
@@ -146,7 +146,7 @@ From `20261103120000_career_coach.sql`. See [career-coach.md](career-coach.md).
 
 `guard_coach_row` (`security invoker`) runs before insert and update on all six. Its trigger arguments name the row's link columns. It lets a foreign key clear links with no session when nothing else changes. Otherwise it requires the owner's session, keeps `user_id` fixed, and rejects a new or changed link to a row the caller does not own (or a posting the caller cannot read).
 
-`mark_coach_draft_sent(p_draft_id, p_local_date)` and `create_follow_up_task(p_key, p_title, p_description, p_due, p_application_id)` are `security invoker` with an empty `search_path`, and only `authenticated` can execute them. The first marks the caller's own draft sent and updates only the caller's linked contact. The second locks the caller's suggestion state row and creates at most one live task per key.
+`mark_coach_draft_sent(p_draft_id, p_local_date)`, `create_follow_up_task(p_key, p_title, p_description, p_due, p_application_id)`, and `add_question_to_preparation(p_set_id, p_question_id, p_title, p_category, p_notes)` are `security invoker` with an empty `search_path`, and only `authenticated` can execute them. The first marks the caller's own draft sent and updates only the caller's linked contact. The second locks the caller's suggestion state row and creates at most one live task per key. The third locks the caller's question set and creates at most one Preparation item per question.
 
 All six tables are owner-only for select, insert, update, and delete. `anon` has no grants.
 

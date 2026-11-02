@@ -23,7 +23,7 @@ There is no chat page.
 
 ## Features
 
-**Interview questions** (`/interview/new?analysis=…`, `/interview/[id]`). The model sees the analysis requirements (with ids) and the verified facts. It returns technical and behavioral questions, each tagged with requirement ids. The server drops a question whose tags are all unknown, keeps at most 8 technical and 6 behavioral, drops repeats, and runs the shared checks with the requirement text, cited facts, and the job's title and company as sources. *Add to prep* creates one `preparation_items` row (behavioral → `behavioral`; technical → `system_design`, `coding`, or `other` by keyword) and records its id on the question, so a second click does not duplicate it.
+**Interview questions** (`/interview/new?analysis=…`, `/interview/[id]`). The model sees the analysis requirements (with ids) and the verified facts. It returns technical and behavioral questions, each tagged with requirement ids. The server drops a question whose tags are all unknown, keeps at most 8 technical and 6 behavioral, drops repeats, and runs the shared checks with the requirement text, cited facts, and the job's title and company as sources. *Add to prep* creates one `preparation_items` row (behavioral → `behavioral`; technical → `system_design`, `coding`, or `other` by keyword) and records its id on the question in one locked database call (`add_question_to_preparation`), so a double click does not duplicate it.
 
 **Story bank** (`/interview/stories`). One STAR outline per competency: ownership, conflict, failure, leadership, ambiguity, impact. Each outline must cite at least one verified employment, accomplishment, or project fact, and every sentence must pass the shared checks against the cited facts alone. A rebuild replaces the bank; if nothing passes, the old bank stays. A story whose cited fact is no longer verified shows "Facts changed".
 
@@ -59,10 +59,13 @@ There is no chat page.
 
 - Numbers, years, months, and degree or certification words must appear in evidence. The job description never supplies them, so "5+ years" or "PhD preferred" in a JD cannot become a claim about the user.
 - Title words (senior, staff, lead, director, and the rest of M4's list) must appear in evidence, unless they are inside the job or contact title phrase used as the role ("the Staff Platform Engineer role", a subject line), and not claimed as the user's own ("I am a…", "as a…").
-- Names (capitalized words, acronyms, known employers and technologies) may come from evidence or context, with two exceptions. A name only found in context cannot follow an employment cue ("worked at", "while at", "I work at", "At X, I…"). A known technology or employer from context cannot appear in a sentence about the user.
-- Interview questions describe the job, so for them the requirement text counts as evidence.
+- Role nouns (engineer, developer, scientist, analyst, and similar) follow the title rule in sentences about the user, and education words (graduate, alum, honors) follow the credential rule.
+- Names (capitalized words, acronyms, known employers and technologies) may come from evidence or context, with exceptions. A name only found in context cannot follow an employment cue ("worked at", "while at", "I work at", "At X, I…", "alum") or "as a". A known technology or employer from context cannot appear in a sentence about the user. In a sentence about the user, any word after an employment cue and "at" or "for" is an employer, whatever its case, and must be in evidence.
+- "leading", "first", and "top" are ordinary words in "leading the migration" or "at first", and rank claims in "the leading", "ranked first", "first in", or "top-rated".
+- Interview questions describe the job, so for them the requirement text counts as evidence, except in a clause that presumes something about the candidate ("your …", "you led …", "since you …"), which may use only the cited facts.
+- In coaching notes, "you" and "your" are the user.
 
-Drafts are validated per sentence, so one bad sentence is dropped rather than the whole draft. Company claims count as evidence only in sentences that are not about the user. A failing subject line falls back to the job title. Every drop is counted by reason and shown as "N dropped" with the reasons in a tooltip.
+Drafts are validated per sentence, so one bad sentence is dropped rather than the whole draft. A cited company claim counts as evidence only in a sentence that names the company and is about neither the user nor the reader. A failing subject line falls back to the job title. Every drop is counted by reason and shown as "N dropped" with the reasons in a tooltip.
 
 ## Research-source rule
 
@@ -71,8 +74,9 @@ A research claim is kept only when all of these hold:
 1. Its `sourceId` is one of the brief's sources.
 2. Its quote is found in that source by `groundQuote`.
 3. The sentence of the source around the quote does not read as an instruction ("ignore previous", "system:", "you are now", "add a claim", and similar). This catches injected text in pasted pages and job descriptions even though the user supplied it.
-4. The claim passes `checkSentence` with the quote as its only evidence, so it cannot add a number, name, title, date, or credential the quote lacks.
-5. It is not a repeat and the brief has fewer than 25 claims.
+4. The claim is about the company: a claim mentioning the user, candidate, applicant, "you", or "I" is dropped, and so is a claim whose quote mentions the user or candidate.
+5. The claim passes `checkSentence` with the quote as its evidence, so it cannot add a number, title, date, or credential the quote lacks. Names may also come from the same source or the company name, so "It serves 400 clinics" can be restated as "Northwind serves 400 clinics". Source references such as "(S1)" are removed from the claim text first.
+6. It is not a repeat and the brief has fewer than 25 claims.
 
 The page shows each claim with its source id and quote, and every source with its text and hash.
 
@@ -90,7 +94,7 @@ Deterministic, in `src/lib/coach/follow-ups.ts`, computed in the user's saved ti
 | `thank_you` | Status is Recruiter Screen, Technical Interview, or Final Interview, and the stage began 0–72 hours ago. | 24 hours after the stage began |
 | `contact_follow_up` | A contact's next follow-up date is today or earlier. | That date |
 
-The last status change comes from the new `applications.status_changed_at` column, which a trigger sets on insert and on every status change and which clients cannot set. Rows from before this migration have it null: the Applied rule uses the applied date, and the thank-you rule uses `updated_at`.
+The last status change comes from the new `applications.status_changed_at` column, which a trigger sets when an existing application's status changes and which clients cannot set. It is null until then: for rows from before this migration, new rows, and imported rows. With null, the Applied rule uses the applied date, and the thank-you rule does not fire, because there is no observed time the interview stage began. An application created directly in an interview stage gets its thank-you suggestion only after its next status change.
 
 *Create task* calls `create_follow_up_task` with the title, due date, and application the server recomputed for that suggestion key, not values from the form. The function records the task against the key, and a repeat click returns the same task. If that task is deleted, the suggestion comes back. *Dismiss* hides a suggestion; a new anchor (a later status change or a new follow-up date) produces a new key. *Draft message* opens the draft form with the kind (follow-up or thank-you) and links prefilled.
 
@@ -126,3 +130,4 @@ Runs every coach call (questions, story bank, practice, research, and each draft
 - Contact notes are sent to the model but never count as evidence or context, so a note like "met at the Go meetup" cannot appear in a draft.
 - Fact ids are checked in code against the caller's verified facts; the database stores them as JSON without a foreign key, so a deleted fact leaves a stale id (shown as "Fact no longer verified").
 - Practice is typed only. There is no audio.
+- A story whose cited fact is no longer verified is hidden behind a "Facts changed" prompt to rebuild.
