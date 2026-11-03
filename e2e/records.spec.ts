@@ -28,6 +28,8 @@ test("companies: create, edit, delete", async ({ page }) => {
 
   await open(page, "/companies")
   await page.getByRole("link", { name: "Acme Robotics" }).click()
+  // Delete lives in the ⋯ menu; it still opens the same confirmation dialog.
+  await page.getByRole("button", { name: "More actions" }).click()
   await page.getByRole("button", { name: "Delete company" }).click()
   await page.getByRole("dialog").getByRole("button", { name: "Delete company" }).click()
   await page.waitForURL("**/companies")
@@ -44,6 +46,12 @@ test("applications: create, edit, change status, delete", async ({ page }) => {
   await page.getByLabel("Applied date").fill("2026-10-20")
   await page.getByRole("button", { name: "Create application" }).click()
   await expect(page.getByRole("heading", { level: 1, name: "Platform Engineer" })).toBeVisible()
+
+  // Secondary actions moved into the ⋯ menu stay reachable.
+  await page.getByRole("button", { name: "More actions" }).click()
+  await expect(page.getByRole("link", { name: "Analyze fit" })).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(page.getByRole("link", { name: "Analyze fit" })).toBeHidden()
 
   await page.getByRole("button", { name: "Edit" }).click()
   await page.waitForURL("**/edit")
@@ -64,6 +72,8 @@ test("applications: create, edit, change status, delete", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Platform Engineer" })).toBeVisible()
 
   await page.getByRole("link", { name: "Platform Engineer" }).click()
+  // Delete lives in the ⋯ menu; it still opens the same confirmation dialog.
+  await page.getByRole("button", { name: "More actions" }).click()
   await page.getByRole("button", { name: "Delete application" }).click()
   await page.getByRole("dialog").getByRole("button", { name: "Delete application" }).click()
   await page.waitForURL("**/applications")

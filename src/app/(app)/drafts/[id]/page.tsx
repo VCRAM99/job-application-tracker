@@ -39,7 +39,7 @@ export default async function DraftPage({ params }: { params: Promise<{ id: stri
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <PageHeader
         title={DRAFT_KIND_LABELS[draft.kind]}
-        description={[person?.name, FORMAT_LABELS[draft.format]].filter(Boolean).join(" · ")}
+        subtitle={[person?.name, FORMAT_LABELS[draft.format]].filter(Boolean).join(" · ")}
         action={<Link href={back} className="text-sm underline-offset-4 hover:underline">Back</Link>}
       />
       <div className="flex flex-wrap items-center gap-3">

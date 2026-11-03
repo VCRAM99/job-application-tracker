@@ -23,7 +23,7 @@ export default async function StoryBankPage() {
   const verified = facts.ok ? facts.facts : []
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
-      <PageHeader title="Story bank" description="STAR outlines from your verified facts, one per competency." />
+      <PageHeader title="Story bank" help="STAR outlines from your verified facts, one per competency." />
       <BuildStoriesForm mode={mode.mode} nonce={crypto.randomUUID()} rebuild={stories.length > 0} />
       {stories.length === 0 ? <p className="text-sm text-muted-foreground">No stories yet.</p> : <DroppedNote counts={stories[0]!.dropped} label="dropped in the last build" />}
       <ul className="grid gap-4 md:grid-cols-2">

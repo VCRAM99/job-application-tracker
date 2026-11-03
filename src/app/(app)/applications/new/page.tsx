@@ -95,7 +95,7 @@ export default async function NewApplicationPage({
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <PageHeader
         title={trackedId ? "Add recommended job" : "Add application"}
-        description={
+        subtitle={
           trackedId
             ? "Review the prefilled fields, then save. This does not submit an application to the employer."
             : "Choose a company you already track, or create one with the application."

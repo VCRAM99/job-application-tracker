@@ -41,7 +41,7 @@ export default async function ApplicationsPage({
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <PageHeader
         title="Applications"
-        description="Track each role from Saved through Offer, including the company it belongs to."
+        help="Track each role from Saved through Offer, including the company it belongs to."
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" nativeButton={false} render={<Link href="/applications/import" />}>Import / export</Button>

@@ -75,7 +75,7 @@ export default async function JobsPage({
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <PageHeader
         title="Recommended jobs"
-        description="Search the shared catalog with your preferences. Match estimates use verified career facts only."
+        help="Search the shared catalog with your preferences. Match estimates use verified career facts only."
         action={
           <Button variant="outline" nativeButton={false} render={<Link href="/jobs/alerts" />}>
             Job alerts

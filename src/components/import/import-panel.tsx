@@ -3,6 +3,7 @@
 import { startTransition, useActionState, useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import { SectionHeader } from "@/components/records/fields"
 import {
   APPLICATION_STATUSES,
   COMPANY_SIZES,
@@ -26,11 +27,10 @@ export function ImportPanel({ kind }: { kind: ImportKind }) {
   return (
     <div className="flex flex-col gap-6">
       <section className="surface p-4">
-        <h2 className="text-sm font-medium">Template</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Download a blank {title.toLowerCase()} template. The header names must match exactly.
-          Column order can change. Dates use YYYY-MM-DD. Leave optional cells blank.
-        </p>
+        <SectionHeader
+          title="Template"
+          help={`Download a blank ${title.toLowerCase()} template. The header names must match exactly. Column order can change. Dates use YYYY-MM-DD. Leave optional cells blank.`}
+        />
         <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="outline" nativeButton={false} render={<a href={`/export/templates/${kind}?format=csv`} />}>
             Download CSV
@@ -176,11 +176,10 @@ function AcceptedValues({ kind }: { kind: ImportKind }) {
       ]
   return (
     <section className="surface p-4">
-      <h2 className="text-sm font-medium">Accepted values</h2>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Empty optional cells use the default. Any other value is an error, and one error blocks the whole file.
-        Existing records are skipped and are not overwritten.
-      </p>
+      <SectionHeader
+        title="Accepted values"
+        help="Empty optional cells use the default. Any other value is an error, and one error blocks the whole file. Existing records are skipped and are not overwritten."
+      />
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[560px] text-left text-sm">
           <thead className="border-b text-xs tracking-wide text-muted-foreground uppercase">

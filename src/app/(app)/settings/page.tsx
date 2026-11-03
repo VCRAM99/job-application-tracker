@@ -4,11 +4,11 @@ import { ChangePasswordForm } from "@/components/auth/change-password-form"
 import { AiSettingsSection } from "@/components/settings/ai-settings"
 import { DeveloperNote } from "@/components/settings/developer-note"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { PageHeader } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -26,16 +26,10 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-          Account, password, appearance, and optional career AI for this signed-in session.
-        </p>
-      </header>
+      <PageHeader title="Settings" help="Account, password, appearance, and optional career AI for this signed-in session." />
       <Card>
         <CardHeader>
-          <CardTitle>Account</CardTitle>
-          <CardDescription>This session is stored in a secure cookie.</CardDescription>
+          <CardTitle help="This session is stored in a secure cookie.">Account</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <dl className="space-y-3 text-sm">
@@ -53,11 +47,7 @@ export default async function SettingsPage() {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Password</CardTitle>
-          <CardDescription>
-            Changing the password for a signed-in account requires the current
-            password. Email recovery uses a separate link.
-          </CardDescription>
+          <CardTitle help="Changing the password for a signed-in account requires the current password. Email recovery uses a separate link.">Password</CardTitle>
         </CardHeader>
         <CardContent>
           <ChangePasswordForm updatePassword={changePassword} />
@@ -65,8 +55,7 @@ export default async function SettingsPage() {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Appearance</CardTitle>
-          <CardDescription>The interface starts in dark mode.</CardDescription>
+          <CardTitle help="The interface starts in dark mode.">Appearance</CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">Switch between dark and light.</p>
@@ -75,10 +64,7 @@ export default async function SettingsPage() {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Health Tracking (Beta)</CardTitle>
-          <CardDescription>
-            Optional personal health notes on Daily Tasks. Off by default. Turning this off hides the section and keeps saved entries private to this account.
-          </CardDescription>
+          <CardTitle help="Optional personal health notes on Daily Tasks. Off by default. Turning this off hides the section and keeps saved entries private to this account.">Health Tracking (Beta)</CardTitle>
         </CardHeader>
         <CardContent>
           {preference.ok ? (
@@ -98,8 +84,7 @@ export default async function SettingsPage() {
       <AiSettingsSection />
       <Card>
         <CardHeader>
-          <CardTitle>More about the developer</CardTitle>
-          <CardDescription>The person who built this workspace.</CardDescription>
+          <CardTitle help="The person who built this workspace.">More about the developer</CardTitle>
         </CardHeader>
         <CardContent>
           <DeveloperNote />

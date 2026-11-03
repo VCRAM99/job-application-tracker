@@ -10,7 +10,7 @@ export default function ImportApplicationsPage() {
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
       <PageHeader
         title="Import and export applications"
-        description="Upload the official applications template. A company that is not already yours is created. Matching company, job title, and job URL are skipped and never overwritten."
+        help="Upload the official applications template. A company that is not already yours is created. Matching company, job title, and job URL are skipped and never overwritten."
       />
       <ImportPanel kind="applications" />
     </div>

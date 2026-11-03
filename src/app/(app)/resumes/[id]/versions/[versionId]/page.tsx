@@ -48,7 +48,7 @@ export default async function VersionPage({ params }: { params: Promise<{ id: st
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <PageHeader
         title={version.label}
-        description={`${version.provider} · ${version.model} · ${version.mode === "managed" ? "Managed" : "Your key"}`}
+        subtitle={`${version.provider} · ${version.model} · ${version.mode === "managed" ? "Managed" : "Your key"}`}
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" nativeButton={false} render={<a href={`/api/resumes/versions/${version.id}/export?format=docx`} />}>

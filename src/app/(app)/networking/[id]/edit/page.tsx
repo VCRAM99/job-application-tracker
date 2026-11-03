@@ -30,7 +30,7 @@ export default async function EditContactPage({ params }: { params: Promise<{ id
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <PageHeader title={`Edit ${record.name}`} description="Update outreach, follow-up, and the company or application link." />
+      <PageHeader title={`Edit ${record.name}`} help="Update outreach, follow-up, and the company or application link." />
       <ContactForm
         action={updateContact}
         id={record.id}

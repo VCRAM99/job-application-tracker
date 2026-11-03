@@ -4,6 +4,7 @@ import { cn } from "cn"
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import { moreActionsItemClass, useMoreActionsTrigger } from "@/components/ui/more-actions"
 import {
   Dialog,
   DialogClose,
@@ -24,6 +25,7 @@ export function DeleteRecordButton({
   returnTo,
   fields,
   className,
+  asMenuItem = false,
 }: {
   action: (formData: FormData) => Promise<void>
   id: string
@@ -33,13 +35,27 @@ export function DeleteRecordButton({
   returnTo?: string
   fields?: Record<string, string>
   className?: string
+  /** Render the trigger as an item in a ⋯ menu. The confirmation dialog is the same. */
+  asMenuItem?: boolean
 }) {
   const [pending, setPending] = useState(false)
+  // From a ⋯ menu, the item is hidden once chosen, so focus goes back to the ⋯ button on close.
+  const menuTrigger = useMoreActionsTrigger()
 
   return (
     <Dialog>
-      <DialogTrigger render={<Button variant="destructive" size="sm" className={cn("pressable", className)} />}>{label}</DialogTrigger>
-      <DialogContent>
+      <DialogTrigger
+        render={
+          asMenuItem ? (
+            <button type="button" className={cn(moreActionsItemClass, "text-destructive", className)} />
+          ) : (
+            <Button variant="destructive" size="sm" className={cn("pressable", className)} />
+          )
+        }
+      >
+        {label}
+      </DialogTrigger>
+      <DialogContent finalFocus={asMenuItem && menuTrigger ? menuTrigger : undefined}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

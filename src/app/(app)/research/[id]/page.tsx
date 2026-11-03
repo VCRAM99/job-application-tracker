@@ -26,7 +26,7 @@ export default async function ResearchBriefPage({ params }: { params: Promise<{ 
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
       <PageHeader
         title={brief.label}
-        description="From your sources only. Each claim quotes one."
+        subtitle="From your sources only. Each claim quotes one."
         action={
           <div className="flex flex-wrap items-center gap-2">
             {brief.applicationId ? (

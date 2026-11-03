@@ -13,7 +13,8 @@
     "test:e2e": "tsx e2e/support/serve.ts build && playwright test",
     "test:e2e:nobuild": "playwright test",
     "perf:seed": "tsx --conditions=react-server scripts/perf/seed-dataset.ts",
-    "perf:measure": "tsx --conditions=react-server scripts/perf/measure.ts"
+    "perf:measure": "tsx --conditions=react-server scripts/perf/measure.ts",
+    "ui:screenshots": "tsx --conditions=react-server scripts/ui/screenshots.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.137.0",

@@ -46,11 +46,7 @@ export async function AiSettingsSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>AI</CardTitle>
-        <CardDescription>
-          Choose managed AI or your own key. A saved key stays unverified until a later explicit check.
-          Saving a key does not connect a provider.
-        </CardDescription>
+        <CardTitle help="Choose managed AI or your own key. A saved key stays unverified until a later explicit check. Saving a key does not connect a provider.">AI</CardTitle>
       </CardHeader>
       <CardContent>
         <AiSettingsForm

@@ -33,7 +33,7 @@ export default async function CompaniesPage({
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <PageHeader
         title="Companies"
-        description="Research targets, priority, and the applications tied to each company."
+        help="Research targets, priority, and the applications tied to each company."
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" nativeButton={false} render={<Link href="/companies/import" />}>Import / export</Button>

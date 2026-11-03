@@ -10,7 +10,7 @@ export default function ImportCompaniesPage() {
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
       <PageHeader
         title="Import and export companies"
-        description="Upload the official companies template. Duplicate names, ignoring case and extra spaces, are skipped. Invalid rows cancel the whole import."
+        help="Upload the official companies template. Duplicate names, ignoring case and extra spaces, are skipped. Invalid rows cancel the whole import."
       />
       <ImportPanel kind="companies" />
     </div>

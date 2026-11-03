@@ -66,7 +66,7 @@ export default async function QuestionSetPage({ params }: { params: Promise<{ id
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
       <PageHeader
         title={set.label}
-        description={`${set.questions.length} questions`}
+        subtitle={`${set.questions.length} questions`}
         action={
           <div className="flex flex-wrap items-center gap-2">
             {set.applicationId ? (

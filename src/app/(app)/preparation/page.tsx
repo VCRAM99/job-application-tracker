@@ -24,7 +24,7 @@ export default async function PreparationPage({
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <PageHeader
         title="Preparation"
-        description="Certifications and interview practice you choose. This list is not a fixed catalog."
+        help="Certifications and interview practice you choose. This list is not a fixed catalog."
         action={
           <div className="flex flex-wrap gap-2">
             {careerCoachEnabled() ? (

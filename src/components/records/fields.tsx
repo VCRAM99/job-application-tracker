@@ -1,28 +1,74 @@
 import type { ReactNode } from "react"
 
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { HelpTip } from "@/components/ui/help-tip"
 import { Label } from "@/components/ui/label"
 import { cn } from "cn"
 import type { ApplicationStatus, PriorityTier } from "@/lib/records/constants"
 import type { RecordFormState } from "@/lib/records/form-state"
 
+/**
+ * Page title row: the title with an optional HelpTip, an optional visible subtitle for
+ * context (company, counts, a must-see note), one primary action, and an optional ⋯ menu.
+ * Explanations go in `help`, never in a paragraph under the title.
+ */
 export function PageHeader({
   title,
-  description,
+  help,
+  subtitle,
   action,
+  menu,
 }: {
   title: string
-  description: string
+  help?: ReactNode
+  subtitle?: ReactNode
   action?: ReactNode
+  menu?: ReactNode
 }) {
   return (
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="min-w-0 space-y-1.5">
-        <h1 className="text-2xl font-semibold tracking-tight text-balance">{title}</h1>
-        <p className="max-w-2xl text-sm leading-6 text-pretty text-muted-foreground">{description}</p>
+    <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0 space-y-1">
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-balance">{title}</h1>
+          {help ? <HelpTip label={`About ${title}`}>{help}</HelpTip> : null}
+        </div>
+        {subtitle ? <p className="text-sm text-pretty text-muted-foreground">{subtitle}</p> : null}
+      </div>
+      {action || menu ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {action}
+          {menu}
+        </div>
+      ) : null}
+    </header>
+  )
+}
+
+/** Section title with an optional HelpTip and an optional action on the right. */
+export function SectionHeader({
+  id,
+  title,
+  help,
+  action,
+  level = 2,
+}: {
+  id?: string
+  title: string
+  help?: ReactNode
+  action?: ReactNode
+  level?: 2 | 3
+}) {
+  const Heading = level === 2 ? "h2" : "h3"
+  return (
+    <div className="flex min-h-8 items-center justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-2">
+        <Heading id={id} className="text-sm font-medium tracking-tight">
+          {title}
+        </Heading>
+        {help ? <HelpTip label={`About ${title.toLowerCase()}`}>{help}</HelpTip> : null}
       </div>
       {action}
-    </header>
+    </div>
   )
 }
 
@@ -63,7 +109,7 @@ export function NativeSelect({ className, ...props }: React.ComponentProps<"sele
   return (
     <select
       className={cn(
-        "h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30",
+        "h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30",
         className,
       )}
       {...props}
@@ -78,7 +124,7 @@ export function RecordState({
   tone = "empty",
 }: {
   title: string
-  description: string
+  description?: string
   action?: ReactNode
   tone?: "empty" | "error"
 }) {
@@ -88,7 +134,7 @@ export function RecordState({
       role={tone === "error" ? "alert" : "status"}
     >
       <h2 className="text-base font-medium">{title}</h2>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">{description}</p>
+      {description ? <p className="mt-1.5 max-w-xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   )

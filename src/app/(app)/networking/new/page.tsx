@@ -29,7 +29,7 @@ export default async function NewContactPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <PageHeader title="Add contact" description="Link this person to a company or application you already track, or leave both blank." />
+      <PageHeader title="Add contact" help="Link this person to a company or application you already track, or leave both blank." />
       <ContactForm
         action={createContact}
         values={emptyContactForm}

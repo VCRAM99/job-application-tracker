@@ -43,7 +43,7 @@ export default async function TailorPage({
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <PageHeader
         title="Tailor resume"
-        description={`${loaded.resume.label} → ${[record.title || "Untitled job", record.company].filter(Boolean).join(" · ")}`}
+        subtitle={`${loaded.resume.label} → ${[record.title || "Untitled job", record.company].filter(Boolean).join(" · ")}`}
       />
       <p className="text-sm text-muted-foreground">
         {record.requirements.length} requirements · edits cite your verified facts only
