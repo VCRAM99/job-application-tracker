@@ -56,7 +56,7 @@ This builds the app once (`e2e/support/serve.ts build`), then Playwright:
 | `flags-off.spec.ts` | off states for jobs, fit analysis, Resume Studio, and the coach pages; tracking pages still work and hide V2 entry points |
 | `mobile.spec.ts` | ten key pages on a Pixel 7 viewport with no horizontal scroll, and the mobile navigation |
 
-The resume test alone sets `bypassCSP`. The production CSP allows `https://*.supabase.co` only, so the browser's direct upload to local Storage would be blocked under `next start`. Every other test runs with the real policy.
+Every test, including the resume upload, runs with the real production CSP. Its connect-src names the configured Supabase origin (`http://127.0.0.1:54321` in the e2e build).
 
 ### Why e2e is a local gate, not a CI job
 

@@ -15,6 +15,7 @@ import {
 import { executeAnalysis } from "@/lib/analyze/execute"
 import { sha256 } from "@/lib/analyze/hash"
 import { mockStructuredResponse } from "@/lib/analyze/mock"
+import { checkAiRateLimit } from "@/lib/ai/rate-limit"
 import { settleDuplicateRun } from "@/lib/analyze/settle"
 import { validateJobDescription } from "@/lib/analyze/text"
 import { completeWithProvider } from "@/lib/ai/providers"
@@ -81,6 +82,10 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
     if (source.error || !source.data) return { ok: false, message: "That resume source is not available." }
     resume = { sourceId: source.data.id, text: source.data.body }
   }
+
+  // Cached results above are free; a new run counts toward the per-user AI limit.
+  const limited = await checkAiRateLimit(supabase, user.id)
+  if (!limited.ok) return { ok: false, message: AI_ERROR_MESSAGES.ai_rate_limited }
 
   const mock = jobAnalysisMockProvider()
   const allowance = managedAllowance()

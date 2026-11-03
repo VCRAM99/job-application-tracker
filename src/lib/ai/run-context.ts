@@ -4,6 +4,7 @@ import { accountingProof, accountingSecret } from "@/lib/ai/accounting"
 import { decryptSecret, parseKeyRing } from "@/lib/ai/crypto"
 import { managedAllowance, providerEnabled, readPlatformKey } from "@/lib/ai/flags"
 import { betaAllowedFor } from "@/lib/beta"
+import { checkAiRateLimit } from "@/lib/ai/rate-limit"
 import type { ReservationRecord } from "@/lib/ai/gateway"
 import { resolveExecutionMode } from "@/lib/ai/mode"
 import { AiRequestError, AI_ERROR_MESSAGES, isProvider, isStoredMode, type ProviderId, type StoredExecutionMode } from "@/lib/ai/types"
@@ -87,6 +88,8 @@ export async function prepareAiRun(
   if (!apiKey) return { ok: false, message: AI_ERROR_MESSAGES.missing_credentials }
   const secret = accountingSecret()
   if (!secret) return { ok: false, message: AI_ERROR_MESSAGES.accounting_unconfigured }
+  const limited = await checkAiRateLimit(supabase, userId)
+  if (!limited.ok) return { ok: false, message: AI_ERROR_MESSAGES.ai_rate_limited }
   return {
     ok: true,
     run: {

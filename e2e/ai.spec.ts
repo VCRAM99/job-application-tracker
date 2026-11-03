@@ -133,10 +133,8 @@ test("follow-up suggestion creates one task", async ({ page }) => {
 })
 
 test.describe("resume studio", () => {
-  // The production CSP allows https://*.supabase.co only, so the browser's direct
-  // upload to local Storage (http://127.0.0.1:54321) is blocked under `next start`.
-  // Only this test bypasses CSP; every other e2e test runs with the real policy.
-  test.use({ bypassCSP: true })
+  // Runs with the real CSP: connect-src names the configured Supabase origin, so the
+  // browser's direct upload to local Storage is allowed under `next start`.
 
 test("resume: upload, parse, tailor, export", async ({ page }, testInfo) => {
   const file = testInfo.outputPath("resume.docx")

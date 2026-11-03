@@ -11,6 +11,7 @@ import { resolveExecutionMode } from "@/lib/ai/mode"
 import { assertSupportedModel } from "@/lib/ai/models"
 import { EXTRACTION_SYSTEM_PROMPT, extractionUserMessage } from "@/lib/ai/prompt"
 import { completeWithProvider } from "@/lib/ai/providers"
+import { checkAiRateLimit } from "@/lib/ai/rate-limit"
 import { asReservation } from "@/lib/ai/run-context"
 import { AiRequestError, AI_ERROR_MESSAGES, isProvider, isStoredMode } from "@/lib/ai/types"
 import { done, fail, readRing, ready } from "@/lib/career/action-utils"
@@ -60,6 +61,8 @@ export async function extractCareerFacts(
 
   const allowance = managedAllowance()
   let apiKey: string | null = null
+  const limited = await checkAiRateLimit(context.supabase, context.user.id)
+  if (!limited.ok) return fail(AI_ERROR_MESSAGES.ai_rate_limited)
   try {
     apiKey =
       resolved.mode === "managed"

@@ -69,8 +69,6 @@ async function newContext(browser: Browser, theme: Theme, mobile: boolean, stora
     hasTouch: mobile,
     colorScheme: theme,
     storageState: storage,
-    // The production CSP blocks the browser's direct upload to local Storage under next start.
-    bypassCSP: true,
   })
   await context.addInitScript((value) => {
     try {
