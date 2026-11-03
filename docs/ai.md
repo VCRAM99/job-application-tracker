@@ -30,6 +30,8 @@ Model ids were checked against each provider's model page on 2026-11-02:
 
 **Anthropic.** Calls set `max_tokens` to 16,000 and `output_config.effort: "low"`. Thinking tokens count toward `max_tokens`, so long inputs no longer stop at `context_limit`.
 
+**Timeouts.** Every provider request times out after 60 seconds (`PROVIDER_TIMEOUT_MS`). Without that, the Gemini SDK waits indefinitely and the other SDKs wait up to 10 minutes. A timeout is a provider failure: the gateway retries it like other transient errors, then voids the reservation.
+
 A provider 404, or a "model not found" message, is reported as `model_unavailable` with a message that asks the user to pick another model. It is not retried.
 
 Execution modes:
