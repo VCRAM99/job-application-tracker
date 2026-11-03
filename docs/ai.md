@@ -10,17 +10,27 @@ Live provider calls are not part of the automated tests. Tests use fake clients 
 
 Server actions call `generateStructured`. That function checks the execution mode, model registry, and credentials before it reserves usage. A provider adapter then returns text plus normalized token counts. Zod validates the JSON. Only after that validation does the action store suggestions. Finalize runs after the suggestions are stored. A failed provider call voids the reservation.
 
-Supported cloud providers:
+Supported cloud providers (`src/lib/ai/models.ts`; the first entry is the default):
 
-| Provider | Adapter | Curated models |
-| --- | --- | --- |
-| OpenAI | Chat Completions JSON schema | `gpt-5.4-mini`, `gpt-5.4` |
-| Anthropic | Messages API JSON schema | `claude-sonnet-5`, `claude-haiku-5-5`, `claude-haiku-4-5` |
-| Google Gemini | `generateContent` JSON schema | `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-2.5-flash`, `gemini-2.5-pro` |
+| Provider | Adapter | Models offered | Legacy (kept for saved settings, not offered) | Status |
+| --- | --- | --- | --- | --- |
+| Google Gemini | `generateContent` JSON schema | `gemini-3.5-flash-lite` (default), `gemini-3.8-flash` | `gemini-2.5-flash`, `gemini-2.5-pro` | Live-verified |
+| OpenAI | Chat Completions JSON schema | `gpt-6-luna` (default), `gpt-6.1-terra` | `gpt-5.4-mini`, `gpt-5.4` | Mock-tested only, hidden unless enabled |
+| Anthropic | Messages API JSON schema | `claude-haiku-5-5` (default), `claude-sonnet-5-5`, `claude-sonnet-5` | `claude-haiku-4-5` | Mock-tested only, hidden unless enabled |
 
-The model list lives in `src/lib/ai/models.ts`. The first model for each provider is the default in AI settings. Prices are not stored. Unsupported model strings are rejected before a provider call. The client cannot choose an API endpoint.
+Model ids were checked against each provider's model page on 2026-11-02:
 
-Google no longer serves the Gemini 2.5 models to new users. They stay in the list for accounts that already use them. A provider 404, or a "model not found" message, is reported as `model_unavailable` with a message that asks the user to pick another model. It is not retried.
+- Google: aistudio.google.com/docs/models. 3.8 Flash and 3.5 Flash-Lite are stable; 2.5 Flash and 2.5 Pro are deprecated, closed to new users, and shut down on December 1, 2026.
+- Anthropic: platform.claude.com/docs/en/about-claude/models/overview. `claude-haiku-4-5` is an alias of a dated snapshot that retires no sooner than October 15, 2026.
+- OpenAI: developers.openai.com/api/docs/models. `gpt-6-luna` is listed as the most efficient model; the 5.4 ids could not be confirmed there.
+
+**Which model runs.** The model picked in AI settings is used by every feature (analysis, resume, coach, extraction). If nothing is picked, or the saved id is no longer in the registry, the provider default applies. `JOB_ANALYSIS_{OPENAI,ANTHROPIC,GOOGLE}_MODEL` remain operator overrides for analysis only. Unsupported model strings are rejected before a provider call. The client cannot choose an API endpoint. Prices are not stored.
+
+**Gemini overload fallback.** When `gemini-3.5-flash-lite` answers 503 or 529 (overloaded), the adapter waits briefly and retries once on `gemini-3.8-flash`. Every other failure (bad key, rate limit, unavailable model) is reported as is. Saved results record the model that actually answered; usage rows record the requested one.
+
+**Anthropic.** Calls set `max_tokens` to 16,000 and `output_config.effort: "low"`. Thinking tokens count toward `max_tokens`, so long inputs no longer stop at `context_limit`.
+
+A provider 404, or a "model not found" message, is reported as `model_unavailable` with a message that asks the user to pick another model. It is not retried.
 
 Execution modes:
 
@@ -29,6 +39,27 @@ Execution modes:
 - **Local desktop.** Reserved for a future Windows/macOS companion. `assertCloudExecution` rejects it. This milestone does not include Tauri, Ollama, device pairing, or a remote command channel.
 
 The gateway does not switch modes on its own. A request must match the mode saved in AI settings.
+
+## Beta access and providers
+
+- **`BETA_USER_IDS`** is a comma-separated list of user UUIDs. On Vercel it gates every V2 feature on the server: career AI, fit analysis, Resume Studio, the coach, and recommended jobs. Pages show the off state, actions refuse before they create a Supabase client, and `prepareAiRun` checks again before any provider call.
+  - Unset on Vercel means nobody gets access; unset locally means everyone.
+  - One malformed entry closes access for everyone.
+  - `JOB_RECOMMENDATIONS_ALLOWED_USER_IDS` still grants Jobs on its own, so the existing production allowlist keeps working (`src/lib/beta.ts`).
+- **`AI_PROVIDERS_ENABLED`** is a comma-separated list of `google`, `openai` and `anthropic`. On Vercel it defaults to `google`; locally every provider is on. A provider that is not listed is hidden in settings, refused when saved, and refused again by every run path and by `completeWithProvider`. Providers other than Google carry a "Beta — not live-verified" label.
+- **Managed AI** is offered only when `AI_MANAGED_ENABLED=true` with positive limits. Otherwise every mode picker hides it, and the settings action and the run paths refuse it.
+
+## Rate limits
+
+Each user may start 6 AI runs per minute and 80 per day, in every mode. The limits are counted from `ai_usage_events`, so no migration was needed (`src/lib/ai/rate-limit.ts`). Cached analyses and reused results are free. A run past the limit gets "You have reached the AI request limit for now." If the count cannot be read, the check fails open; the database caps (one open reservation, 200 rows a month) still apply.
+
+## Monitoring
+
+Sentry is loaded only when `SENTRY_DSN` is set (`src/instrumentation.ts`, `src/instrumentation-client.ts`). It reports errors only: tracing is off, and there are no breadcrumbs and no default PII.
+- `scrubEvent` keeps only the method and path of the request, and drops users, extras, spans and stack-frame source and variables.
+- It redacts emails, API keys, JWTs, bearer tokens and UUIDs in messages and tags.
+- Provider failures are reported once per run, tagged with code, provider and model only.
+- Browser events go through the `/monitoring` tunnel, so the CSP needs no Sentry host.
 
 ## Bring your own key
 
@@ -83,8 +114,10 @@ To exercise the UI locally, set `AI_FEATURES_ENABLED=true` in `.env.local`, gene
 
 ## Production and staging
 
-Production defaults:
+Production defaults (the activation steps, in order, are in [launch.md](launch.md)):
 
+- `BETA_USER_IDS` unset (nobody)
+- `AI_PROVIDERS_ENABLED` unset (Google only)
 - `AI_FEATURES_ENABLED` unset or `false`
 - `AI_MANAGED_ENABLED` unset or `false`
 - managed limits `0`
