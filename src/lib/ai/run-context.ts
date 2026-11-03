@@ -61,7 +61,7 @@ export async function prepareAiRun(
 ): Promise<{ ok: true; run: AiRun } | { ok: false; message: string }> {
   // Every AI action passes through here, so the beta list is enforced even if a caller forgot.
   if (!betaAllowedFor(userId)) return { ok: false, message: AI_ERROR_MESSAGES.features_disabled }
-  const settings = await supabase.from("ai_user_settings").select("execution_mode, provider").eq("user_id", userId).maybeSingle()
+  const settings = await supabase.from("ai_user_settings").select("execution_mode, provider, model").eq("user_id", userId).maybeSingle()
   if (settings.error || !settings.data) return { ok: false, message: AI_ERROR_MESSAGES.not_configured }
   const saved = isStoredMode(settings.data.execution_mode) ? settings.data.execution_mode : null
   const resolved = resolveExecutionMode(saved, requested)
@@ -71,7 +71,8 @@ export async function prepareAiRun(
   if (!providerEnabled(provider)) return { ok: false, message: AI_ERROR_MESSAGES.provider_disabled }
   let model: string
   try {
-    model = analysisModelFor(provider)
+    // The model chosen in Settings; feature defaults apply only when none is saved.
+    model = analysisModelFor(provider, process.env, settings.data.model)
   } catch {
     return { ok: false, message: "The configured fast model is not available." }
   }

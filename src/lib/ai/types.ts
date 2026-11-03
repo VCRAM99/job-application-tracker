@@ -74,6 +74,8 @@ export type StructuredRequest = {
 export type StructuredResponse = TokenUsage & {
   text: string
   finishReason: string | null
+  /** Set when a fallback model answered instead of the requested one. */
+  modelUsed?: string
 }
 
 export class AiRequestError extends Error {

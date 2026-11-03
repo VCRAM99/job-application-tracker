@@ -1,15 +1,9 @@
-import { assertSupportedModel } from "@/lib/ai/models"
+import { assertSupportedModel, defaultModelFor, findModel } from "@/lib/ai/models"
 import type { ProviderId } from "@/lib/ai/types"
 
 export const PROMPT_VERSION = "job-fit-2026-10-23"
 export const SCHEMA_VERSION = "job-fit-schema-1"
 export const MAX_REQUIREMENTS = 40
-
-const FAST_MODELS: Record<ProviderId, string> = {
-  openai: "gpt-5.4-mini",
-  anthropic: "claude-haiku-5-5",
-  google: "gemini-3.8-flash",
-}
 
 const MODEL_ENV: Record<ProviderId, string> = {
   openai: "JOB_ANALYSIS_OPENAI_MODEL",
@@ -17,12 +11,19 @@ const MODEL_ENV: Record<ProviderId, string> = {
   google: "JOB_ANALYSIS_GOOGLE_MODEL",
 }
 
+/**
+ * The model every AI feature uses for a user: the model chosen in Settings when it is in the
+ * registry for that provider; otherwise the operator override (JOB_ANALYSIS_*_MODEL); otherwise
+ * the registry default (src/lib/ai/models.ts). Throws for an unknown override.
+ */
 export function analysisModelFor(
   provider: ProviderId,
   env: Record<string, string | undefined> = process.env,
+  chosen?: string | null,
 ): string {
+  if (chosen && findModel(provider, chosen)) return chosen
   const configured = env[MODEL_ENV[provider]]?.trim()
-  const model = configured || FAST_MODELS[provider]
+  const model = configured || defaultModelFor(provider)
   assertSupportedModel(provider, model)
   return model
 }

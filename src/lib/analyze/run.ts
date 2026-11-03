@@ -58,7 +58,7 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
   if (!providerEnabled(provider)) return { ok: false, message: AI_ERROR_MESSAGES.provider_disabled }
   let model: string
   try {
-    model = analysisModelFor(provider)
+    model = analysisModelFor(provider, process.env, settingsResult.data.model)
   } catch (error) {
     if (error instanceof AiRequestError) return { ok: false, message: "The configured job analysis model is not available." }
     return { ok: false, message: AI_ERROR_MESSAGES.unsupported_model }
