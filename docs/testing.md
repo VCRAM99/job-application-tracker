@@ -62,9 +62,15 @@ Every test, including the resume upload, runs with the real production CSP. Its 
 
 The suite needs the full local Supabase stack (Postgres, Auth, Storage, PostgREST, and about ten containers), a production build, three servers, and local secrets generated per machine for the credential key ring, accounting gate, and catalog gate. GitHub Actions could run `supabase start`, but the image pulls and stack start-up add several minutes and are a known source of flaky runs, and the secrets would have to be generated in the workflow. Run `npm run test:e2e` before opening a PR that touches UI, data access, or actions. A CI job is a reasonable follow-up once the stack start-up has proven reliable there.
 
-## Live model evals
+## AI evals
 
-`scripts/eval/*-live.ts` call a real provider with fictional fixtures and report how many outputs the validators keep or drop. They are opt-in and cost tokens. See [ai.md](ai.md), [analyze.md](analyze.md), [resume-studio.md](resume-studio.md), and [career-coach.md](career-coach.md).
+`scripts/eval/run.ts` runs fit analysis (M3), Resume Studio (M4), and the coach (M5) through the app's prompts and validators on fictional fixtures. It plants fabrications, injected instructions, and bad citations in the model's output; the validators must drop them all.
+
+```bash
+npm run test:eval
+```
+
+That is `--mock --check`: deterministic, no network, and it fails on any safety regression. CI runs it. `--live --write` calls Gemini (reading `GEMINI_API_KEY` from the shell or that one key from `.env.local`, never printed), spends tokens, writes no database, and updates [evals/latest.md](evals/latest.md).
 
 ## Performance measurement
 

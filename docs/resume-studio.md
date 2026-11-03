@@ -69,7 +69,7 @@ A version stores the base, the kept edits (all `pending`), and dropped counts. A
 ## Live eval
 
 ```bash
-npx tsx --conditions=react-server scripts/eval/resume-live.ts
+npx tsx --conditions=react-server scripts/eval/run.ts --live --write   # all suites; see docs/evals/latest.md
 ```
 
 Parses and tailors the fictional fixtures in `src/lib/resume/fixtures` with Gemini and prints, per file, the parsed counts and grounding drops, the kept edits and validator drops, and whether an injected requirement leaked into an edit. It reads `GEMINI_API_KEY` from the environment or from `.env.local` without printing it, uses `JOB_ANALYSIS_GOOGLE_MODEL` or the default fast model, and writes nothing to a database. It spends tokens.

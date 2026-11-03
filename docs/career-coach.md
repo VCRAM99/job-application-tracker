@@ -118,7 +118,7 @@ See [data-model.md](data-model.md) for columns. Six owner-only tables (`research
 ## Live eval
 
 ```bash
-npx tsx --conditions=react-server scripts/eval/coach-live.ts
+npx tsx --conditions=react-server scripts/eval/run.ts --live --write   # all suites; see docs/evals/latest.md
 ```
 
 Runs every coach call (questions, story bank, practice, research, and each draft kind and format) on the fictional fixtures in `src/lib/coach/fixtures.ts`, which include prompt-injection text in the JD, the pasted company text, and the contact notes. Prints kept and dropped counts by reason per call, the overall drop rate, token totals, and any injected claim (PhD, MIT, Google, Director, $90M, Principal, "already works there") that reached kept output; it exits non-zero on a leak. It reads `GEMINI_API_KEY` from the environment or `.env.local` without printing it, uses `JOB_ANALYSIS_GOOGLE_MODEL` or the default fast model, and writes nothing to a database. `COACH_EVAL_VERBOSE=1` prints each raw model reply to stderr. It spends tokens.
