@@ -1,3 +1,4 @@
+import { reportFailure } from "@/lib/monitoring/report"
 import type { z } from "zod"
 
 import { assertSupportedModel } from "@/lib/ai/models"
@@ -105,6 +106,8 @@ export async function generateStructured<T>(
       }
     } catch (error) {
       const ai = mapProviderFailure(error)
+      reportProviderFailure(ai.code, input.provider, input.model)
+    reportProviderFailure(ai.code, input.provider, input.model)
       if (!ai.retryable || attempt === 3) {
         await deps.voidReservation(reservation.id, ai.code)
         return failure(ai.code, reservation.id)
@@ -168,6 +171,7 @@ export async function withUsageReservation<T>(
     }
   } catch (error) {
     const ai = mapProviderFailure(error)
+    reportProviderFailure(ai.code, input.provider, input.model)
     try {
       await deps.voidReservation(reservation.id, ai.code)
     } catch {
@@ -202,4 +206,10 @@ function failure<T>(code: AiErrorCode, usageEventId?: string): GenerateResult<T>
     message: new AiRequestError(code).message,
     usageEventId,
   }
+}
+
+/** Provider-side failures go to monitoring by code, provider, and model only (never input or keys). */
+const REPORTED_CODES = new Set(["provider_outage", "model_unavailable", "unsupported_model", "invalid_response", "context_limit", "transient"])
+function reportProviderFailure(code: string, provider: string, model: string) {
+  if (REPORTED_CODES.has(code)) void reportFailure("ai_provider_error", { code, provider, model })
 }

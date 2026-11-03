@@ -9,6 +9,10 @@
  *            --usage --attribution --retention --fields title,location,urls
  *   approve  --slug [--status draft|approved|revoked] [--terms unclear|permitted|restricted]
  *            [--refresh-limit 0-24] [--live] --usage --attribution --retention --fields ...
+ *            Suggested for a live source: --refresh-limit 2. The limit counts runs in a rolling 24 hours,
+ *            and Vercel Hobby cron fires once a day at a jittered minute inside its hour, so two
+ *            consecutive daily runs can land less than 24 hours apart; a limit of 1 would skip one.
+ *   status [--runs 5]                                Latest runs per source: time, status, fetched count, error code.
  *   refresh [--fixtures]                             Run the ingestion runner once. Needs JOB_INGESTION_ENABLED=true in the shell.
  *                                                    --fixtures reads src/lib/jobs/sources/fixtures instead of the network,
  *                                                    and is refused for --target production.
@@ -139,6 +143,14 @@ async function main() {
     )
     return report(await call("approve-source", JSON.stringify({ ...built.payload, now: new Date().toISOString() })))
   }
+  if (args.command === "status") {
+    const { call } = await catalog("read source run status (read-only)")
+    const runs = Math.min(20, Math.max(1, Number(args.flags.runs) || 5))
+    const result = await call("source-status", JSON.stringify({ now: new Date().toISOString(), runs }))
+    if (result.error) fail(`Database refused the request (${result.error.code ?? "no code"}): ${result.error.message}`)
+    console.log(formatStatus(result.data))
+    return
+  }
   if (args.command === "refresh") {
     if (!jobIngestionEnabled(process.env)) fail("Set JOB_INGESTION_ENABLED=true in the shell for this command.")
     const fixtures = args.flags.fixtures === true
@@ -157,6 +169,22 @@ async function main() {
     return
   }
   fail("Usage: preview <provider> <identifier> | register ... | approve ... | refresh. See the header of scripts/jobs/cli.ts.")
+}
+
+/** One block per source; only slugs, run times, statuses, counts, and short error codes. */
+function formatStatus(data: unknown): string {
+  const body = (data ?? {}) as { sources?: Array<{ slug: string; approvalStatus: string; liveIngestionEnabled: boolean; refreshLimitPerDay: number; runs: Array<{ startedAt: string; status: string; fetchedCount: number | null; error: string | null }> }> }
+  const sources = body.sources ?? []
+  if (sources.length === 0) return "No sources registered."
+  return sources
+    .map((source) => {
+      const head = `${source.slug} · ${source.approvalStatus} · live ${source.liveIngestionEnabled ? "on" : "off"} · ${source.refreshLimitPerDay}/day`
+      const runs = source.runs.length
+        ? source.runs.map((run) => `  ${run.startedAt}  ${run.status.padEnd(9)}  fetched ${run.fetchedCount ?? "-"}${run.error ? `  error ${run.error}` : ""}`)
+        : ["  no runs yet"]
+      return [head, ...runs].join("\n")
+    })
+    .join("\n\n")
 }
 
 main().catch((error: unknown) => {

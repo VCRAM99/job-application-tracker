@@ -88,6 +88,7 @@ async function operate(operation: JobOperation, payload: unknown) {
     "record-alerts": "record_job_alerts",
     "collect-alerts": "collect_alert_workspace",
     "list-ingestion-sources": "list_job_ingestion_sources",
+    "source-status": "job_source_status",
   }
   const response = await rest(null, `rpc/${functions[operation]}`, {
     method: "POST",
