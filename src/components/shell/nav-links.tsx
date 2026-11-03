@@ -66,7 +66,7 @@ export function NavLinks({
                     aria-current={active ? "page" : undefined}
                     onClick={onNavigate}
                     className={cn(
-                      "relative flex min-h-8 items-center gap-2.5 rounded-lg px-2.5 text-sm text-sidebar-foreground transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+                      "relative flex min-h-10 items-center md:min-h-8 gap-2.5 rounded-lg px-2.5 text-sm text-sidebar-foreground transition-colors focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none",
                       active
                         ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                         : "text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground",

@@ -106,7 +106,7 @@ export function JobCard({ job }: { job: JobListing }) {
           <p className="text-sm text-muted-foreground">No skills were named on this listing.</p>
         )}
         <details className="space-y-1 text-sm">
-          <summary className="w-fit cursor-pointer font-medium focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none">Why this estimate</summary>
+          <summary className="w-fit cursor-pointer font-medium focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none">Why this estimate</summary>
           {job.reasonsMatchScore ? (
             <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
               {reasons.map((reason) => (

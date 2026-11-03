@@ -305,6 +305,8 @@ async function main() {
       name: "state-dialog-delete-application",
       path: `/applications/${ids.application}`,
       prepare: async (target) => {
+        const more = target.getByRole("button", { name: "More actions" })
+        if (await more.count()) await more.first().click()
         await target.getByRole("button", { name: /Delete/ }).first().click()
         await target.getByRole("dialog").waitFor()
       },

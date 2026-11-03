@@ -4,7 +4,7 @@ import { cn } from "cn"
 import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
-import { moreActionsItemClass } from "@/components/ui/more-actions"
+import { moreActionsItemClass, useMoreActionsTrigger } from "@/components/ui/more-actions"
 import {
   Dialog,
   DialogClose,
@@ -39,6 +39,8 @@ export function DeleteRecordButton({
   asMenuItem?: boolean
 }) {
   const [pending, setPending] = useState(false)
+  // From a ⋯ menu, the item is hidden once chosen, so focus goes back to the ⋯ button on close.
+  const menuTrigger = useMoreActionsTrigger()
 
   return (
     <Dialog>
@@ -53,7 +55,7 @@ export function DeleteRecordButton({
       >
         {label}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent finalFocus={asMenuItem && menuTrigger ? menuTrigger : undefined}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

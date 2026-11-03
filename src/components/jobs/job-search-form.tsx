@@ -86,7 +86,7 @@ export function JobSearchForm({
           </NativeSelect>
         </label>
         <details className="group sm:col-span-2 lg:col-span-4" open={advancedCount > 0}>
-          <summary className="w-fit cursor-pointer rounded-md text-sm text-muted-foreground hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none">
+          <summary className="w-fit cursor-pointer rounded-md text-sm text-muted-foreground hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring focus-visible:outline-none">
             More filters{advancedCount > 0 ? ` · ${advancedCount} on` : ""}
           </summary>
           <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
