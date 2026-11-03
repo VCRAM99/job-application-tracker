@@ -78,3 +78,23 @@ export const FILE_ERROR_MESSAGES: Record<string, string> = {
   no_text: "No text was found in that file.",
   unreadable_pdf: "That PDF could not be read.",
 }
+
+/** Uploads older than this, with no resume row, are treated as abandoned. */
+export const ABANDONED_UPLOAD_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Storage objects under the user's own prefix that no resume row points to and that are older
+ * than a day: an upload whose registration never finished. Newer objects may still be
+ * registering, and anything that does not match the owner path pattern is left alone.
+ */
+export function abandonedUploadPaths(
+  userId: string,
+  objects: Array<{ name: string; created_at?: string | null }>,
+  registered: ReadonlySet<string>,
+  now = new Date(),
+): string[] {
+  return objects
+    .map((object) => ({ path: `${userId.toLowerCase()}/${object.name}`, created: Date.parse(object.created_at ?? "") }))
+    .filter(({ path, created }) => isOwnedResumePath(userId, path) && !registered.has(path) && Number.isFinite(created) && now.getTime() - created > ABANDONED_UPLOAD_MS)
+    .map(({ path }) => path)
+}

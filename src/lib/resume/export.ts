@@ -1,6 +1,8 @@
 import "server-only"
 
-import { Document as PdfDocument, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer"
+import path from "node:path"
+
+import { Document as PdfDocument, Font, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer"
 import { Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx"
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate"
 import { createElement as h, type ReactElement } from "react"
@@ -112,18 +114,43 @@ export async function buildDocx(content: ResumeContent, date: Date): Promise<Uin
   return pinDocx(new Uint8Array(await Packer.toBuffer(document)), date)
 }
 
+/**
+ * Noto Sans (SIL OFL 1.1, src/lib/resume/fonts/OFL.txt) in three subsets, regular and bold, so
+ * names and text in Latin Extended (Polish, Czech, Turkish, …) and Vietnamese render instead of
+ * dropping glyphs. react-pdf tries each family in order for every character. CJK, Arabic, and
+ * other scripts are not embedded (docs/resume-studio.md). Server-only; next.config.ts traces the
+ * files into the export route.
+ */
+const FONT_DIR = path.join(process.cwd(), "src/lib/resume/fonts")
+export const PDF_FONT_FAMILIES = ["NotoSansLatin", "NotoSansLatinExt", "NotoSansVietnamese"]
+const SUBSETS: Record<string, string> = { NotoSansLatin: "latin", NotoSansLatinExt: "latin-ext", NotoSansVietnamese: "vietnamese" }
+let fontsRegistered = false
+function registerFonts() {
+  if (fontsRegistered) return
+  for (const family of PDF_FONT_FAMILIES) {
+    Font.register({
+      family,
+      fonts: [400, 700].map((weight) => ({ src: path.join(FONT_DIR, `noto-sans-${SUBSETS[family]}-${weight}-normal.woff`), fontWeight: weight })),
+    })
+  }
+  // Keep words whole; the default hyphenation splits names.
+  Font.registerHyphenationCallback((word) => [word])
+  fontsRegistered = true
+}
+
 const styles = StyleSheet.create({
-  page: { paddingVertical: 48, paddingHorizontal: 54, fontFamily: "Helvetica", fontSize: 10.5, lineHeight: 1.35 },
-  name: { fontFamily: "Helvetica-Bold", fontSize: 18, marginBottom: 2 },
+  page: { paddingVertical: 48, paddingHorizontal: 54, fontFamily: PDF_FONT_FAMILIES, fontSize: 10.5, lineHeight: 1.35 },
+  name: { fontWeight: 700, fontSize: 18, marginBottom: 2 },
   contact: { marginBottom: 10 },
-  heading: { fontFamily: "Helvetica-Bold", fontSize: 12, marginTop: 10, marginBottom: 4 },
-  entry: { fontFamily: "Helvetica-Bold", marginTop: 6 },
+  heading: { fontWeight: 700, fontSize: 12, marginTop: 10, marginBottom: 4 },
+  entry: { fontWeight: 700, marginTop: 6 },
   bullet: { flexDirection: "row", marginLeft: 8 },
   dot: { width: 10 },
   bulletText: { flex: 1 },
 })
 
 export async function buildPdf(content: ResumeContent, date: Date): Promise<Uint8Array> {
+  registerFonts()
   const nodes: ReactElement[] = resumeBlocks(content).map((block, index) => {
     switch (block.kind) {
       case "name":

@@ -78,7 +78,9 @@ Regenerate the fixtures with `npx tsx scripts/fixtures/resume-fixtures.mts`. The
 
 ## Known limits
 
-- The PDF template uses the built-in Helvetica font, which covers Latin-1 only. Names or text outside it (for example Polish, Vietnamese, or CJK) do not render correctly in the PDF; the DOCX export is unaffected.
+- The PDF embeds Noto Sans (SIL OFL 1.1, `src/lib/resume/fonts/`) in Latin, Latin Extended, and Vietnamese subsets, regular and bold, so names such as Wąsik-Żółkiewska or Nguyễn render. Chinese, Japanese, Korean, Arabic, Hebrew, Devanagari, and other scripts are not embedded and still drop out of the PDF (about 4 MB more per CJK weight would be needed). The DOCX export uses the reader's fonts and is unaffected.
+- Abandoned uploads (a file whose registration never finished) are deleted the next time the owner opens /resumes once they are more than a day old, using the owner's own session.
+- Tailored versions whose resume was deleted and that link to no application are listed under "Unlinked versions" on /resumes, with a delete button.
 - An upload that is never registered (a closed tab or a network failure) stays in Storage under the user's own prefix. There is no cleanup job or per-user object limit yet.
 - A version whose resume was deleted while it was linked, and whose application was deleted later, has no resume or application link. It is still reachable at its own URL, where the ⋯ menu deletes it, but nothing lists it.
 - The name and number checks are lexical. They are conservative and can drop an honest rewrite, for example one that starts with an uncommon verb.

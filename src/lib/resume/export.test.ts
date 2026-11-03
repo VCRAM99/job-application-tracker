@@ -28,6 +28,23 @@ const content: ResumeContent = {
 const date = new Date("2026-11-02T10:00:00.000Z")
 
 describe("resume export", () => {
+  it("renders Polish and Vietnamese names with the embedded Noto Sans fonts", async () => {
+    const names = { contact: { ...content.contact, name: "Zofia Wąsik-Żółkiewska", location: "Łódź, Polska" } }
+    const bullets = ["Nguyễn Thị Minh Khai led the Hà Nội rollout with Đặng Văn Lâm.", "Grzegorz Brzęczyszczykiewicz ported the śledź parser."]
+    const pdf = await buildPdf({ ...content, ...names, experience: [{ ...content.experience[0]!, bullets }] }, date)
+    const raw = Buffer.from(pdf).toString("latin1")
+    expect(raw).toMatch(/NotoSans/)
+    expect(raw).not.toMatch(/\/BaseFont \/Helvetica/)
+    const text = await extractResumeText("pdf", pdf)
+    expect(text.ok).toBe(true)
+    if (text.ok) {
+      const flat = text.text.normalize("NFC").replace(/\s+/g, " ")
+      for (const phrase of ["Zofia Wąsik-Żółkiewska", "Łódź, Polska", "Nguyễn Thị Minh Khai", "Hà Nội", "Đặng Văn Lâm", "Brzęczyszczykiewicz", "śledź"]) {
+        expect(flat).toContain(phrase)
+      }
+    }
+  })
+
   it("builds a valid, deterministic DOCX that reads back with the same text", async () => {
     const first = await buildDocx(content, date)
     const second = await buildDocx(content, date)

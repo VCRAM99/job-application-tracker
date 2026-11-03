@@ -3,7 +3,8 @@ import "server-only"
 import { requireUser } from "@/lib/auth/session"
 import { listApplications } from "@/lib/records/data"
 import { isUuid } from "@/lib/records/form-state"
-import { PARSE_PROMPT_VERSION } from "@/lib/resume/constants"
+import { PARSE_PROMPT_VERSION, RESUME_BUCKET } from "@/lib/resume/constants"
+import { abandonedUploadPaths } from "@/lib/resume/files"
 import { resumeContentSchema, type ResumeContent } from "@/lib/resume/content"
 import type { ParseDropped } from "@/lib/resume/parse"
 import type { ResumeEdit, TailorDropped } from "@/lib/resume/tailor"
@@ -147,6 +148,41 @@ export async function getVersion(id: string): Promise<VersionDetail | null> {
     mode: String(row.execution_mode),
     updatedAt: String(row.updated_at),
   }
+}
+
+/** Versions whose resume was deleted and that are linked to no application: listed on /resumes so they can be deleted. */
+export async function listUnlinkedVersions(): Promise<VersionSummary[]> {
+  const user = await requireUser()
+  const supabase = await createClient()
+  const result = await supabase
+    .from("resume_versions")
+    .select(VERSION_COLUMNS)
+    .eq("user_id", user.id)
+    .is("resume_id", null)
+    .is("application_id", null)
+    .order("created_at", { ascending: false })
+  return (result.data ?? []).map((row) => versionSummary(row as Row))
+}
+
+/**
+ * Deletes the signed-in user's own abandoned uploads (no resume row, older than a day) with the
+ * user's session: the Storage policy only lets a user list and delete under their own prefix.
+ * Best effort; a failure leaves the objects for the next visit. Returns how many were removed.
+ */
+export async function cleanupAbandonedUploads(now = new Date()): Promise<number> {
+  const user = await requireUser()
+  const supabase = await createClient()
+  const storage = supabase.storage.from(RESUME_BUCKET)
+  const [listed, rows] = await Promise.all([
+    storage.list(user.id.toLowerCase(), { limit: 1000 }),
+    supabase.from("resumes").select("storage_path").eq("user_id", user.id),
+  ])
+  if (listed.error || rows.error) return 0
+  const registered = new Set((rows.data ?? []).map((row) => String(row.storage_path)))
+  const paths = abandonedUploadPaths(user.id, listed.data ?? [], registered, now)
+  if (paths.length === 0) return 0
+  const removed = await storage.remove(paths)
+  return removed.error ? 0 : paths.length
 }
 
 export async function listVersionsForApplication(applicationId: string): Promise<VersionSummary[]> {

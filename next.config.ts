@@ -22,6 +22,8 @@ const nextConfig: NextConfig = {
   },
   // The browser SDK starts only when a DSN was present at build time.
   env: { NEXT_PUBLIC_SENTRY_DSN: process.env.SENTRY_DSN?.trim() ?? "" },
+  // The resume PDF export reads its embedded Noto Sans files at runtime.
+  outputFileTracingIncludes: { "/api/resumes/versions/[id]/export": ["./src/lib/resume/fonts/*"] },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
