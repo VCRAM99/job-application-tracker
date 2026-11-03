@@ -40,7 +40,7 @@ export default async function JobsPage({
     return (
       <RecordState
         title="Recommended jobs are off"
-        description="This section stays off in production until the jobs migration and feature flag are approved."
+        description="Recommended jobs are not available for your account yet. Your applications and other tracking are unchanged."
       />
     )
   }

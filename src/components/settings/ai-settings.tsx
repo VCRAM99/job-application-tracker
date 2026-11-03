@@ -12,7 +12,7 @@ export async function AiSettingsSection() {
       <Card>
         <CardHeader>
           <CardTitle>AI</CardTitle>
-          <CardDescription>Career AI is off until AI_FEATURES_ENABLED is set on the server.</CardDescription>
+          <CardDescription>AI features are not available for your account yet.</CardDescription>
         </CardHeader>
       </Card>
     )

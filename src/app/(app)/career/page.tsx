@@ -30,7 +30,7 @@ export default async function CareerPage() {
       {loaded.state === "disabled" ? (
         <RecordState
           title="Career tools are off"
-          description="Set AI_FEATURES_ENABLED=true on the server to use the career profile. Existing job tracking is unchanged."
+          description="The career profile is not available for your account yet. Your job tracking is unchanged."
         />
       ) : null}
       {loaded.state === "missing_table" ? (

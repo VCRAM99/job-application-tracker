@@ -25,7 +25,7 @@ export default async function AnalysisDetailPage({
     return (
       <RecordState
         title="Fit analysis is off"
-        description="Set JOB_ANALYSIS_ENABLED=true and AI_FEATURES_ENABLED=true on the server. Existing tracking is unchanged."
+        description="Fit analysis is not available for your account yet. Your applications and other tracking are unchanged."
       />
     )
   }
