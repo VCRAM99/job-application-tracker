@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs"
 import { expect, test, type Page } from "@playwright/test"
 import { Document, Packer, Paragraph } from "docx"
 
-import { clearAiRateWindow, E2E_EMAIL } from "./support/seed"
+import { clearAiRateWindow } from "./support/psql"
 import { open, selectMatching } from "./support/user"
 
 /**
@@ -12,7 +12,7 @@ import { open, selectMatching } from "./support/user"
  */
 test.describe.configure({ mode: "serial" })
 
-test.beforeEach(() => clearAiRateWindow(E2E_EMAIL))
+test.beforeEach(() => clearAiRateWindow("e2e-user@example.test"))
 
 const JD =
   "Staff Platform Engineer at Northwind Analytics. You will design TypeScript services backed by PostgreSQL. " +

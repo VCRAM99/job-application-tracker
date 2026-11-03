@@ -2,7 +2,10 @@ import { expect, test, type Page } from "@playwright/test"
 
 import { open } from "./support/user"
 
-const card = (page: Page, title: string) => page.locator('[data-slot="card"]').filter({ has: page.getByText(title, { exact: true }) })
+// Visible cards only: Next keeps the previous route mounted but hidden (React Activity) after a
+// client navigation, so the last results page can still be in the DOM.
+const card = (page: Page, title: string) =>
+  page.locator('[data-slot="card"]').filter({ visible: true }).filter({ has: page.getByText(title, { exact: true }) })
 
 async function search(page: Page, keyword: string, options: { saved?: boolean; hidden?: boolean } = {}) {
   await open(page, "/jobs")
