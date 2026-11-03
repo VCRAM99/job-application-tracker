@@ -178,7 +178,7 @@ export async function parseResume(_previous: RecordFormState, formData: FormData
     text: String(row.extracted_text),
     run,
     reservation: usageReservationDeps(supabase, { userId: user.id, secret: run.secret, idempotencyKey, mode: run.mode, provider: run.provider, model: run.model }),
-    persist: async (outcome) => {
+    persist: async (outcome, modelUsed) => {
       const saved = await supabase
         .from("resumes")
         .update({
@@ -186,7 +186,7 @@ export async function parseResume(_previous: RecordFormState, formData: FormData
           parsed: outcome.content,
           parse_dropped: outcome.dropped,
           parse_provider: run.provider,
-          parse_model: run.model,
+          parse_model: modelUsed,
           parse_execution_mode: run.mode,
           parse_prompt_version: PARSE_PROMPT_VERSION,
           parse_schema_version: PARSE_SCHEMA_VERSION,

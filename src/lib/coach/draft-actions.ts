@@ -120,7 +120,7 @@ export async function createResearchBrief(_previous: RecordFormState, formData: 
     reservation: usageReservationDeps(supabase, { userId: user.id, secret: run.secret, idempotencyKey: key, mode: run.mode, provider: run.provider, model: run.model }),
     company: companyName,
     sources,
-    persist: async (outcome) => {
+    persist: async (outcome, modelUsed) => {
       const inserted = await supabase
         .from("research_briefs")
         .insert({
@@ -134,7 +134,7 @@ export async function createResearchBrief(_previous: RecordFormState, formData: 
           prompt_version: RESEARCH_PROMPT_VERSION,
           schema_version: COACH_SCHEMA_VERSION,
           provider: run.provider,
-          model: run.model,
+          model: modelUsed,
           execution_mode: run.mode,
         })
         .select("id")
@@ -197,12 +197,12 @@ async function runDraft(
     run,
     reservation: usageReservationDeps(supabase, { userId: user.id, secret: run.secret, idempotencyKey: key, mode: run.mode, provider: run.provider, model: run.model }),
     context: loaded.context,
-    persist: async (outcome) => {
+    persist: async (outcome, modelUsed) => {
       if (!outcome.body.trim()) {
         empty = outcome
         return
       }
-      await save(outcome, { links: loaded.links, run: { provider: run.provider, model: run.model, mode: run.mode } })
+      await save(outcome, { links: loaded.links, run: { provider: run.provider, model: modelUsed, mode: run.mode } })
     },
   })
   if (!result.ok) return aiFailure(result.code, result.message)

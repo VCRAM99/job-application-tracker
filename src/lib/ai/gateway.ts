@@ -23,7 +23,8 @@ export type GatewayDeps<T> = {
   finalize: (id: string, usage: TokenUsage) => Promise<void>
   voidReservation: (id: string, code: string) => Promise<void>
   complete: (user: string) => Promise<StructuredResponse>
-  persist?: (data: T, usageEventId: string) => Promise<void>
+  /** `modelUsed` is the model that answered, which differs from the requested one after an overload fallback. */
+  persist?: (data: T, usageEventId: string, modelUsed: string) => Promise<void>
 }
 
 export type GenerateResult<T> =
@@ -95,7 +96,7 @@ export async function generateStructured<T>(
         inputTokens: response.inputTokens,
         outputTokens: response.outputTokens,
       }
-      if (deps.persist) await deps.persist(parsed.data, reservation.id)
+      if (deps.persist) await deps.persist(parsed.data, reservation.id, response.modelUsed ?? input.model)
       await deps.finalize(reservation.id, usage)
       return {
         ok: true,
@@ -106,9 +107,9 @@ export async function generateStructured<T>(
       }
     } catch (error) {
       const ai = mapProviderFailure(error)
-      reportProviderFailure(ai.code, input.provider, input.model)
-    reportProviderFailure(ai.code, input.provider, input.model)
       if (!ai.retryable || attempt === 3) {
+        // Reported once, for the attempt that ends the run, not for each retry.
+        reportProviderFailure(ai.code, input.provider, input.model)
         await deps.voidReservation(reservation.id, ai.code)
         return failure(ai.code, reservation.id)
       }

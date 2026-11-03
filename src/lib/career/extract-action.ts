@@ -151,7 +151,7 @@ export async function extractCareerFacts(
         schemaName: "career_extraction",
         jsonSchema: EXTRACTION_JSON_SCHEMA,
       }),
-      persist: async (data, usageEventId) => {
+      persist: async (data, usageEventId, modelUsed) => {
         const planned = planSuggestions(sourceId, data)
         const itemsText = JSON.stringify(
           planned.map((item) => ({
@@ -180,7 +180,7 @@ export async function extractCareerFacts(
           p_action: "extract_career_facts",
           p_schema_name: "career_extraction",
           p_provider: provider,
-          p_model: model,
+          p_model: modelUsed,
           p_status: "suggested",
           p_error_class: null,
           p_request_hash: requestHash,

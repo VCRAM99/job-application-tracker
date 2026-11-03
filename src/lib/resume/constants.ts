@@ -1,5 +1,7 @@
 export const RESUME_BUCKET = "resumes"
 export const MAX_RESUME_BYTES = 5 * 1024 * 1024
+/** Files one user may keep in the resumes bucket. The Storage insert policy enforces the same number (M6c migration). */
+export const MAX_STORED_RESUME_FILES = 30
 /** Matches career_sources, so an upload can be saved as a career source unchanged. */
 export const MAX_RESUME_TEXT = 80_000
 /** A PDF with less selectable text than this is treated as image-only. */

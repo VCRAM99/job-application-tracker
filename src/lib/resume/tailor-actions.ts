@@ -95,7 +95,7 @@ export async function tailorResume(_previous: RecordFormState, formData: FormDat
     facts: facts.facts,
     run,
     reservation: usageReservationDeps(supabase, { userId: user.id, secret: run.secret, idempotencyKey, mode: run.mode, provider: run.provider, model: run.model }),
-    persist: async (outcome) => {
+    persist: async (outcome, modelUsed) => {
       const readability = readabilityReport(resumeId, baseText, record.requirements)
       const inserted = await supabase
         .from("resume_versions")
@@ -114,7 +114,7 @@ export async function tailorResume(_previous: RecordFormState, formData: FormDat
           prompt_version: TAILOR_PROMPT_VERSION,
           schema_version: TAILOR_SCHEMA_VERSION,
           provider: run.provider,
-          model: run.model,
+          model: modelUsed,
           execution_mode: run.mode,
         })
         .select("id")

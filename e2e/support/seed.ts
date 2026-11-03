@@ -49,6 +49,14 @@ export function psql(sql: string, capture = false, role = "postgres"): string {
 
 const quote = (value: string) => `'${value.replace(/'/g, "''")}'`
 
+/**
+ * Moves a user's AI usage rows out of the per-minute and per-day rate-limit windows, so a serial
+ * suite of AI flows is not refused by the real limit (which is what a person would hit).
+ */
+export function clearAiRateWindow(email: string) {
+  psql(`update public.ai_usage_events set created_at = created_at - interval '2 days' where user_id = (select id from auth.users where email = ${quote(email)});`)
+}
+
 export type Local = Awaited<ReturnType<typeof connectLocal>>
 
 /** REST helpers for the local stack, plus the local accounting and catalog gates. */

@@ -5,10 +5,13 @@ import { generateStructured, type ReservationRecord } from "@/lib/ai/gateway"
 import { resolveExecutionMode } from "@/lib/ai/mode"
 import { AiRequestError } from "@/lib/ai/types"
 
+const report = vi.hoisted(() => vi.fn(async () => undefined))
+vi.mock("@/lib/monitoring/report", () => ({ reportFailure: report }))
+
 const schema = z.object({ skills: z.array(z.string()) }).strict()
 const good = JSON.stringify({ skills: ["TypeScript"] })
 
-function harness(complete: (user: string) => Promise<{ text: string; inputTokens: number | null; outputTokens: number | null; finishReason: string | null }>) {
+function harness(complete: (user: string) => Promise<{ text: string; inputTokens: number | null; outputTokens: number | null; finishReason: string | null; modelUsed?: string }>) {
   const calls = { reserve: 0, complete: 0, finalize: 0, voided: 0 }
   const deps = {
     reserve: vi.fn(async (): Promise<ReservationRecord> => {
@@ -199,5 +202,26 @@ describe("generateStructured", () => {
     expect(run.calls.complete).toBe(1)
     expect(run.calls.finalize).toBe(0)
     expect(run.calls.voided).toBe(1)
+  })
+
+  it("reports a provider failure once per run, not once per retry", async () => {
+    report.mockClear()
+    const run = harness(async () => {
+      throw new AiRequestError("provider_outage", { retryable: true })
+    })
+    const result = await generateStructured(base, run.deps)
+    expect(result).toMatchObject({ ok: false, code: "provider_outage" })
+    expect(run.calls.complete).toBe(3)
+    expect(report).toHaveBeenCalledTimes(1)
+    expect(report).toHaveBeenCalledWith("ai_provider_error", expect.objectContaining({ code: "provider_outage" }))
+  })
+
+  it("passes the model that answered to persist, so a fallback is recorded", async () => {
+    const persisted: string[] = []
+    const fellBack = harness(async () => ({ text: good, inputTokens: 1, outputTokens: 1, finishReason: "stop", modelUsed: "gemini-3.8-flash" }))
+    await generateStructured(base, { ...fellBack.deps, persist: async (_data, _id, modelUsed) => void persisted.push(modelUsed) })
+    const direct = harness(async () => ({ text: good, inputTokens: 1, outputTokens: 1, finishReason: "stop" }))
+    await generateStructured(base, { ...direct.deps, persist: async (_data, _id, modelUsed) => void persisted.push(modelUsed) })
+    expect(persisted).toEqual(["gemini-3.8-flash", base.model])
   })
 })

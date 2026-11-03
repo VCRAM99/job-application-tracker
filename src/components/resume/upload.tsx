@@ -6,7 +6,7 @@ import { useId, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { HelpTip } from "@/components/ui/help-tip"
 import { registerResume } from "@/lib/resume/actions"
-import { DOCX_MIME, MAX_RESUME_BYTES, PDF_MIME, RESUME_BUCKET } from "@/lib/resume/constants"
+import { DOCX_MIME, MAX_RESUME_BYTES, MAX_STORED_RESUME_FILES, PDF_MIME, RESUME_BUCKET } from "@/lib/resume/constants"
 
 const ACCEPT = `.pdf,.docx,${PDF_MIME},${DOCX_MIME}`
 
@@ -31,7 +31,14 @@ export function ResumeUpload({ userId }: { userId: string }) {
       const uploaded = await createClient()
         .storage.from(RESUME_BUCKET)
         .upload(path, file, { contentType: extension === "pdf" ? PDF_MIME : DOCX_MIME, upsert: false })
-      if (uploaded.error) return setError("The upload did not finish. Try again.")
+      if (uploaded.error) {
+        // The Storage policy refuses new files past the per-user cap with a row-level security error.
+        return setError(
+          /row-level security/i.test(uploaded.error.message)
+            ? `You can keep up to ${MAX_STORED_RESUME_FILES} resume files. Delete one you no longer need, then upload again.`
+            : "The upload did not finish. Try again.",
+        )
+      }
       const registered = await registerResume({ path, label: file.name })
       if (!registered.ok) return setError(registered.message)
       router.push(`/resumes/${registered.id}`)

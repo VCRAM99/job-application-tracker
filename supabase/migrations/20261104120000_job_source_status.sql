@@ -1,5 +1,7 @@
--- M6c: read-only status of catalog source runs for the operator CLI (`jobs status`).
--- Additive only: one function. No tables, columns, policies, or data change.
+-- M6c launch hardening. Two changes, no tables, columns, or data:
+-- 1. job_source_status: read-only status of catalog source runs for the operator CLI (`jobs status`).
+-- 2. The resumes bucket insert policy also caps each user at 30 stored files, counted by
+--    public.resume_file_count() (see the end of this file).
 -- Same HMAC gate as the other catalog functions (job_catalog_gate secret + fresh `now`), so a
 -- session-less publishable-key client can call it but only the operator who holds
 -- JOB_CATALOG_WRITE_SECRET gets an answer. It returns source slugs and run metadata only:
@@ -82,3 +84,47 @@ revoke all on function public.job_source_status(text, text) from public, anon, a
 -- The CLI calls with the publishable key and no session (role anon), like the other catalog
 -- functions; the HMAC proof is the gate.
 grant execute on function public.job_source_status(text, text) to anon, authenticated;
+
+-- Resume uploads go straight from the browser to Storage, so the insert policy is the only
+-- server-side check on how much one account can store. It now also refuses a new object once the
+-- user's folder holds 30 files (150 MB at the 5 MB limit). Read and delete are unchanged, and
+-- deleting a resume or an abandoned upload frees a slot. Same skip as the original block when the
+-- storage schema is absent (unit test databases).
+do $storage$
+begin
+  if to_regclass('storage.objects') is null then
+    return;
+  end if;
+
+  -- A policy on storage.objects cannot read storage.objects itself (Postgres reports infinite
+  -- recursion), so the count runs as the function owner. It only ever counts the caller's own
+  -- folder, takes no arguments, and returns a number; anon cannot call it.
+  execute $function$
+    create or replace function public.resume_file_count()
+    returns integer
+    language sql
+    stable
+    security definer
+    set search_path = ''
+    as $body$
+      select count(*)::integer from storage.objects
+      where bucket_id = 'resumes'
+        and auth.uid() is not null
+        and (storage.foldername(name))[1] = auth.uid()::text
+    $body$
+  $function$;
+  revoke all on function public.resume_file_count() from public, anon, authenticated;
+  grant execute on function public.resume_file_count() to authenticated;
+
+  drop policy if exists "insert own resume files" on storage.objects;
+  execute $policy$
+    create policy "insert own resume files" on storage.objects
+      for insert to authenticated
+      with check (
+        bucket_id = 'resumes'
+        and name ~ ('^' || (select auth.uid())::text || '/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(pdf|docx)$')
+        and public.resume_file_count() < 30
+      )
+  $policy$;
+end;
+$storage$;

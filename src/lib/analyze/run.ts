@@ -78,6 +78,7 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
       .from("career_sources")
       .select("id, body")
       .eq("id", input.resumeSourceId)
+      .eq("user_id", user.id)
       .maybeSingle()
     if (source.error || !source.data) return { ok: false, message: "That resume source is not available." }
     resume = { sourceId: source.data.id, text: source.data.body }
@@ -118,6 +119,8 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
     executionMode: resolved.mode,
   }
 
+  // The stored analysis names the model that answered; after an overload fallback that is not `model`.
+  let modelUsed = model
   const produce = () =>
     executeAnalysis({
       jdText: validated.text,
@@ -126,11 +129,14 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
       model,
       complete: mock
         ? async (request) => mockStructuredResponse(request)
-        : (request) =>
-            completeWithProvider(provider, {
+        : async (request) => {
+            const response = await completeWithProvider(provider, {
               ...request,
               apiKey: apiKey ?? "",
-            }),
+            })
+            if (response.modelUsed) modelUsed = response.modelUsed
+            return response
+          },
     })
 
   if (mock) {
@@ -162,7 +168,7 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
     async () => {
       try {
         const produced = await produce()
-        const inserted = await insertAnalysis({ ...storedBase, analysis: produced.analysis })
+        const inserted = await insertAnalysis({ ...storedBase, model: modelUsed, analysis: produced.analysis })
         if (!inserted.ok) throw new AiRequestError("transient")
         return { data: inserted.id, usage: produced.usage }
       } catch (error) {

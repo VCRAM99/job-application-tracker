@@ -55,6 +55,9 @@ export function scrubEvent<T>(input: T): T {
   delete next.user
   delete next.breadcrumbs
   delete next.extra
+  // Spans carry full request and fetch URLs (query strings, ids); errors never need them.
+  delete next.spans
+  if (event.tags) next.tags = Object.fromEntries(Object.entries(event.tags).map(([key, value]) => [key, typeof value === "string" ? scrubText(value) : value]))
   if (event.contexts) {
     // Runtime and OS facts only; drop anything that could carry state or input.
     const { runtime, os, browser, device } = event.contexts as Record<string, unknown>
@@ -79,16 +82,19 @@ export function scrubEvent<T>(input: T): T {
   return next as T
 }
 
-/** Sentry options shared by every runtime: conservative sampling and no PII. */
+/**
+ * Sentry options shared by every runtime: errors only, no PII. Tracing is off: transactions and
+ * spans carry full URLs (query strings, ids) that error scrubbing does not cover.
+ */
 export function sentryBaseOptions(dsn: string) {
   return {
     dsn,
     sendDefaultPii: false,
     sampleRate: 1,
-    tracesSampleRate: 0.02,
+    tracesSampleRate: 0,
     maxBreadcrumbs: 0,
     beforeSend: scrubEvent,
-    beforeSendTransaction: scrubEvent,
+    beforeSendTransaction: () => null,
     beforeBreadcrumb: () => null,
   }
 }

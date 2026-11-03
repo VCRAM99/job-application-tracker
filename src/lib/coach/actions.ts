@@ -58,7 +58,7 @@ export async function generateQuestionSet(_previous: RecordFormState, formData: 
     company: analysis.company,
     requirements: analysis.requirements,
     facts: facts.facts,
-    persist: async (outcome) => {
+    persist: async (outcome, modelUsed) => {
       const inserted = await supabase
         .from("interview_question_sets")
         .insert({
@@ -70,7 +70,7 @@ export async function generateQuestionSet(_previous: RecordFormState, formData: 
           prompt_version: QUESTIONS_PROMPT_VERSION,
           schema_version: COACH_SCHEMA_VERSION,
           provider: run.provider,
-          model: run.model,
+          model: modelUsed,
           execution_mode: run.mode,
         })
         .select("id")
@@ -139,7 +139,7 @@ export async function buildStoryBank(_previous: RecordFormState, formData: FormD
     run,
     reservation: usageReservationDeps(supabase, { userId: user.id, secret: run.secret, idempotencyKey: key, mode: run.mode, provider: run.provider, model: run.model }),
     facts: usable,
-    persist: async (outcome) => {
+    persist: async (outcome, modelUsed) => {
       kept = outcome.stories.length
       dropped = Object.values(outcome.dropped).reduce((sum, value) => sum + value, 0)
       if (outcome.stories.length === 0) return
@@ -153,7 +153,7 @@ export async function buildStoryBank(_previous: RecordFormState, formData: FormD
           prompt_version: STORIES_PROMPT_VERSION,
           schema_version: COACH_SCHEMA_VERSION,
           provider: run.provider,
-          model: run.model,
+          model: modelUsed,
           execution_mode: run.mode,
         })),
         { onConflict: "user_id,competency" },
@@ -198,7 +198,7 @@ export async function practiceAnswer(_previous: RecordFormState, formData: FormD
     requirements: analysis?.requirements ?? [],
     answer,
     facts: facts.facts,
-    persist: async (outcome) => {
+    persist: async (outcome, modelUsed) => {
       const inserted = await supabase.from("practice_answers").insert({
         set_id: set.id,
         question_id: question.id,
@@ -208,7 +208,7 @@ export async function practiceAnswer(_previous: RecordFormState, formData: FormD
         prompt_version: PRACTICE_PROMPT_VERSION,
         schema_version: COACH_SCHEMA_VERSION,
         provider: run.provider,
-        model: run.model,
+        model: modelUsed,
         execution_mode: run.mode,
       })
       if (inserted.error) saveFailed("Practice answer", inserted.error.code)

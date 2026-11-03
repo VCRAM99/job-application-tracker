@@ -48,6 +48,15 @@ describe("Sentry scrubbing", () => {
     expect(event.exception?.values?.[0]?.stacktrace?.frames?.[0]).toEqual({ filename: "app.js", lineno: 1 })
   })
 
+  it("drops spans and scrubs tag values", () => {
+    const event = scrubEvent({
+      spans: [{ description: "GET https://x.supabase.co/rest/v1/resumes?user_id=eq.5c8a88a5-ce9d-4d0d-a548-fd640726c32f" }],
+      tags: { code: "provider_outage", note: "ada@example.com" },
+    })
+    expect(event.spans).toBeUndefined()
+    expect(event.tags).toEqual({ code: "provider_outage", note: "[email]" })
+  })
+
   it("cuts long messages", () => {
     expect(scrubText("x".repeat(500))!.length).toBeLessThanOrEqual(201)
   })
@@ -55,7 +64,8 @@ describe("Sentry scrubbing", () => {
   it("uses conservative options with no PII and no breadcrumbs", () => {
     const options = sentryBaseOptions("https://key@o1.ingest.sentry.io/1")
     expect(options.sendDefaultPii).toBe(false)
-    expect(options.tracesSampleRate).toBeLessThanOrEqual(0.05)
+    expect(options.tracesSampleRate).toBe(0)
+    expect(options.beforeSendTransaction()).toBeNull()
     expect(options.maxBreadcrumbs).toBe(0)
     expect(options.beforeBreadcrumb()).toBeNull()
   })

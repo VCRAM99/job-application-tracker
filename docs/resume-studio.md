@@ -15,7 +15,7 @@ The provider and execution mode (your key or managed) come from AI settings. Bot
 
 ## Storage
 
-Bucket `resumes` is private, has a 5 MB file size limit, and accepts only `application/pdf` and `application/vnd.openxmlformats-officedocument.wordprocessingml.document`. Object keys are exactly `<auth.uid()>/<uuid>.pdf` or `.docx`. `storage.objects` policies let a signed-in user insert, read, and delete only those keys under their own id. There is no update policy, so an upload cannot be overwritten. `anon` has no access.
+Bucket `resumes` is private, has a 5 MB file size limit, and accepts only `application/pdf` and `application/vnd.openxmlformats-officedocument.wordprocessingml.document`. Object keys are exactly `<auth.uid()>/<uuid>.pdf` or `.docx`. `storage.objects` policies let a signed-in user insert, read, and delete only those keys under their own id. There is no update policy, so an upload cannot be overwritten. The insert policy also refuses a new file once the user already stores 30 (`public.resume_file_count()`, M6c), and the upload form then says so. `anon` has no access.
 
 The browser uploads straight to Storage with the user's session, because Vercel limits a function request body to 4.5 MB. `registerResume` then checks the path belongs to the caller, downloads the object, and checks it again: the type comes from magic bytes (`%PDF-` at byte 0, or a zip with `word/document.xml`), the extension must agree, macro-enabled DOCX is refused, and the DOCX parts we read may not expand past 2 MB; the DOCX reader is a single linear pass, so malformed XML cannot make it slow. A rejected upload is removed. Registering the same path twice returns the first row and keeps its file.
 
@@ -60,6 +60,7 @@ A version stores the base, the kept edits (all `pending`), and dropped counts. A
 | Limit | Value |
 | --- | --- |
 | Upload size | 5 MB |
+| Stored files per user | 30 (Storage insert policy) |
 | Extracted text | 80,000 characters |
 | DOCX parts read, uncompressed | 2 MB |
 | Parsed content stored | 200,000 characters |

@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs"
 import { expect, test, type Page } from "@playwright/test"
 import { Document, Packer, Paragraph } from "docx"
 
+import { clearAiRateWindow, E2E_EMAIL } from "./support/seed"
 import { open, selectMatching } from "./support/user"
 
 /**
@@ -10,6 +11,8 @@ import { open, selectMatching } from "./support/user"
  * OpenAI key, so every model call goes to the local fake and none leaves the machine.
  */
 test.describe.configure({ mode: "serial" })
+
+test.beforeEach(() => clearAiRateWindow(E2E_EMAIL))
 
 const JD =
   "Staff Platform Engineer at Northwind Analytics. You will design TypeScript services backed by PostgreSQL. " +
