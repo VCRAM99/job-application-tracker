@@ -3,7 +3,7 @@ import "server-only"
 import { GoogleGenAI, ThinkingLevel } from "@google/genai"
 
 import { findModel, responseSchemaFor } from "@/lib/ai/models"
-import { isOverloaded, mapProviderFailure, OVERLOAD_RETRY_DELAY_MS } from "@/lib/ai/provider-error"
+import { isOverloaded, mapProviderFailure, OVERLOAD_RETRY_DELAY_MS, PROVIDER_TIMEOUT_MS } from "@/lib/ai/provider-error"
 import { AiRequestError, type StructuredRequest, type StructuredResponse } from "@/lib/ai/types"
 
 export type GeminiResponse = {
@@ -28,7 +28,7 @@ export type GeminiLike = {
 }
 
 export function createGeminiClient(apiKey: string): GeminiLike {
-  return new GoogleGenAI({ apiKey })
+  return new GoogleGenAI({ apiKey, httpOptions: { timeout: PROVIDER_TIMEOUT_MS } })
 }
 
 export async function completeGemini(

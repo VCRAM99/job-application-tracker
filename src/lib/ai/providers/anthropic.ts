@@ -2,7 +2,7 @@ import "server-only"
 
 import Anthropic from "@anthropic-ai/sdk"
 
-import { mapProviderFailure } from "@/lib/ai/provider-error"
+import { mapProviderFailure, PROVIDER_TIMEOUT_MS } from "@/lib/ai/provider-error"
 import { AiRequestError, type StructuredRequest, type StructuredResponse } from "@/lib/ai/types"
 
 type AnthropicMessage = {
@@ -21,7 +21,7 @@ export type AnthropicLike = {
 export const ANTHROPIC_MAX_TOKENS = 16_000
 
 export function createAnthropicClient(apiKey: string): Anthropic {
-  return new Anthropic({ apiKey })
+  return new Anthropic({ apiKey, timeout: PROVIDER_TIMEOUT_MS })
 }
 
 export async function completeAnthropic(
