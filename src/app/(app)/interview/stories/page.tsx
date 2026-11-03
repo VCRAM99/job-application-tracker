@@ -7,15 +7,15 @@ import { PageHeader } from "@/components/records/fields"
 import { loadFactLabels, loadVerifiedFacts } from "@/lib/analyze/data"
 import { COMPETENCY_LABELS } from "@/lib/coach/constants"
 import { listStories } from "@/lib/coach/data"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import { staleStory, STAR_PARTS } from "@/lib/coach/stories"
 import { loadExecutionMode } from "@/lib/resume/data"
+import { coachAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Story bank" }
 export const instant = false
 
 export default async function StoryBankPage() {
-  if (!careerCoachEnabled()) return <CoachOff />
+  if (!(await coachAllowed())) return <CoachOff />
   await connection()
   const [stories, facts, mode] = await Promise.all([listStories(), loadVerifiedFacts(), loadExecutionMode()])
   if (!stories) return <CoachUnavailable />

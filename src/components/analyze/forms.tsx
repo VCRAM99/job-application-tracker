@@ -5,6 +5,7 @@ import { useActionState } from "react"
 
 import { claimRequirement, rerunAnalysis, startAnalysis } from "@/lib/analyze/actions"
 import { normalizeJobText } from "@/lib/analyze/text"
+import { useAiAvailability } from "@/components/ai/availability"
 import { FormStatus, NativeSelect } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,6 +32,7 @@ export function AnalyzeForm({
   blockedReason: string | null
 }) {
   const [state, formAction, pending] = useActionState(startAnalysis, initialRecordFormState)
+  const { managed } = useAiAvailability()
   const [jdText, setJdText] = useState(defaults.jdText)
   const count = normalizeJobText(jdText).length
   return (
@@ -65,13 +67,15 @@ export function AnalyzeForm({
       <fieldset className="grid gap-2">
         <legend className="text-sm font-medium">Execution mode</legend>
         <label className="flex items-center gap-2 text-sm">
-          <input type="radio" name="executionMode" value="byok" defaultChecked={settings?.executionMode !== "managed"} />
+          <input type="radio" name="executionMode" value="byok" defaultChecked={settings?.executionMode !== "managed" || !managed} />
           Bring your own key
         </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="radio" name="executionMode" value="managed" defaultChecked={settings?.executionMode === "managed"} />
-          Managed AI
-        </label>
+        {managed ? (
+          <label className="flex items-center gap-2 text-sm">
+            <input type="radio" name="executionMode" value="managed" defaultChecked={settings?.executionMode === "managed"} />
+            Managed AI
+          </label>
+        ) : null}
       </fieldset>
       <label className="grid gap-2 text-sm">
         Pasted resume for readability heuristics

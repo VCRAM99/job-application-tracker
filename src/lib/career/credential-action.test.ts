@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const rpc = vi.fn()
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
-vi.mock("@/lib/auth/session", () => ({ requireUser: vi.fn(async () => ({ id: "user-1", email: null })) }))
+vi.mock("@/lib/auth/session", () => ({ requireUser: vi.fn(async () => ({ id: "user-1", email: null })), getCurrentUser: vi.fn(async () => ({ id: "user-1", email: null })) }))
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ rpc })) }))
 
 import { decryptSecret, parseKeyRing } from "@/lib/ai/crypto"

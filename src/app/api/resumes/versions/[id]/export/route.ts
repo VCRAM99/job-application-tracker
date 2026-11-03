@@ -3,12 +3,12 @@ import { isUuid } from "@/lib/records/form-state"
 import { resumeContentSchema, type ResumeContent } from "@/lib/resume/content"
 import { DOCX_MIME, PDF_MIME } from "@/lib/resume/constants"
 import { buildDocx, buildPdf, contentDisposition } from "@/lib/resume/export"
-import { resumeStudioEnabled } from "@/lib/resume/flags"
 import { createClient } from "@/lib/supabase/server"
+import { resumesAllowed } from "@/lib/beta"
 
 /** Builds a DOCX or PDF from a version's final content: accepted edits only. Nothing is stored. */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!resumeStudioEnabled()) return new Response("Not found", { status: 404 })
+  if (!(await resumesAllowed())) return new Response("Not found", { status: 404 })
   const user = await getCurrentUser()
   if (!user) return new Response("Sign in required", { status: 401 })
   const { id } = await params

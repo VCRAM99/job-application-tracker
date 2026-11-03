@@ -5,10 +5,11 @@ import { connection } from "next/server"
 import { AnalyzeForm } from "@/components/analyze/forms"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { jobAnalysisEnabled, jobAnalysisMockProvider } from "@/lib/ai/flags"
+import { jobAnalysisMockProvider } from "@/lib/ai/flags"
 import { analysisBlockedReason } from "@/lib/analyze/readiness"
 import { listAnalyses, loadAnalysisContext, loadApplicationPrefill, loadPostingText } from "@/lib/analyze/data"
 import { isUuid } from "@/lib/records/form-state"
+import { analyzeAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Fit" }
 export const instant = false
@@ -18,7 +19,7 @@ export default async function AnalyzePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  if (!jobAnalysisEnabled()) {
+  if (!(await analyzeAllowed())) {
     return (
       <RecordState
         title="Fit analysis is off"

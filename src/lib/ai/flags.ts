@@ -73,3 +73,33 @@ export function readPlatformKey(
   const value = env[name]?.trim()
   return value ? value : null
 }
+
+const ALL_PROVIDERS = ["openai", "anthropic", "google"] as const
+type Provider = (typeof ALL_PROVIDERS)[number]
+
+/**
+ * AI_PROVIDERS_ENABLED: comma-separated providers this server accepts (openai, anthropic, google).
+ * Unset: only "google" on a Vercel deployment (the launch provider), every provider locally.
+ * Unknown names are ignored; a list with no known name falls back to "google".
+ */
+export function enabledProviders(env: Env = process.env): Provider[] {
+  const raw = env.AI_PROVIDERS_ENABLED?.trim()
+  if (!raw) return env.VERCEL_ENV?.trim() ? ["google"] : [...ALL_PROVIDERS]
+  const listed = ALL_PROVIDERS.filter((provider) => raw.toLowerCase().split(",").map((item) => item.trim()).includes(provider))
+  return listed.length > 0 ? listed : ["google"]
+}
+
+export function providerEnabled(provider: string, env: Env = process.env): boolean {
+  return (enabledProviders(env) as string[]).includes(provider)
+}
+
+/** Providers other than Gemini have not been verified against live APIs for launch. */
+export function providerLiveVerified(provider: string): boolean {
+  return provider === "google"
+}
+
+/** Managed AI can be offered: allowance on and a platform key for at least one enabled provider. */
+export function managedOffered(env: Env = process.env): boolean {
+  if (!managedAllowance(env).enabled) return false
+  return enabledProviders(env).some((provider) => Boolean(readPlatformKey(provider, env)))
+}

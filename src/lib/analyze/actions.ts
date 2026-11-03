@@ -3,13 +3,13 @@
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
-import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { AI_ERROR_MESSAGES } from "@/lib/ai/types"
 import { getAnalysis } from "@/lib/analyze/data"
 import { runJobAnalysis } from "@/lib/analyze/run"
 import { requireUser } from "@/lib/auth/session"
 import { formText, isUuid, type RecordFormState } from "@/lib/records/form-state"
 import { createClient } from "@/lib/supabase/server"
+import { analyzeAllowed } from "@/lib/beta"
 
 function fail(message: string): RecordFormState {
   return { status: "error", message, fieldErrors: {} }
@@ -25,7 +25,7 @@ export async function startAnalysis(
   _previous: RecordFormState,
   formData: FormData,
 ): Promise<RecordFormState> {
-  if (!jobAnalysisEnabled()) return fail(AI_ERROR_MESSAGES.features_disabled)
+  if (!(await analyzeAllowed())) return fail(AI_ERROR_MESSAGES.features_disabled)
   const requested = formText(formData, "executionMode")
   const executionMode = requested === "managed" || requested === "byok" || requested === "local" ? requested : "byok"
   const postingId = formText(formData, "postingId")
@@ -114,7 +114,7 @@ export async function claimRequirement(
   _previous: RecordFormState,
   formData: FormData,
 ): Promise<RecordFormState> {
-  if (!jobAnalysisEnabled()) return fail(AI_ERROR_MESSAGES.features_disabled)
+  if (!(await analyzeAllowed())) return fail(AI_ERROR_MESSAGES.features_disabled)
   const analysisId = formText(formData, "analysisId")
   const requirementId = formText(formData, "requirementId")
   if (!isUuid(analysisId) || !/^req-\d+$/.test(requirementId)) return fail("That requirement is not available.")

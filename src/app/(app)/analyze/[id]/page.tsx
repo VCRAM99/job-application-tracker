@@ -7,11 +7,9 @@ import { AnalysisResult } from "@/components/analyze/result"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
 import { MoreActions, MoreActionsLink } from "@/components/ui/more-actions"
-import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { getAnalysis, loadAnalysisContext, loadFactLabels } from "@/lib/analyze/data"
 import { isUuid } from "@/lib/records/form-state"
-import { resumeStudioEnabled } from "@/lib/resume/flags"
-import { careerCoachEnabled } from "@/lib/coach/flags"
+import { analyzeAllowed, coachAllowed, resumesAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Fit result" }
 export const instant = false
@@ -23,7 +21,7 @@ export default async function AnalysisDetailPage({
   params: Promise<{ id: string }>
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  if (!jobAnalysisEnabled()) {
+  if (!(await analyzeAllowed())) {
     return (
       <RecordState
         title="Fit analysis is off"
@@ -63,7 +61,7 @@ export default async function AnalysisDetailPage({
         subtitle={analysis.company || "Job text compared with verified career facts."}
         action={
           <div className="flex flex-wrap gap-2">
-            {resumeStudioEnabled() && analysis.status === "complete" ? (
+            {(await resumesAllowed()) && analysis.status === "complete" ? (
               <Button
                 nativeButton={false}
                 render={<Link href={`/resumes?analysis=${analysis.id}${analysis.applicationId ? `&application=${analysis.applicationId}` : ""}`} />}
@@ -71,7 +69,7 @@ export default async function AnalysisDetailPage({
                 Tailor resume
               </Button>
             ) : null}
-            {careerCoachEnabled() && analysis.status === "complete" ? (
+            {(await coachAllowed()) && analysis.status === "complete" ? (
               <Button variant="outline" nativeButton={false} render={<Link href={`/interview/new?analysis=${analysis.id}`} />}>
                 Prepare for interview
               </Button>

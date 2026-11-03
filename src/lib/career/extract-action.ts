@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 import { accountingProof, accountingSecret } from "@/lib/ai/accounting"
 import { decryptSecret, sha256 } from "@/lib/ai/crypto"
 import { EXTRACTION_JSON_SCHEMA, extractionSchema } from "@/lib/ai/extraction"
-import { managedAllowance, readPlatformKey } from "@/lib/ai/flags"
+import { managedAllowance, providerEnabled, readPlatformKey } from "@/lib/ai/flags"
 import { generateStructured } from "@/lib/ai/gateway"
 import { resolveExecutionMode } from "@/lib/ai/mode"
 import { assertSupportedModel } from "@/lib/ai/models"
@@ -43,6 +43,7 @@ export async function extractCareerFacts(
   const provider = settingsResult.data.provider
   const model = settingsResult.data.model
   if (!provider || !isProvider(provider) || !model) return fail(AI_ERROR_MESSAGES.not_configured)
+  if (!providerEnabled(provider)) return fail(AI_ERROR_MESSAGES.provider_disabled)
   try {
     assertSupportedModel(provider, model)
   } catch {

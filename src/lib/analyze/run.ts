@@ -1,7 +1,7 @@
 import "server-only"
 
 import { accountingSecret } from "@/lib/ai/accounting"
-import { jobAnalysisEnabled, jobAnalysisMockProvider, managedAllowance, readPlatformKey } from "@/lib/ai/flags"
+import { jobAnalysisMockProvider, managedAllowance, providerEnabled, readPlatformKey } from "@/lib/ai/flags"
 import { withUsageReservation } from "@/lib/ai/gateway"
 import { readByokKey, usageReservationDeps } from "@/lib/ai/run-context"
 import { resolveExecutionMode } from "@/lib/ai/mode"
@@ -21,6 +21,7 @@ import { completeWithProvider } from "@/lib/ai/providers"
 import { AiRequestError, AI_ERROR_MESSAGES, isProvider, isStoredMode, type AiErrorCode } from "@/lib/ai/types"
 import { requireUser } from "@/lib/auth/session"
 import { createClient } from "@/lib/supabase/server"
+import { analyzeAllowed } from "@/lib/beta"
 
 export type AnalysisRunInput = {
   jdText: string
@@ -38,7 +39,7 @@ export type AnalysisRunResult =
   | { ok: false; message: string }
 
 export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisRunResult> {
-  if (!jobAnalysisEnabled()) return { ok: false, message: AI_ERROR_MESSAGES.features_disabled }
+  if (!(await analyzeAllowed())) return { ok: false, message: AI_ERROR_MESSAGES.features_disabled }
   const validated = validateJobDescription(input.jdText)
   if (!validated.ok) return { ok: false, message: validated.message }
   const user = await requireUser()
@@ -54,6 +55,7 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
   if (!resolved.ok) return { ok: false, message: AI_ERROR_MESSAGES[resolved.code] }
   const provider = settingsResult.data.provider
   if (!provider || !isProvider(provider)) return { ok: false, message: AI_ERROR_MESSAGES.not_configured }
+  if (!providerEnabled(provider)) return { ok: false, message: AI_ERROR_MESSAGES.provider_disabled }
   let model: string
   try {
     model = analysisModelFor(provider)

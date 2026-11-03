@@ -12,10 +12,10 @@ import { initialRecordFormState, isUuid, type RecordFormState } from "@/lib/reco
 import { MIME_BY_KIND, PARSE_PROMPT_VERSION, PARSE_SCHEMA_VERSION, RESUME_BUCKET } from "@/lib/resume/constants"
 import { extractResumeText } from "@/lib/resume/extract"
 import { checkResumeFile, FILE_ERROR_MESSAGES, isOwnedResumePath, kindFromPath } from "@/lib/resume/files"
-import { resumeStudioEnabled } from "@/lib/resume/flags"
 import { sliceChars } from "@/lib/resume/text"
 import { parseResumeText } from "@/lib/resume/run-parse"
 import { createClient } from "@/lib/supabase/server"
+import { resumesAllowed } from "@/lib/beta"
 
 export type RegisterResult = { ok: true; id: string; existing: boolean } | { ok: false; message: string }
 
@@ -31,7 +31,7 @@ function labelFrom(value: string): string {
  * bytes, size, and extractable text. A rejected file is removed.
  */
 export async function registerResume(input: { path: string; label: string }): Promise<RegisterResult> {
-  if (!resumeStudioEnabled()) return { ok: false, message: OFF }
+  if (!(await resumesAllowed())) return { ok: false, message: OFF }
   const user = await requireUser()
   const path = String(input.path ?? "")
   if (!isOwnedResumePath(user.id, path)) return { ok: false, message: "That upload could not be found." }
@@ -98,7 +98,7 @@ export async function registerResume(input: { path: string; label: string }): Pr
  * application records what was sent.
  */
 export async function deleteResume(formData: FormData): Promise<RecordFormState> {
-  if (!resumeStudioEnabled()) return { status: "error", message: OFF, fieldErrors: {} }
+  if (!(await resumesAllowed())) return { status: "error", message: OFF, fieldErrors: {} }
   const user = await requireUser()
   const id = String(formData.get("resumeId") ?? "")
   if (!isUuid(id)) return { status: "error", message: "That resume could not be found.", fieldErrors: {} }
@@ -125,7 +125,7 @@ export async function deleteResume(formData: FormData): Promise<RecordFormState>
 
 /** Saves the extracted text through the existing career source flow, so facts still start as suggestions. */
 export async function saveResumeAsCareerSource(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!resumeStudioEnabled()) return { status: "error", message: OFF, fieldErrors: {} }
+  if (!(await resumesAllowed())) return { status: "error", message: OFF, fieldErrors: {} }
   const user = await requireUser()
   const id = String(formData.get("resumeId") ?? "")
   if (!isUuid(id)) return { status: "error", message: "That resume could not be found.", fieldErrors: {} }
@@ -149,7 +149,7 @@ function requestedMode(formData: FormData): "managed" | "byok" | "local" {
  * file hash, prompt version, mode, provider, and model.
  */
 export async function parseResume(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!resumeStudioEnabled()) return { status: "error", message: OFF, fieldErrors: {} }
+  if (!(await resumesAllowed())) return { status: "error", message: OFF, fieldErrors: {} }
   const user = await requireUser()
   const id = String(formData.get("resumeId") ?? "")
   if (!isUuid(id)) return { status: "error", message: "That resume could not be found.", fieldErrors: {} }

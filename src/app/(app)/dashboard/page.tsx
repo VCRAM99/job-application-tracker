@@ -6,19 +6,19 @@ import { Suspense } from "react"
 import { DashboardFollowUps } from "@/components/coach/entry-points"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { SectionSkeleton } from "@/components/shell/section-skeleton"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import { loadFollowUps } from "@/lib/coach/follow-up-data"
 import { APPLICATION_STATUS_LABELS } from "@/lib/records/constants"
 import { todayDate } from "@/lib/records/logic"
 import { buildDashboard } from "@/lib/records/dashboard"
 import { loadDashboardSources } from "@/lib/records/tracker-data"
+import { coachAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Dashboard" }
 
 export default async function DashboardPage() {
   await connection()
   // Follow-ups start alongside the dashboard queries and stream in when ready.
-  const followUps = careerCoachEnabled() ? loadFollowUps() : null
+  const followUps = (await coachAllowed()) ? loadFollowUps() : null
   followUps?.catch(() => {})
   const sources = await loadDashboardSources()
   const today = todayDate()

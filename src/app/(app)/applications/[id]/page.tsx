@@ -10,8 +10,6 @@ import { ApplicationStatusLabel, ApplicationStatusScope, StatusForm } from "@/co
 import { SectionSkeleton } from "@/components/shell/section-skeleton"
 import { Button } from "@/components/ui/button"
 import { MoreActions, MoreActionsLink } from "@/components/ui/more-actions"
-import { jobAnalysisEnabled } from "@/lib/ai/flags"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import { deleteApplication } from "@/lib/records/actions"
 import {
   EMPLOYMENT_TYPE_LABELS,
@@ -22,8 +20,8 @@ import {
 import { getApplication } from "@/lib/records/data"
 import { formatSalary } from "@/lib/records/logic"
 import { latestAnalysisForApplication, listVersionsForApplication } from "@/lib/resume/data"
-import { resumeStudioEnabled } from "@/lib/resume/flags"
 import { isFollowUpDue } from "@/lib/records/query"
+import { analyzeAllowed, coachAllowed, resumesAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Application" }
 
@@ -40,7 +38,7 @@ export default async function ApplicationDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const resumes = resumeStudioEnabled()
+  const resumes = (await resumesAllowed())
   // Versions and the latest analysis need only the id, so they load alongside the application.
   const [result, [versions, latestAnalysis]] = await Promise.all([
     getApplication(id),
@@ -77,8 +75,8 @@ export default async function ApplicationDetailPage({
         }
         menu={
           <MoreActions>
-            {jobAnalysisEnabled() ? <MoreActionsLink href={`/analyze?application=${application.id}`}>Analyze fit</MoreActionsLink> : null}
-            {resumes && latestAnalysis && jobAnalysisEnabled() ? (
+            {(await analyzeAllowed()) ? <MoreActionsLink href={`/analyze?application=${application.id}`}>Analyze fit</MoreActionsLink> : null}
+            {resumes && latestAnalysis && (await analyzeAllowed()) ? (
               <MoreActionsLink href={`/resumes?analysis=${latestAnalysis}&application=${application.id}`}>Tailor resume</MoreActionsLink>
             ) : null}
             <DeleteRecordButton
@@ -177,7 +175,7 @@ export default async function ApplicationDetailPage({
           <p className="text-sm leading-6 whitespace-pre-wrap">{application.notes}</p>
         </section>
       ) : null}
-      {careerCoachEnabled() ? (
+      {(await coachAllowed()) ? (
         <Suspense fallback={<SectionSkeleton label="Loading follow-ups and drafts…" />}>
           <ApplicationCoach applicationId={application.id} />
         </Suspense>

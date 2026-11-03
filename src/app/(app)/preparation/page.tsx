@@ -4,10 +4,10 @@ import Link from "next/link"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { PreparationFilters, PreparationTable } from "@/components/tracker/lists"
 import { Button } from "@/components/ui/button"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import { searchParamsToURL } from "@/lib/records/query"
 import { filterPreparation, parsePreparationListQuery, preparationProgress, sortPreparation } from "@/lib/records/tracker"
 import { listPreparation } from "@/lib/records/tracker-data"
+import { coachAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Preparation" }
 
@@ -27,7 +27,7 @@ export default async function PreparationPage({
         help="Certifications and interview practice you choose. This list is not a fixed catalog."
         action={
           <div className="flex flex-wrap gap-2">
-            {careerCoachEnabled() ? (
+            {(await coachAllowed()) ? (
               <Button variant="outline" nativeButton={false} render={<Link href="/interview/stories" />}>Story bank</Button>
             ) : null}
             <Button nativeButton={false} render={<Link href="/preparation/new" />}>Add item</Button>

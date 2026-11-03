@@ -7,9 +7,9 @@ import { done, fail } from "@/lib/coach/action-utils"
 import { userLocalDate } from "@/lib/coach/context"
 import { loadFollowUps } from "@/lib/coach/follow-up-data"
 import { SUGGESTION_KEY } from "@/lib/coach/follow-ups"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import type { RecordFormState } from "@/lib/records/form-state"
 import { createClient } from "@/lib/supabase/server"
+import { coachAllowed } from "@/lib/beta"
 
 const OFF = "Career coach is turned off."
 
@@ -26,7 +26,7 @@ function revalidateFollowUps(item: { applicationId: string | null; contactId: st
  * returns the existing task on a repeat click.
  */
 export async function createSuggestionTask(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!careerCoachEnabled()) return fail(OFF)
+  if (!(await coachAllowed())) return fail(OFF)
   const user = await requireUser()
   const key = String(formData.get("key") ?? "")
   if (!SUGGESTION_KEY.test(key)) return fail("That suggestion is no longer current.")
@@ -54,7 +54,7 @@ export async function createSuggestionTask(_previous: RecordFormState, formData:
 }
 
 export async function dismissSuggestion(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!careerCoachEnabled()) return fail(OFF)
+  if (!(await coachAllowed())) return fail(OFF)
   const user = await requireUser()
   const key = String(formData.get("key") ?? "")
   if (!SUGGESTION_KEY.test(key)) return fail("That suggestion is no longer current.")

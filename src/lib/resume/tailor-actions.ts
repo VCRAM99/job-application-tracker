@@ -7,18 +7,17 @@ import { redirect } from "next/navigation"
 
 import { prepareAiRun, usageReservationDeps } from "@/lib/ai/run-context"
 import { AiRequestError, AI_ERROR_MESSAGES } from "@/lib/ai/types"
-import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { fingerprintOf, getAnalysis, loadVerifiedFacts } from "@/lib/analyze/data"
 import { readabilityReport } from "@/lib/analyze/readability"
 import { requireUser } from "@/lib/auth/session"
 import { isUuid, type RecordFormState } from "@/lib/records/form-state"
 import { TAILOR_PROMPT_VERSION, TAILOR_SCHEMA_VERSION } from "@/lib/resume/constants"
 import { contentToText, resumeContentSchema, type ResumeContent } from "@/lib/resume/content"
-import { resumeStudioEnabled } from "@/lib/resume/flags"
 import { sliceChars } from "@/lib/resume/text"
 import { tailorResumeContent } from "@/lib/resume/run-tailor"
 import { applyEdits, type EditStatus, type ResumeEdit } from "@/lib/resume/tailor"
 import { createClient } from "@/lib/supabase/server"
+import { analyzeAllowed, resumesAllowed } from "@/lib/beta"
 
 function fail(message: string): RecordFormState {
   return { status: "error", message, fieldErrors: {} }
@@ -35,7 +34,7 @@ function mode(formData: FormData): "managed" | "byok" | "local" {
  * starts with every kept edit pending and the final content equal to the base.
  */
 export async function tailorResume(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!resumeStudioEnabled() || !jobAnalysisEnabled()) return fail("Resume tailoring is turned off.")
+  if (!(await resumesAllowed()) || !(await analyzeAllowed())) return fail("Resume tailoring is turned off.")
   const user = await requireUser()
   const resumeId = String(formData.get("resumeId") ?? "")
   const analysisId = String(formData.get("analysisId") ?? "")
@@ -155,7 +154,7 @@ export async function tailorResume(_previous: RecordFormState, formData: FormDat
 
 /** Sets one edit's status, or every pending edit with editId "all", and recomputes the final content on the server. */
 export async function decideEdit(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!resumeStudioEnabled()) return fail("Resume Studio is turned off.")
+  if (!(await resumesAllowed())) return fail("Resume Studio is turned off.")
   const user = await requireUser()
   const versionId = String(formData.get("versionId") ?? "")
   const editId = String(formData.get("editId") ?? "")
@@ -195,7 +194,7 @@ export async function decideEdit(_previous: RecordFormState, formData: FormData)
 
 /** Links a version to one of the user's applications, or clears the link. */
 export async function linkVersion(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!resumeStudioEnabled()) return fail("Resume Studio is turned off.")
+  if (!(await resumesAllowed())) return fail("Resume Studio is turned off.")
   const user = await requireUser()
   const versionId = String(formData.get("versionId") ?? "")
   const applicationId = String(formData.get("applicationId") ?? "")
@@ -213,7 +212,7 @@ export async function linkVersion(_previous: RecordFormState, formData: FormData
 
 /** Deletes one tailored version. The resume and any linked application are unchanged. */
 export async function deleteVersion(formData: FormData): Promise<RecordFormState> {
-  if (!resumeStudioEnabled()) return fail("Resume Studio is turned off.")
+  if (!(await resumesAllowed())) return fail("Resume Studio is turned off.")
   const user = await requireUser()
   const versionId = String(formData.get("versionId") ?? "")
   if (!isUuid(versionId)) return fail("That version could not be found.")

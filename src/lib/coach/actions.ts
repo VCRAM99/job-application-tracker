@@ -16,13 +16,13 @@ import {
   STORIES_PROMPT_VERSION,
 } from "@/lib/coach/constants"
 import { getQuestionSet, loadCoachAnalysis } from "@/lib/coach/data"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import { preparationCategory } from "@/lib/coach/questions"
 import { coachAnswer, generateQuestions, generateStories } from "@/lib/coach/run"
 import { STORY_FACT_TYPES } from "@/lib/coach/stories"
 import { isUuid, type RecordFormState } from "@/lib/records/form-state"
 import { sliceChars } from "@/lib/resume/text"
 import { createClient } from "@/lib/supabase/server"
+import { coachAllowed } from "@/lib/beta"
 
 const OFF = "Career coach is turned off."
 
@@ -34,7 +34,7 @@ function saveFailed(what: string, code: string | undefined): never {
 
 /** Generates technical and behavioral questions from a completed analysis's requirements and the user's verified facts. */
 export async function generateQuestionSet(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!careerCoachEnabled()) return fail(OFF)
+  if (!(await coachAllowed())) return fail(OFF)
   const user = await requireUser()
   const analysisId = String(formData.get("analysisId") ?? "")
   if (!isUuid(analysisId)) return fail("Choose a completed fit analysis.")
@@ -98,7 +98,7 @@ export async function generateQuestionSet(_previous: RecordFormState, formData: 
 
 /** Adds one question to Preparation, once. The question records the item it created. */
 export async function addQuestionToPrep(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!careerCoachEnabled()) return fail(OFF)
+  if (!(await coachAllowed())) return fail(OFF)
   await requireUser()
   const setId = String(formData.get("setId") ?? "")
   const questionId = String(formData.get("questionId") ?? "")
@@ -122,7 +122,7 @@ export async function addQuestionToPrep(_previous: RecordFormState, formData: Fo
 
 /** Builds or rebuilds the story bank from verified employment, accomplishment, and project facts. */
 export async function buildStoryBank(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!careerCoachEnabled()) return fail(OFF)
+  if (!(await coachAllowed())) return fail(OFF)
   const user = await requireUser()
   const facts = await loadVerifiedFacts()
   if (!facts.ok) return fail("Verified career facts could not be loaded.")
@@ -173,7 +173,7 @@ export async function buildStoryBank(_previous: RecordFormState, formData: FormD
 
 /** Coaches one typed practice answer. The notes are stored with the answer; no score is produced. */
 export async function practiceAnswer(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!careerCoachEnabled()) return fail(OFF)
+  if (!(await coachAllowed())) return fail(OFF)
   const user = await requireUser()
   const setId = String(formData.get("setId") ?? "")
   const questionId = String(formData.get("questionId") ?? "")
@@ -221,7 +221,7 @@ export async function practiceAnswer(_previous: RecordFormState, formData: FormD
 
 /** Deletes one question set and its practice answers. Preparation items it created stay. */
 export async function deleteQuestionSet(formData: FormData): Promise<RecordFormState> {
-  if (!careerCoachEnabled()) return fail(OFF)
+  if (!(await coachAllowed())) return fail(OFF)
   const user = await requireUser()
   const setId = String(formData.get("setId") ?? "")
   if (!isUuid(setId)) return fail("That question set could not be found.")

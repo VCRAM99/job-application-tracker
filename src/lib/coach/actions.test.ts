@@ -18,7 +18,7 @@ vi.mock("next/navigation", () => ({
     throw Object.assign(new Error("NEXT_REDIRECT"), { path })
   }),
 }))
-vi.mock("@/lib/auth/session", () => ({ requireUser: vi.fn(async () => ({ id: USER, email: null })) }))
+vi.mock("@/lib/auth/session", () => ({ requireUser: vi.fn(async () => ({ id: USER, email: null })), getCurrentUser: vi.fn(async () => ({ id: USER, email: null })) }))
 vi.mock("@/lib/coach/flags", () => ({ careerCoachEnabled: () => true }))
 vi.mock("@/lib/analyze/data", () => ({ loadVerifiedFacts: vi.fn(async () => ({ ok: true, facts: COACH_FACTS })), fingerprintOf: () => "fp" }))
 vi.mock("@/lib/ai/run-context", () => ({

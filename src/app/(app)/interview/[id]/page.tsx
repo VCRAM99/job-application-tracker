@@ -11,9 +11,9 @@ import { Button } from "@/components/ui/button"
 import { HelpTip } from "@/components/ui/help-tip"
 import { loadFactLabels } from "@/lib/analyze/data"
 import { getQuestionSet, listPracticeAnswers, loadCoachAnalysis } from "@/lib/coach/data"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import type { PracticeAttempt } from "@/lib/coach/data"
 import { loadExecutionMode } from "@/lib/resume/data"
+import { coachAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Interview questions" }
 export const instant = false
@@ -50,7 +50,7 @@ function Feedback({ attempt }: { attempt: PracticeAttempt }) {
 }
 
 export default async function QuestionSetPage({ params }: { params: Promise<{ id: string }> }) {
-  if (!careerCoachEnabled()) return <CoachOff />
+  if (!(await coachAllowed())) return <CoachOff />
   await connection()
   const { id } = await params
   const [set, mode] = await Promise.all([getQuestionSet(id), loadExecutionMode()])

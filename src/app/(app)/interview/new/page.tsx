@@ -7,14 +7,14 @@ import { GenerateQuestionsForm } from "@/components/coach/interview-forms"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
 import { listQuestionSets, loadCoachAnalysis } from "@/lib/coach/data"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import { loadExecutionMode } from "@/lib/resume/data"
+import { coachAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Interview prep" }
 export const instant = false
 
 export default async function NewInterviewPrepPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  if (!careerCoachEnabled()) return <CoachOff />
+  if (!(await coachAllowed())) return <CoachOff />
   await connection()
   const query = await searchParams
   const analysisId = typeof query.analysis === "string" ? query.analysis : ""

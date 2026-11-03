@@ -8,13 +8,13 @@ import { ListPager } from "@/components/records/pagination"
 import { ContactFilters, ContactTable } from "@/components/tracker/lists"
 import { SectionSkeleton } from "@/components/shell/section-skeleton"
 import { Button } from "@/components/ui/button"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import { listContacts } from "@/lib/records/tracker-data"
 import { todayDate } from "@/lib/records/logic"
 import { paginate, parsePage } from "@/lib/records/pagination"
 import { isOverdue, isUpcoming } from "@/lib/records/tracker"
 import { filterContacts, parseContactListQuery, sortContacts } from "@/lib/records/tracker"
 import { searchParamsToURL } from "@/lib/records/query"
+import { coachAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Networking" }
 
@@ -38,7 +38,7 @@ export default async function NetworkingPage({
         help="Contacts and follow-ups. Nothing here sends email or LinkedIn messages."
         action={<Button nativeButton={false} render={<Link href="/networking/new" />}>Add contact</Button>}
       />
-      {careerCoachEnabled() ? (
+      {(await coachAllowed()) ? (
         <Suspense fallback={<SectionSkeleton label="Loading drafts…" />}>
           <RecentDrafts />
         </Suspense>

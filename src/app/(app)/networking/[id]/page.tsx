@@ -9,12 +9,12 @@ import { DetailList, PageHeader, RecordState } from "@/components/records/fields
 import { SectionSkeleton } from "@/components/shell/section-skeleton"
 import { Button } from "@/components/ui/button"
 import { MoreActions } from "@/components/ui/more-actions"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import { OUTREACH_LABELS, RELATIONSHIP_LABELS } from "@/lib/records/constants"
 import { deleteContact } from "@/lib/records/tracker-actions"
 import { getContact } from "@/lib/records/tracker-data"
 import { isOverdue } from "@/lib/records/tracker"
 import { todayDate } from "@/lib/records/logic"
+import { coachAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Contact" }
 
@@ -45,7 +45,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
         subtitle={[contact.roleTitle, contact.organization].filter(Boolean).join(" · ") || "Contact"}
         action={
           <div className="flex flex-wrap gap-2">
-            {careerCoachEnabled() ? (
+            {(await coachAllowed()) ? (
               <Button nativeButton={false} render={<Link href={`/drafts/new?contact=${contact.id}`} />}>Draft outreach</Button>
             ) : null}
             <Button variant="outline" nativeButton={false} render={<Link href={`/networking/${contact.id}/edit`} />}>Edit</Button>
@@ -107,7 +107,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
           <p className="text-sm leading-6 whitespace-pre-wrap">{contact.notes}</p>
         </section>
       ) : null}
-      {careerCoachEnabled() ? (
+      {(await coachAllowed()) ? (
         <Suspense fallback={<SectionSkeleton label="Loading follow-ups and drafts…" />}>
           <ContactCoach contactId={contact.id} />
         </Suspense>
