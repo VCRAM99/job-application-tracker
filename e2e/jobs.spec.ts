@@ -25,9 +25,13 @@ test("jobs: search, save, hide, add to tracker", async ({ page }) => {
   await expect(card(page, "Account Executive")).toBeVisible()
   await expect(card(page, "Senior Backend Engineer")).toHaveCount(0)
   // Less frequent actions moved into the card's ⋯ menu stay reachable.
-  await card(page, "Account Executive").getByRole("button", { name: "More job actions" }).click()
+  const more = card(page, "Account Executive").getByRole("button", { name: "More job actions" })
+  await more.click()
+  // The panel renders in a portal; the ⋯ button names it with aria-controls.
+  const panel = page.locator(`[id="${await more.getAttribute("aria-controls")}"]`)
   for (const name of ["Not interested", "Already applied", "Prefer company", "Exclude company"]) {
-    await expect(card(page, "Account Executive").getByRole("button", { name })).toBeVisible()
+    await expect(panel.getByRole("button", { name })).toBeVisible()
+    await expect(panel.getByRole("button", { name })).toBeInViewport()
   }
   await page.keyboard.press("Escape")
 

@@ -60,6 +60,9 @@ const SUMMARY: Record<string, string> = {
   "state-error-application-form": "Validation errors stay visible next to each field.",
   "state-dialog-delete-application": "Same confirmation dialog, opened from the ⋯ menu.",
   "state-dialog-mark-sent": "Same confirmation dialog.",
+  "state-menu-application": "New: the ⋯ menu on application detail, kept inside the viewport at 390px.",
+  "state-menu-job": "New: a job card's ⋯ menu with the less frequent actions.",
+  "state-helptip-dashboard": "New: the header HelpTip, opened by tap on mobile.",
 }
 
 const before = existsSync(path.join(DIR, "before")) ? readdirSync(path.join(DIR, "before")) : []

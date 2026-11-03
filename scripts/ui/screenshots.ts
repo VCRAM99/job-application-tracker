@@ -312,6 +312,33 @@ async function main() {
       },
     },
     {
+      name: "state-menu-application",
+      path: `/applications/${ids.application}`,
+      mobile: true,
+      prepare: async (target) => {
+        await target.getByRole("button", { name: "More actions" }).first().click()
+        await target.waitForTimeout(200)
+      },
+    },
+    {
+      name: "state-menu-job",
+      path: "/jobs",
+      mobile: true,
+      prepare: async (target) => {
+        await target.getByRole("button", { name: "More job actions" }).first().click()
+        await target.waitForTimeout(200)
+      },
+    },
+    {
+      name: "state-helptip-dashboard",
+      path: "/dashboard",
+      mobile: true,
+      prepare: async (target) => {
+        await target.getByRole("button", { name: "About Dashboard" }).click()
+        await target.waitForTimeout(200)
+      },
+    },
+    {
       name: "state-dialog-mark-sent",
       path: `/drafts/${ids.draft}`,
       prepare: async (target) => {
