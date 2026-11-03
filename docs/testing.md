@@ -56,15 +56,21 @@ This builds the app once (`e2e/support/serve.ts build`), then Playwright:
 | `flags-off.spec.ts` | off states for jobs, fit analysis, Resume Studio, and the coach pages; tracking pages still work and hide V2 entry points |
 | `mobile.spec.ts` | ten key pages on a Pixel 7 viewport with no horizontal scroll, and the mobile navigation |
 
-The resume test alone sets `bypassCSP`. The production CSP allows `https://*.supabase.co` only, so the browser's direct upload to local Storage would be blocked under `next start`. Every other test runs with the real policy.
+Every test, including the resume upload, runs with the real production CSP. Its connect-src names the configured Supabase origin (`http://127.0.0.1:54321` in the e2e build).
 
 ### Why e2e is a local gate, not a CI job
 
 The suite needs the full local Supabase stack (Postgres, Auth, Storage, PostgREST, and about ten containers), a production build, three servers, and local secrets generated per machine for the credential key ring, accounting gate, and catalog gate. GitHub Actions could run `supabase start`, but the image pulls and stack start-up add several minutes and are a known source of flaky runs, and the secrets would have to be generated in the workflow. Run `npm run test:e2e` before opening a PR that touches UI, data access, or actions. A CI job is a reasonable follow-up once the stack start-up has proven reliable there.
 
-## Live model evals
+## AI evals
 
-`scripts/eval/*-live.ts` call a real provider with fictional fixtures and report how many outputs the validators keep or drop. They are opt-in and cost tokens. See [ai.md](ai.md), [analyze.md](analyze.md), [resume-studio.md](resume-studio.md), and [career-coach.md](career-coach.md).
+`scripts/eval/run.ts` runs fit analysis (M3), Resume Studio (M4), and the coach (M5) through the app's prompts and validators on fictional fixtures. It plants fabrications, injected instructions, and bad citations in the model's output; the validators must drop them all.
+
+```bash
+npm run test:eval
+```
+
+That is `--mock --check`: deterministic, no network, and it fails on any safety regression. CI runs it. `--live --write` calls Gemini (reading `GEMINI_API_KEY` from the shell or that one key from `.env.local`, never printed), spends tokens, writes no database, and updates [evals/latest.md](evals/latest.md).
 
 ## Performance measurement
 

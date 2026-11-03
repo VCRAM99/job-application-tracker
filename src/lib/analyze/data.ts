@@ -1,6 +1,5 @@
 import "server-only"
 
-import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { requireUser } from "@/lib/auth/session"
 import { PROMPT_VERSION, SCHEMA_VERSION } from "@/lib/analyze/constants"
 import { profileFingerprint } from "@/lib/analyze/facts"
@@ -16,6 +15,7 @@ import type {
 import { jobsErrorKind } from "@/lib/jobs/query"
 import { isMissingTable } from "@/lib/records/logic"
 import { createClient } from "@/lib/supabase/server"
+import { analyzeAllowed } from "@/lib/beta"
 
 export type AnalysisStatus = "pending" | "complete" | "failed"
 
@@ -109,7 +109,7 @@ function mapAnalysis(row: Record<string, unknown>): AnalysisRecord {
 }
 
 export async function listAnalyses(): Promise<{ ok: true; analyses: AnalysisSummary[] } | { ok: false; error: LoadError }> {
-  if (!jobAnalysisEnabled()) return { ok: false, error: "disabled" }
+  if (!(await analyzeAllowed())) return { ok: false, error: "disabled" }
   await requireUser()
   const supabase = await createClient()
   const result = await supabase
@@ -135,7 +135,7 @@ export async function listAnalyses(): Promise<{ ok: true; analyses: AnalysisSumm
 export async function getAnalysis(
   id: string,
 ): Promise<{ ok: true; analysis: AnalysisRecord | null } | { ok: false; error: LoadError }> {
-  if (!jobAnalysisEnabled()) return { ok: false, error: "disabled" }
+  if (!(await analyzeAllowed())) return { ok: false, error: "disabled" }
   await requireUser()
   const supabase = await createClient()
   const result = await supabase.from("job_analyses").select("*").eq("id", id).maybeSingle()
@@ -249,7 +249,7 @@ export async function loadAnalysisContext(): Promise<
     }
   | { ok: false; error: LoadError }
 > {
-  if (!jobAnalysisEnabled()) return { ok: false, error: "disabled" }
+  if (!(await analyzeAllowed())) return { ok: false, error: "disabled" }
   const supabase = await createClient()
   const [settings, sources, credentials] = await Promise.all([
     supabase.from("ai_user_settings").select("execution_mode, provider").maybeSingle(),

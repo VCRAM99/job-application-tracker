@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useAiAvailability } from "@/components/ai/availability"
 import { HelpTip } from "@/components/ui/help-tip"
 import { initialRecordFormState, type RecordFormState } from "@/lib/records/form-state"
 import { deleteResume, parseResume, saveResumeAsCareerSource } from "@/lib/resume/actions"
@@ -24,15 +25,19 @@ type Mode = "managed" | "byok"
 
 /** Billing mode stays visible next to every AI action. */
 function ModePicker({ mode }: { mode: Mode }) {
+  // Managed AI is offered only when the server enables it; otherwise "Your key" is the only, visible, mode.
+  const { managed } = useAiAvailability()
   return (
     <fieldset className="flex flex-wrap items-center gap-3 text-sm">
       <legend className="sr-only">Billing</legend>
       <label className="flex items-center gap-1.5">
-        <input type="radio" name="executionMode" value="byok" defaultChecked={mode !== "managed"} /> Your key
+        <input type="radio" name="executionMode" value="byok" defaultChecked={mode !== "managed" || !managed} /> Your key
       </label>
-      <label className="flex items-center gap-1.5">
-        <input type="radio" name="executionMode" value="managed" defaultChecked={mode === "managed"} /> Managed
-      </label>
+      {managed ? (
+        <label className="flex items-center gap-1.5">
+          <input type="radio" name="executionMode" value="managed" defaultChecked={mode === "managed"} /> Managed
+        </label>
+      ) : null}
     </fieldset>
   )
 }

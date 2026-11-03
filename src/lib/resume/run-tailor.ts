@@ -27,7 +27,7 @@ export async function tailorResumeContent(input: {
   facts: VerifiedFact[]
   run: Pick<AiRun, "provider" | "model" | "mode" | "apiKey" | "managedAllowed">
   reservation: Pick<GatewayDeps<unknown>, "reserve" | "finalize" | "voidReservation">
-  persist: (outcome: TailorOutcome) => Promise<void>
+  persist: (outcome: TailorOutcome, modelUsed: string) => Promise<void>
   complete?: (request: StructuredRequest) => Promise<StructuredResponse>
 }) {
   const complete = input.complete ?? ((request: StructuredRequest) => completeWithProvider(input.run.provider, request))
@@ -54,7 +54,7 @@ export async function tailorResumeContent(input: {
           schemaName: "resume_edits",
           jsonSchema: TAILOR_JSON_SCHEMA,
         }),
-      persist: (raw) => input.persist(validateEdits(raw.edits, input.content, input.facts)),
+      persist: (raw, _id, modelUsed) => input.persist(validateEdits(raw.edits, input.content, input.facts), modelUsed),
     },
   )
 }

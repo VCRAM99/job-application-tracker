@@ -69,15 +69,15 @@ test("applications: create, edit, change status, delete", async ({ page }) => {
   await open(page, "/applications")
   await page.getByLabel("Status").selectOption("recruiter_screen")
   await page.getByRole("button", { name: "Apply filters" }).click()
-  await expect(page.getByRole("link", { name: "Platform Engineer" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "Platform Engineer", exact: true })).toBeVisible()
 
-  await page.getByRole("link", { name: "Platform Engineer" }).click()
+  await page.getByRole("link", { name: "Platform Engineer", exact: true }).click()
   // Delete lives in the ⋯ menu; it still opens the same confirmation dialog.
   await page.getByRole("button", { name: "More actions" }).click()
   await page.getByRole("button", { name: "Delete application" }).click()
   await page.getByRole("dialog").getByRole("button", { name: "Delete application" }).click()
   await page.waitForURL("**/applications")
-  await expect(page.getByRole("link", { name: "Platform Engineer" })).toHaveCount(0)
+  await expect(page.getByRole("link", { name: "Platform Engineer", exact: true })).toHaveCount(0)
 })
 
 test("applications: CSV import and export", async ({ page }, testInfo) => {

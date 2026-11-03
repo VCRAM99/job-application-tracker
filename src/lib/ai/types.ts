@@ -26,6 +26,8 @@ export const AI_ERROR_CODES = [
   "mode_mismatch",
   "in_progress",
   "not_configured",
+  "provider_disabled",
+  "ai_rate_limited",
 ] as const
 
 export type AiErrorCode = (typeof AI_ERROR_CODES)[number]
@@ -48,6 +50,8 @@ export const AI_ERROR_MESSAGES: Record<AiErrorCode, string> = {
   mode_unavailable: "Local desktop execution is not available in this version.",
   mode_mismatch: "The request does not match the execution mode saved in AI settings.",
   in_progress: "This extraction is already running. Wait a moment and try again.",
+  provider_disabled: "That AI provider is not enabled on this server. Choose an enabled provider in Settings.",
+  ai_rate_limited: "You have reached the AI request limit for now. Wait a minute and try again, or come back tomorrow.",
   not_configured: "Choose a provider and model in AI settings first.",
 }
 
@@ -70,6 +74,8 @@ export type StructuredRequest = {
 export type StructuredResponse = TokenUsage & {
   text: string
   finishReason: string | null
+  /** Set when a fallback model answered instead of the requested one. */
+  modelUsed?: string
 }
 
 export class AiRequestError extends Error {

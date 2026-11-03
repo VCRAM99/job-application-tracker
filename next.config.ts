@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
+import { withSentryConfig } from "@sentry/nextjs/config";
 
 import { devSupabaseGuardError } from "./src/lib/dev-guard";
 import { securityHeaders } from "./src/lib/security-headers";
@@ -19,6 +20,10 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  // The browser SDK starts only when a DSN was present at build time.
+  env: { NEXT_PUBLIC_SENTRY_DSN: process.env.SENTRY_DSN?.trim() ?? "" },
+  // The resume PDF export reads its embedded Noto Sans files at runtime.
+  outputFileTracingIncludes: { "/api/resumes/versions/[id]/export": ["./src/lib/resume/fonts/*"] },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
@@ -40,5 +45,17 @@ export default function config(phase: string): NextConfig {
     const error = devSupabaseGuardError(process.env);
     if (error) throw new Error(error);
   }
-  return nextConfig;
+  if (!process.env.SENTRY_DSN?.trim()) return nextConfig;
+  // Sentry's build step only with a DSN: the /monitoring tunnel, and source maps uploaded only
+  // when SENTRY_AUTH_TOKEN (plus SENTRY_ORG and SENTRY_PROJECT) is present at build.
+  const token = process.env.SENTRY_AUTH_TOKEN?.trim();
+  return withSentryConfig(nextConfig, {
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    authToken: token,
+    tunnelRoute: "/monitoring",
+    silent: true,
+    telemetry: false,
+    sourcemaps: { disable: !token, deleteSourcemapsAfterUpload: true },
+  }) as NextConfig;
 }

@@ -63,4 +63,6 @@ The application status change, task completion, job Save/Unsave and Hide/Unhide,
 
 - `next dev` refuses to start unless `NEXT_PUBLIC_SUPABASE_URL` is the local stack (`http://127.0.0.1:54321` or `localhost`). Setting `ALLOW_REMOTE_SUPABASE_IN_DEV=true` allows a hosted project on purpose. The check runs only in the development-server phase (`next.config.ts`, `src/lib/dev-guard.ts`), so `next build` and production servers are unaffected.
 - `PERF_TIMING=1` (ignored on Vercel) logs each Supabase request's method, path, status, and duration, never query strings, headers, or bodies (`src/lib/supabase/timing.ts`). Only `scripts/perf/measure.ts` turns it on.
+- V2 features need both their flag and beta access (`src/lib/beta.ts`). The check is per request and per user: the nav, pages, server actions, and `prepareAiRun` all call the same `v2Allowed` helpers, so a hidden link cannot be bypassed with a direct request. See [ai.md](ai.md#beta-access-and-providers).
+- The CSP's `connect-src` names only the configured Supabase origin, plus its WebSocket form (`src/lib/security-headers.ts`). Production also sends HSTS, COOP and a restrictive Permissions-Policy.
 - Feature flags default off and are read on the server at request time, so the same build serves both flag states (the e2e suite runs one build with flags on and off).

@@ -1,17 +1,18 @@
 import { AiSettingsForm } from "@/components/career/forms"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { aiFeaturesEnabled, managedAllowance, platformKeyConfigured } from "@/lib/ai/flags"
+import { managedAllowance, platformKeyConfigured } from "@/lib/ai/flags"
 import { credentialConfigError } from "@/lib/ai/crypto"
 import { revokeProviderCredential, saveAiSettings, saveProviderCredential } from "@/lib/career/settings-actions"
 import { loadCareer } from "@/lib/career/data"
+import { careerAllowed } from "@/lib/beta"
 
 export async function AiSettingsSection() {
-  if (!aiFeaturesEnabled()) {
+  if (!(await careerAllowed())) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>AI</CardTitle>
-          <CardDescription>Career AI is off until AI_FEATURES_ENABLED is set on the server.</CardDescription>
+          <CardDescription>AI features are not available for your account yet.</CardDescription>
         </CardHeader>
       </Card>
     )

@@ -1,0 +1,68 @@
+{
+  "mode": "mock",
+  "model": "mock",
+  "at": "2026-11-03T04:11:01.121Z",
+  "safety": {
+    "fabricationCatch": 1,
+    "injectionCatch": 1,
+    "citationValidity": 1,
+    "injectedLeaks": 0
+  },
+  "planted": {
+    "fabrication": 34,
+    "injection": 3,
+    "citations": 2
+  },
+  "quality": {
+    "precision": 0.31343283582089554,
+    "recall": 1
+  },
+  "usage": {
+    "calls": 14,
+    "inputTokens": 0,
+    "outputTokens": 0,
+    "fallbacks": 0
+  },
+  "rows": [
+    {
+      "suite": "M3 extraction",
+      "metric": "precision (kept that match an expected requirement)",
+      "value": "31.3%"
+    },
+    {
+      "suite": "M3 extraction",
+      "metric": "recall (expected requirements found)",
+      "value": "100%"
+    },
+    {
+      "suite": "M3 extraction",
+      "metric": "grounding drop rate",
+      "value": "0%"
+    },
+    {
+      "suite": "M4 parse",
+      "metric": "grounding drops (items not in the resume text)",
+      "value": "1"
+    },
+    {
+      "suite": "M4 tailor",
+      "metric": "kept / dropped edits",
+      "value": "1 / 0"
+    },
+    {
+      "suite": "M5 research",
+      "metric": "kept / dropped claims",
+      "value": "2 / 0"
+    },
+    {
+      "suite": "M5 questions",
+      "metric": "kept / dropped",
+      "value": "2 / 1"
+    },
+    {
+      "suite": "M5 draft",
+      "metric": "kept / dropped sentences",
+      "value": "3 / 0"
+    }
+  ]
+}

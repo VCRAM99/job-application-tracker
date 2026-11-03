@@ -1,3 +1,4 @@
+import { reportFailure } from "@/lib/monitoring/report"
 import type { z } from "zod"
 
 import { assertSupportedModel } from "@/lib/ai/models"
@@ -22,7 +23,8 @@ export type GatewayDeps<T> = {
   finalize: (id: string, usage: TokenUsage) => Promise<void>
   voidReservation: (id: string, code: string) => Promise<void>
   complete: (user: string) => Promise<StructuredResponse>
-  persist?: (data: T, usageEventId: string) => Promise<void>
+  /** `modelUsed` is the model that answered, which differs from the requested one after an overload fallback. */
+  persist?: (data: T, usageEventId: string, modelUsed: string) => Promise<void>
 }
 
 export type GenerateResult<T> =
@@ -94,7 +96,7 @@ export async function generateStructured<T>(
         inputTokens: response.inputTokens,
         outputTokens: response.outputTokens,
       }
-      if (deps.persist) await deps.persist(parsed.data, reservation.id)
+      if (deps.persist) await deps.persist(parsed.data, reservation.id, response.modelUsed ?? input.model)
       await deps.finalize(reservation.id, usage)
       return {
         ok: true,
@@ -106,6 +108,8 @@ export async function generateStructured<T>(
     } catch (error) {
       const ai = mapProviderFailure(error)
       if (!ai.retryable || attempt === 3) {
+        // Reported once, for the attempt that ends the run, not for each retry.
+        reportProviderFailure(ai.code, input.provider, input.model)
         await deps.voidReservation(reservation.id, ai.code)
         return failure(ai.code, reservation.id)
       }
@@ -168,6 +172,7 @@ export async function withUsageReservation<T>(
     }
   } catch (error) {
     const ai = mapProviderFailure(error)
+    reportProviderFailure(ai.code, input.provider, input.model)
     try {
       await deps.voidReservation(reservation.id, ai.code)
     } catch {
@@ -202,4 +207,10 @@ function failure<T>(code: AiErrorCode, usageEventId?: string): GenerateResult<T>
     message: new AiRequestError(code).message,
     usageEventId,
   }
+}
+
+/** Provider-side failures go to monitoring by code, provider, and model only (never input or keys). */
+const REPORTED_CODES = new Set(["provider_outage", "model_unavailable", "unsupported_model", "invalid_response", "context_limit", "transient"])
+function reportProviderFailure(code: string, provider: string, model: string) {
+  if (REPORTED_CODES.has(code)) void reportFailure("ai_provider_error", { code, provider, model })
 }

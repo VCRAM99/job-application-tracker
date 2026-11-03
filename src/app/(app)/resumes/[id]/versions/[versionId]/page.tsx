@@ -11,8 +11,8 @@ import { Button } from "@/components/ui/button"
 import { HelpTip } from "@/components/ui/help-tip"
 import { loadFactLabels } from "@/lib/analyze/data"
 import { getVersion, listApplicationOptions } from "@/lib/resume/data"
-import { resumeStudioEnabled } from "@/lib/resume/flags"
 import { DROP_REASONS } from "@/lib/resume/tailor"
+import { resumesAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Tailored resume" }
 export const instant = false
@@ -35,7 +35,7 @@ const DROP_LABELS: Record<string, string> = {
 }
 
 export default async function VersionPage({ params }: { params: Promise<{ id: string; versionId: string }> }) {
-  if (!resumeStudioEnabled()) return <ResumeStudioOff />
+  if (!(await resumesAllowed())) return <ResumeStudioOff />
   await connection()
   const { versionId } = await params
   const [version, applications] = await Promise.all([getVersion(versionId), listApplicationOptions()])

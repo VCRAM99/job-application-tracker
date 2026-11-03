@@ -18,7 +18,7 @@ export async function parseResumeText(input: {
   text: string
   run: Pick<AiRun, "provider" | "model" | "mode" | "apiKey" | "managedAllowed">
   reservation: Pick<GatewayDeps<unknown>, "reserve" | "finalize" | "voidReservation">
-  persist: (outcome: ParseOutcome) => Promise<void>
+  persist: (outcome: ParseOutcome, modelUsed: string) => Promise<void>
   complete?: (request: StructuredRequest) => Promise<StructuredResponse>
 }) {
   const complete = input.complete ?? ((request: StructuredRequest) => completeWithProvider(input.run.provider, request))
@@ -45,7 +45,7 @@ export async function parseResumeText(input: {
           jsonSchema: RESUME_CONTENT_JSON_SCHEMA,
           thinking: "low",
         }),
-      persist: (raw) => input.persist(groundResume(input.text, raw)),
+      persist: (raw, _id, modelUsed) => input.persist(groundResume(input.text, raw), modelUsed),
     },
   )
 }

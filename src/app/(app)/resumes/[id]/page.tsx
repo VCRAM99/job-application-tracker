@@ -8,22 +8,21 @@ import { AnalysisPicker, ParseForm, ResumeMenu } from "@/components/resume/forms
 import { ResumeStudioOff } from "@/components/resume/off"
 import { ResumePreview } from "@/components/resume/view"
 import { HelpTip } from "@/components/ui/help-tip"
-import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { AI_ERROR_MESSAGES, type AiErrorCode } from "@/lib/ai/types"
 import { getResume, listCompletedAnalyses, loadExecutionMode } from "@/lib/resume/data"
-import { resumeStudioEnabled } from "@/lib/resume/flags"
+import { analyzeAllowed, resumesAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Resume" }
 export const instant = false
 
 export default async function ResumePage({ params }: { params: Promise<{ id: string }> }) {
-  if (!resumeStudioEnabled()) return <ResumeStudioOff />
+  if (!(await resumesAllowed())) return <ResumeStudioOff />
   await connection()
   const { id } = await params
   const [loaded, mode, analyses] = await Promise.all([
     getResume(id),
     loadExecutionMode(),
-    jobAnalysisEnabled() ? listCompletedAnalyses() : Promise.resolve([]),
+    (await analyzeAllowed()) ? listCompletedAnalyses() : Promise.resolve([]),
   ])
   if (!loaded) notFound()
   const { resume, versions } = loaded
@@ -67,7 +66,7 @@ export default async function ResumePage({ params }: { params: Promise<{ id: str
         </details>
       )}
 
-      {resume.parsed && jobAnalysisEnabled() ? (
+      {resume.parsed && (await analyzeAllowed()) ? (
         <section className="flex flex-col gap-2" aria-labelledby="tailor-heading">
           <h2 id="tailor-heading" className="text-sm font-medium">Tailor to an analysis</h2>
           <AnalysisPicker resumeId={resume.id} analyses={analyses} />

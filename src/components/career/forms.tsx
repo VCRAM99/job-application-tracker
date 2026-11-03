@@ -6,7 +6,8 @@ import { FACT_LABELS } from "@/lib/career/constants"
 import type { CareerFact, CareerSource, CareerSuggestionView, AiSettingsView } from "@/lib/career/data"
 import { FACT_TYPES, type FactType } from "@/lib/ai/extraction"
 import { modelsFor } from "@/lib/ai/models"
-import { PROVIDERS, type ProviderId } from "@/lib/ai/types"
+import type { ProviderId } from "@/lib/ai/types"
+import { useAiAvailability } from "@/components/ai/availability"
 import { Field, FormStatus, NativeSelect } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -281,7 +282,10 @@ export function AiSettingsForm({
     credentialAction,
     initialRecordFormState,
   )
-  const provider = settings.provider ?? "openai"
+  const { managed, providers } = useAiAvailability()
+  // Only enabled providers are offered. A saved provider that is now disabled falls back to the first enabled one.
+  const provider = settings.provider && providers.includes(settings.provider) ? settings.provider : (providers[0] ?? "google")
+  const label = (item: ProviderId) => `${PROVIDER_LABELS[item]}${item === "google" ? "" : " (Beta — not live-verified)"}`
   return (
     <div className="grid gap-8">
       <form action={formAction} className="grid gap-4">
@@ -289,47 +293,61 @@ export function AiSettingsForm({
         <fieldset className="grid gap-2">
           <legend className="text-sm font-medium">Execution mode</legend>
           <label className="flex items-center gap-2 text-sm">
-            <input type="radio" name="executionMode" value="byok" defaultChecked={settings.executionMode !== "managed"} />
+            <input type="radio" name="executionMode" value="byok" defaultChecked={settings.executionMode !== "managed" || !managed} />
             Bring your own key
           </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="radio" name="executionMode" value="managed" defaultChecked={settings.executionMode === "managed"} />
-            Managed AI
-          </label>
+          {managed ? (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="radio" name="executionMode" value="managed" defaultChecked={settings.executionMode === "managed"} />
+              Managed AI
+            </label>
+          ) : null}
           <p className="text-sm text-muted-foreground">Local desktop execution is not available in this version.</p>
         </fieldset>
         <Field name="provider" label="Provider">
           <NativeSelect id="provider" name="provider" defaultValue={provider}>
-            {PROVIDERS.map((item) => (
-              <option key={item} value={item}>{PROVIDER_LABELS[item]}</option>
+            {providers.map((item) => (
+              <option key={item} value={item}>{label(item)}</option>
             ))}
           </NativeSelect>
         </Field>
         <Field name="model" label="Model">
-          <NativeSelect id="model" name="model" defaultValue={settings.model ?? modelsFor(provider)[0]?.id}>
-            {PROVIDERS.flatMap((item) =>
+          <NativeSelect id="model" name="model" defaultValue={settings.provider === provider && settings.model ? settings.model : modelsFor(provider)[0]?.id}>
+            {providers.flatMap((item) =>
               modelsFor(item).map((model) => (
                 <option key={model.id} value={model.id}>{PROVIDER_LABELS[item]} · {model.label}</option>
               )),
             )}
           </NativeSelect>
         </Field>
+        {managed ? (
         <p className="text-sm text-muted-foreground">
           Managed allowance: {managedReady && usage.policyEnabled ? `${usage.requestLimit} requests and ${usage.tokenLimit} tokens this month` : "not configured"}.
           Used this month: {usage.requests} requests, {usage.tokens} tokens.
           Estimates in dollars are omitted until a rate table is configured.
         </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Used this month with your key: {usage.requests} requests, {usage.tokens} tokens.
+          </p>
+        )}
         <Button type="submit" disabled={pending}>Save AI settings</Button>
       </form>
       <form action={credentialFormAction} className="grid gap-4">
         <FormStatus state={credentialState} />
         <Field name="credentialProvider" label="Key provider">
           <NativeSelect id="credentialProvider" name="provider" defaultValue={provider}>
-            {PROVIDERS.map((item) => (
-              <option key={item} value={item}>{PROVIDER_LABELS[item]}</option>
+            {providers.map((item) => (
+              <option key={item} value={item}>{label(item)}</option>
             ))}
           </NativeSelect>
         </Field>
+        {providers.includes("google") ? (
+          <p className="rounded-lg border border-[color-mix(in_oklch,var(--status-overdue)_35%,var(--border))] px-3 py-2 text-sm" role="note">
+            Gemini free tier: Google may use your prompts and outputs to improve its products. Do not use a free-tier key
+            with sensitive resumes, job descriptions, or notes; use a paid (billing-enabled) Gemini key for those.
+          </p>
+        ) : null}
         <Field name="secret" label="API key">
           <Input id="secret" name="secret" type="password" autoComplete="off" placeholder="Paste a new key" />
         </Field>

@@ -14,7 +14,7 @@ const state = vi.hoisted(() => ({
 }))
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
-vi.mock("@/lib/auth/session", () => ({ requireUser: vi.fn(async () => ({ id: USER, email: null })) }))
+vi.mock("@/lib/auth/session", () => ({ requireUser: vi.fn(async () => ({ id: USER, email: null })), getCurrentUser: vi.fn(async () => ({ id: USER, email: null })) }))
 vi.mock("@/lib/resume/flags", () => ({ resumeStudioEnabled: () => true }))
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => {

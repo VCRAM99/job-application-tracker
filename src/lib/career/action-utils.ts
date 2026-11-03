@@ -1,11 +1,11 @@
 import "server-only"
 
 import { parseKeyRing } from "@/lib/ai/crypto"
-import { aiFeaturesEnabled } from "@/lib/ai/flags"
 import { AI_ERROR_MESSAGES } from "@/lib/ai/types"
 import { requireUser } from "@/lib/auth/session"
 import type { RecordFormState } from "@/lib/records/form-state"
 import { createClient } from "@/lib/supabase/server"
+import { careerAllowed } from "@/lib/beta"
 
 /** Shared by the career server actions. Not a server action module itself. */
 export function fail(message: string): RecordFormState {
@@ -20,7 +20,7 @@ export async function ready(): Promise<
   | { ok: false; message: string }
   | { ok: true; user: Awaited<ReturnType<typeof requireUser>>; supabase: Awaited<ReturnType<typeof createClient>> }
 > {
-  if (!aiFeaturesEnabled()) return { ok: false, message: AI_ERROR_MESSAGES.features_disabled }
+  if (!(await careerAllowed())) return { ok: false, message: AI_ERROR_MESSAGES.features_disabled }
   const user = await requireUser()
   const supabase = await createClient()
   return { ok: true, user, supabase }

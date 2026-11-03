@@ -2,7 +2,7 @@ import "server-only"
 
 import Anthropic from "@anthropic-ai/sdk"
 
-import { mapProviderFailure } from "@/lib/ai/provider-error"
+import { mapProviderFailure, PROVIDER_TIMEOUT_MS } from "@/lib/ai/provider-error"
 import { AiRequestError, type StructuredRequest, type StructuredResponse } from "@/lib/ai/types"
 
 type AnthropicMessage = {
@@ -17,8 +17,11 @@ export type AnthropicLike = {
   }
 }
 
+/** Output ceiling for structured calls: room for adaptive thinking plus the JSON answer. */
+export const ANTHROPIC_MAX_TOKENS = 16_000
+
 export function createAnthropicClient(apiKey: string): Anthropic {
-  return new Anthropic({ apiKey })
+  return new Anthropic({ apiKey, timeout: PROVIDER_TIMEOUT_MS })
 }
 
 export async function completeAnthropic(
@@ -26,12 +29,16 @@ export async function completeAnthropic(
   client: AnthropicLike = createAnthropicClient(request.apiKey),
 ): Promise<StructuredResponse> {
   try {
+    // Claude 5.x models think adaptively, and thinking tokens count toward max_tokens. Structured
+    // calls ask for low effort and leave room above the JSON, so a long input does not end in
+    // max_tokens (reported as context_limit) before the answer is written.
     const response = await client.messages.create({
       model: request.model,
-      max_tokens: 4096,
+      max_tokens: ANTHROPIC_MAX_TOKENS,
       system: request.system,
       messages: [{ role: "user", content: request.user }],
       output_config: {
+        effort: "low",
         format: {
           type: "json_schema",
           schema: request.jsonSchema,

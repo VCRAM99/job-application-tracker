@@ -1,7 +1,7 @@
 import "server-only"
 
 import { accountingSecret } from "@/lib/ai/accounting"
-import { jobAnalysisEnabled, jobAnalysisMockProvider, managedAllowance, readPlatformKey } from "@/lib/ai/flags"
+import { jobAnalysisMockProvider, managedAllowance, providerEnabled, readPlatformKey } from "@/lib/ai/flags"
 import { withUsageReservation } from "@/lib/ai/gateway"
 import { readByokKey, usageReservationDeps } from "@/lib/ai/run-context"
 import { resolveExecutionMode } from "@/lib/ai/mode"
@@ -15,12 +15,14 @@ import {
 import { executeAnalysis } from "@/lib/analyze/execute"
 import { sha256 } from "@/lib/analyze/hash"
 import { mockStructuredResponse } from "@/lib/analyze/mock"
+import { checkAiRateLimit } from "@/lib/ai/rate-limit"
 import { settleDuplicateRun } from "@/lib/analyze/settle"
 import { validateJobDescription } from "@/lib/analyze/text"
 import { completeWithProvider } from "@/lib/ai/providers"
 import { AiRequestError, AI_ERROR_MESSAGES, isProvider, isStoredMode, type AiErrorCode } from "@/lib/ai/types"
 import { requireUser } from "@/lib/auth/session"
 import { createClient } from "@/lib/supabase/server"
+import { analyzeAllowed } from "@/lib/beta"
 
 export type AnalysisRunInput = {
   jdText: string
@@ -38,7 +40,7 @@ export type AnalysisRunResult =
   | { ok: false; message: string }
 
 export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisRunResult> {
-  if (!jobAnalysisEnabled()) return { ok: false, message: AI_ERROR_MESSAGES.features_disabled }
+  if (!(await analyzeAllowed())) return { ok: false, message: AI_ERROR_MESSAGES.features_disabled }
   const validated = validateJobDescription(input.jdText)
   if (!validated.ok) return { ok: false, message: validated.message }
   const user = await requireUser()
@@ -54,9 +56,10 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
   if (!resolved.ok) return { ok: false, message: AI_ERROR_MESSAGES[resolved.code] }
   const provider = settingsResult.data.provider
   if (!provider || !isProvider(provider)) return { ok: false, message: AI_ERROR_MESSAGES.not_configured }
+  if (!providerEnabled(provider)) return { ok: false, message: AI_ERROR_MESSAGES.provider_disabled }
   let model: string
   try {
-    model = analysisModelFor(provider)
+    model = analysisModelFor(provider, process.env, settingsResult.data.model)
   } catch (error) {
     if (error instanceof AiRequestError) return { ok: false, message: "The configured job analysis model is not available." }
     return { ok: false, message: AI_ERROR_MESSAGES.unsupported_model }
@@ -75,10 +78,15 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
       .from("career_sources")
       .select("id, body")
       .eq("id", input.resumeSourceId)
+      .eq("user_id", user.id)
       .maybeSingle()
     if (source.error || !source.data) return { ok: false, message: "That resume source is not available." }
     resume = { sourceId: source.data.id, text: source.data.body }
   }
+
+  // Cached results above are free; a new run counts toward the per-user AI limit.
+  const limited = await checkAiRateLimit(supabase, user.id)
+  if (!limited.ok) return { ok: false, message: AI_ERROR_MESSAGES.ai_rate_limited }
 
   const mock = jobAnalysisMockProvider()
   const allowance = managedAllowance()
@@ -111,6 +119,8 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
     executionMode: resolved.mode,
   }
 
+  // The stored analysis names the model that answered; after an overload fallback that is not `model`.
+  let modelUsed = model
   const produce = () =>
     executeAnalysis({
       jdText: validated.text,
@@ -119,11 +129,14 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
       model,
       complete: mock
         ? async (request) => mockStructuredResponse(request)
-        : (request) =>
-            completeWithProvider(provider, {
+        : async (request) => {
+            const response = await completeWithProvider(provider, {
               ...request,
               apiKey: apiKey ?? "",
-            }),
+            })
+            if (response.modelUsed) modelUsed = response.modelUsed
+            return response
+          },
     })
 
   if (mock) {
@@ -155,7 +168,7 @@ export async function runJobAnalysis(input: AnalysisRunInput): Promise<AnalysisR
     async () => {
       try {
         const produced = await produce()
-        const inserted = await insertAnalysis({ ...storedBase, analysis: produced.analysis })
+        const inserted = await insertAnalysis({ ...storedBase, model: modelUsed, analysis: produced.analysis })
         if (!inserted.ok) throw new AiRequestError("transient")
         return { data: inserted.id, usage: produced.usage }
       } catch (error) {

@@ -5,12 +5,13 @@ import { revalidatePath } from "next/cache"
 import { accountingProof, accountingSecret } from "@/lib/ai/accounting"
 import { decryptSecret, sha256 } from "@/lib/ai/crypto"
 import { EXTRACTION_JSON_SCHEMA, extractionSchema } from "@/lib/ai/extraction"
-import { managedAllowance, readPlatformKey } from "@/lib/ai/flags"
+import { managedAllowance, providerEnabled, readPlatformKey } from "@/lib/ai/flags"
 import { generateStructured } from "@/lib/ai/gateway"
 import { resolveExecutionMode } from "@/lib/ai/mode"
 import { assertSupportedModel } from "@/lib/ai/models"
 import { EXTRACTION_SYSTEM_PROMPT, extractionUserMessage } from "@/lib/ai/prompt"
 import { completeWithProvider } from "@/lib/ai/providers"
+import { checkAiRateLimit } from "@/lib/ai/rate-limit"
 import { asReservation } from "@/lib/ai/run-context"
 import { AiRequestError, AI_ERROR_MESSAGES, isProvider, isStoredMode } from "@/lib/ai/types"
 import { done, fail, readRing, ready } from "@/lib/career/action-utils"
@@ -43,6 +44,7 @@ export async function extractCareerFacts(
   const provider = settingsResult.data.provider
   const model = settingsResult.data.model
   if (!provider || !isProvider(provider) || !model) return fail(AI_ERROR_MESSAGES.not_configured)
+  if (!providerEnabled(provider)) return fail(AI_ERROR_MESSAGES.provider_disabled)
   try {
     assertSupportedModel(provider, model)
   } catch {
@@ -59,6 +61,8 @@ export async function extractCareerFacts(
 
   const allowance = managedAllowance()
   let apiKey: string | null = null
+  const limited = await checkAiRateLimit(context.supabase, context.user.id)
+  if (!limited.ok) return fail(AI_ERROR_MESSAGES.ai_rate_limited)
   try {
     apiKey =
       resolved.mode === "managed"
@@ -147,7 +151,7 @@ export async function extractCareerFacts(
         schemaName: "career_extraction",
         jsonSchema: EXTRACTION_JSON_SCHEMA,
       }),
-      persist: async (data, usageEventId) => {
+      persist: async (data, usageEventId, modelUsed) => {
         const planned = planSuggestions(sourceId, data)
         const itemsText = JSON.stringify(
           planned.map((item) => ({
@@ -176,7 +180,7 @@ export async function extractCareerFacts(
           p_action: "extract_career_facts",
           p_schema_name: "career_extraction",
           p_provider: provider,
-          p_model: model,
+          p_model: modelUsed,
           p_status: "suggested",
           p_error_class: null,
           p_request_hash: requestHash,

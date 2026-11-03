@@ -73,8 +73,10 @@ describe("securityHeaders", () => {
       "X-Content-Type-Options",
       "Referrer-Policy",
       "X-Frame-Options",
+      "Cross-Origin-Opener-Policy",
       "Permissions-Policy",
       "Content-Security-Policy",
+      "Strict-Transport-Security",
     ])
     expect(production.find((header) => header.key === "X-Frame-Options")?.value).toBe("DENY")
     expect(production.find((header) => header.key === "Content-Security-Policy")?.value).toContain(

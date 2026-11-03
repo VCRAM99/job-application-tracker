@@ -12,16 +12,16 @@ import { loadFactLabels } from "@/lib/analyze/data"
 import { DRAFT_KIND_LABELS } from "@/lib/coach/constants"
 import { getDraft } from "@/lib/coach/data"
 import { FORMAT_LABELS } from "@/lib/coach/drafts"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import { buildMailto } from "@/lib/coach/mailto"
 import { getContact } from "@/lib/records/tracker-data"
 import { loadExecutionMode } from "@/lib/resume/data"
+import { coachAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Draft" }
 export const instant = false
 
 export default async function DraftPage({ params }: { params: Promise<{ id: string }> }) {
-  if (!careerCoachEnabled()) return <CoachOff />
+  if (!(await coachAllowed())) return <CoachOff />
   await connection()
   const { id } = await params
   const [draft, mode] = await Promise.all([getDraft(id), loadExecutionMode()])

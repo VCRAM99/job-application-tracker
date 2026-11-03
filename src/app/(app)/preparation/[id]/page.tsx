@@ -7,10 +7,10 @@ import { DetailList, PageHeader, RecordState } from "@/components/records/fields
 import { Button } from "@/components/ui/button"
 import { MoreActions } from "@/components/ui/more-actions"
 import { questionSetForPreparation } from "@/lib/coach/data"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import { PREPARATION_CATEGORY_LABELS, PREPARATION_STATUS_LABELS } from "@/lib/records/constants"
 import { deletePreparation } from "@/lib/records/tracker-actions"
 import { getPreparation } from "@/lib/records/tracker-data"
+import { coachAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Preparation item" }
 
@@ -22,7 +22,7 @@ export default async function PreparationDetailPage({ params }: { params: Promis
   }
   if (!result.data) notFound()
   const item = result.data
-  const fromPrep = careerCoachEnabled() ? await questionSetForPreparation(item.id) : null
+  const fromPrep = (await coachAllowed()) ? await questionSetForPreparation(item.id) : null
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
       <PageHeader

@@ -432,9 +432,15 @@ describe("job analysis pipeline", () => {
     expect(fixture?.rejected).toBe(true)
     expect(validateJobDescription(fixture?.jd ?? "").ok).toBe(false)
     expect(JOB_FIXTURES.filter((item) => !item.rejected).every((item) => validateJobDescription(item.jd).ok)).toBe(true)
-    expect(analysisModelFor("google", {})).toBe("gemini-3.8-flash")
+    expect(analysisModelFor("google", {})).toBe("gemini-3.5-flash-lite")
     expect(analysisModelFor("anthropic", {})).toBe("claude-haiku-5-5")
-    expect(analysisModelFor("openai", {})).toBe("gpt-5.4-mini")
+    expect(analysisModelFor("openai", {})).toBe("gpt-6-luna")
+    // The model chosen in Settings wins over the operator override and the default.
+    expect(analysisModelFor("google", { JOB_ANALYSIS_GOOGLE_MODEL: "gemini-3.8-flash" }, "gemini-3.5-flash-lite")).toBe("gemini-3.5-flash-lite")
+    expect(analysisModelFor("google", { JOB_ANALYSIS_GOOGLE_MODEL: "gemini-3.8-flash" }, null)).toBe("gemini-3.8-flash")
+    // A chosen model from another provider, or an unknown one, is ignored.
+    expect(analysisModelFor("google", {}, "gpt-6-luna")).toBe("gemini-3.5-flash-lite")
+    expect(analysisModelFor("google", {}, "gemini-0-nope")).toBe("gemini-3.5-flash-lite")
     expect(() => analysisModelFor("google", { JOB_ANALYSIS_GOOGLE_MODEL: "gemini-1.0-pro" })).toThrow(AiRequestError)
     expect(analysisModelFor("openai", { JOB_ANALYSIS_OPENAI_MODEL: "gpt-5.4" })).toBe("gpt-5.4")
     expect(() => analysisModelFor("openai", { JOB_ANALYSIS_OPENAI_MODEL: "gpt-obsolete" })).toThrow(AiRequestError)

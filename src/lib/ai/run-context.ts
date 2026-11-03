@@ -2,7 +2,9 @@ import "server-only"
 
 import { accountingProof, accountingSecret } from "@/lib/ai/accounting"
 import { decryptSecret, parseKeyRing } from "@/lib/ai/crypto"
-import { managedAllowance, readPlatformKey } from "@/lib/ai/flags"
+import { managedAllowance, providerEnabled, readPlatformKey } from "@/lib/ai/flags"
+import { betaAllowedFor } from "@/lib/beta"
+import { checkAiRateLimit } from "@/lib/ai/rate-limit"
 import type { ReservationRecord } from "@/lib/ai/gateway"
 import { resolveExecutionMode } from "@/lib/ai/mode"
 import { AiRequestError, AI_ERROR_MESSAGES, isProvider, isStoredMode, type ProviderId, type StoredExecutionMode } from "@/lib/ai/types"
@@ -58,16 +60,20 @@ export async function prepareAiRun(
   userId: string,
   requested: "managed" | "byok" | "local",
 ): Promise<{ ok: true; run: AiRun } | { ok: false; message: string }> {
-  const settings = await supabase.from("ai_user_settings").select("execution_mode, provider").eq("user_id", userId).maybeSingle()
+  // Every AI action passes through here, so the beta list is enforced even if a caller forgot.
+  if (!betaAllowedFor(userId)) return { ok: false, message: AI_ERROR_MESSAGES.features_disabled }
+  const settings = await supabase.from("ai_user_settings").select("execution_mode, provider, model").eq("user_id", userId).maybeSingle()
   if (settings.error || !settings.data) return { ok: false, message: AI_ERROR_MESSAGES.not_configured }
   const saved = isStoredMode(settings.data.execution_mode) ? settings.data.execution_mode : null
   const resolved = resolveExecutionMode(saved, requested)
   if (!resolved.ok) return { ok: false, message: AI_ERROR_MESSAGES[resolved.code] }
   const provider = settings.data.provider
   if (!provider || !isProvider(provider)) return { ok: false, message: AI_ERROR_MESSAGES.not_configured }
+  if (!providerEnabled(provider)) return { ok: false, message: AI_ERROR_MESSAGES.provider_disabled }
   let model: string
   try {
-    model = analysisModelFor(provider)
+    // The model chosen in Settings; feature defaults apply only when none is saved.
+    model = analysisModelFor(provider, process.env, settings.data.model)
   } catch {
     return { ok: false, message: "The configured fast model is not available." }
   }
@@ -82,6 +88,8 @@ export async function prepareAiRun(
   if (!apiKey) return { ok: false, message: AI_ERROR_MESSAGES.missing_credentials }
   const secret = accountingSecret()
   if (!secret) return { ok: false, message: AI_ERROR_MESSAGES.accounting_unconfigured }
+  const limited = await checkAiRateLimit(supabase, userId)
+  if (!limited.ok) return { ok: false, message: AI_ERROR_MESSAGES.ai_rate_limited }
   return {
     ok: true,
     run: {

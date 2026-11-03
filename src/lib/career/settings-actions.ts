@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 
 import { credentialConfigError, credentialShapeError, encryptSecret, lastFour } from "@/lib/ai/crypto"
 import { assertSupportedModel } from "@/lib/ai/models"
+import { managedOffered, providerEnabled } from "@/lib/ai/flags"
 import { AI_ERROR_MESSAGES, isProvider } from "@/lib/ai/types"
 import { done, fail, readRing, ready } from "@/lib/career/action-utils"
 import { credentialFormSchema, settingsFormSchema } from "@/lib/career/schemas"
@@ -21,6 +22,8 @@ export async function saveAiSettings(
     model: formText(formData, "model"),
   })
   if (!parsed.success) return fail("Choose a mode, provider, and model.")
+  if (!providerEnabled(parsed.data.provider)) return fail(AI_ERROR_MESSAGES.provider_disabled)
+  if (parsed.data.executionMode === "managed" && !managedOffered()) return fail(AI_ERROR_MESSAGES.managed_unconfigured)
   try {
     assertSupportedModel(parsed.data.provider, parsed.data.model)
   } catch {
@@ -57,6 +60,7 @@ export async function saveProviderCredential(
     secret: formText(formData, "secret"),
   })
   if (!parsed.success || !isProvider(parsed.data.provider)) return fail("Enter a provider key.")
+  if (!providerEnabled(parsed.data.provider)) return fail(AI_ERROR_MESSAGES.provider_disabled)
   const shape = credentialShapeError(parsed.data.provider, parsed.data.secret)
   if (shape) return fail(shape)
   const configError = credentialConfigError()

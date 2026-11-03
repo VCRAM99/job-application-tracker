@@ -12,7 +12,7 @@ export function CoachOff() {
   return (
     <RecordState
       title="Career coach is off"
-      description="Set CAREER_COACH_ENABLED=true and AI_FEATURES_ENABLED=true on the server. Existing tracking is unchanged."
+      description="The interview and networking coach is not available for your account yet. Your applications and other tracking are unchanged."
     />
   )
 }

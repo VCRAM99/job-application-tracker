@@ -2,7 +2,7 @@ import "server-only"
 
 import OpenAI from "openai"
 
-import { mapProviderFailure } from "@/lib/ai/provider-error"
+import { mapProviderFailure, PROVIDER_TIMEOUT_MS } from "@/lib/ai/provider-error"
 import { AiRequestError, type StructuredRequest, type StructuredResponse } from "@/lib/ai/types"
 
 export type OpenAICompletion = {
@@ -24,7 +24,7 @@ export type OpenAILike = {
 }
 
 export function createOpenAIClient(apiKey: string): OpenAI {
-  return new OpenAI({ apiKey })
+  return new OpenAI({ apiKey, timeout: PROVIDER_TIMEOUT_MS })
 }
 
 export async function completeOpenAI(

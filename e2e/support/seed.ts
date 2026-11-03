@@ -19,12 +19,14 @@ import { catalogCaller, publishableClient } from "../../src/lib/jobs/catalog-rpc
 import { fetchSourcePages, runIngestion } from "../../src/lib/jobs/ingest"
 import { approvePayload, registerPayload } from "../../src/lib/jobs/operator"
 import { LOCAL_SUPABASE_URL, ROOT, STATE_DIR, localDevEnv } from "./local-env"
+import { psql } from "./psql"
+
+export { psql }
 
 export const E2E_EMAIL = "e2e-user@example.test"
 /** Signs in and out in auth.spec.ts. Sign-out revokes every session of a user, so it is not the main user. */
 export const E2E_AUTH_EMAIL = "e2e-auth@example.test"
 const FAKE_OPENAI_KEY = "sk-e2e-local-fake-key-not-a-secret-0000"
-const DB_CONTAINER = "supabase_db_job-application-tracker"
 
 function supabaseStatus(): { anon: string; service: string } {
   const output = execFileSync("npx", ["supabase", "status", "-o", "env"], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
@@ -34,20 +36,9 @@ function supabaseStatus(): { anon: string; service: string } {
 }
 
 /** Runs SQL as the local database owner. Output is discarded so nothing echoes. */
-export function psql(sql: string, capture = false, role = "postgres"): string {
-  const ports = execFileSync("docker", ["port", DB_CONTAINER, "5432"], { encoding: "utf8" })
-  if (!ports.split("\n").some((line) => /^(127\.0\.0\.1|0\.0\.0\.0|\[::\]):54322$/.test(line.trim()))) {
-    throw new Error("Refusing: the local database container is not bound to port 54322.")
-  }
-  const output = execFileSync("docker", ["exec", "-i", DB_CONTAINER, "psql", "-U", role, "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-qtA"], {
-    input: sql,
-    encoding: "utf8",
-    stdio: ["pipe", capture ? "pipe" : "ignore", "pipe"],
-  })
-  return capture ? output : ""
-}
 
 const quote = (value: string) => `'${value.replace(/'/g, "''")}'`
+
 
 export type Local = Awaited<ReturnType<typeof connectLocal>>
 

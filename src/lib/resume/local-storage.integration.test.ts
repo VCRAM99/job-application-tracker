@@ -6,6 +6,8 @@ import path from "node:path"
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
+import { MAX_STORED_RESUME_FILES } from "@/lib/resume/constants"
+
 const url = process.env.LOCAL_SUPABASE_URL ?? ""
 const anon = process.env.LOCAL_SUPABASE_ANON_KEY ?? ""
 const service = process.env.LOCAL_SUPABASE_SERVICE_ROLE_KEY ?? ""
@@ -103,4 +105,28 @@ describe.skipIf(!enabled)("local resume storage policies", () => {
     created.push(name)
     expect([400, 403, 409]).toContain((await upload(ada.token, name, PDF, "application/pdf", true)).status)
   })
+
+  it("caps each user at MAX_STORED_RESUME_FILES files and frees a slot on delete", async () => {
+    const names: string[] = []
+    for (let index = 0; index < MAX_STORED_RESUME_FILES; index += 1) {
+      const name = `${grace.id}/${randomUUID()}.pdf`
+      expect((await upload(grace.token, name, PDF)).status).toBe(200)
+      names.push(name)
+      created.push(name)
+    }
+    expect([400, 403]).toContain((await upload(grace.token, `${grace.id}/${randomUUID()}.pdf`, PDF)).status)
+    // Another user's quota is separate.
+    const adaName = `${ada.id}/${randomUUID()}.pdf`
+    expect((await upload(ada.token, adaName, PDF)).status).toBe(200)
+    created.push(adaName)
+
+    const removed = await fetch(`${url}/storage/v1/object/resumes/${names[0]}`, {
+      method: "DELETE",
+      headers: { apikey: anon, authorization: `Bearer ${grace.token}` },
+    })
+    expect(removed.status).toBe(200)
+    const again = `${grace.id}/${randomUUID()}.pdf`
+    expect((await upload(grace.token, again, PDF)).status).toBe(200)
+    created.push(again)
+  }, 60000)
 })

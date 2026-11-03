@@ -1,16 +1,17 @@
 import "server-only"
 
 import { getCurrentUser } from "@/lib/auth/session"
-import { recommendedJobsAllowedFor, recommendedJobsAllowlist, recommendedJobsEnabled } from "@/lib/jobs/flags"
+import { jobsAllowedFor } from "@/lib/beta"
+import { recommendedJobsAllowlist, recommendedJobsEnabled } from "@/lib/jobs/flags"
 
 /**
- * The flag and, when JOB_RECOMMENDATIONS_ALLOWED_USER_IDS is set, the signed-in
- * user's id. Use this in place of recommendedJobsEnabled for pages, actions,
- * loaders, and the Add-to-Tracker prefill.
+ * The flag and the signed-in user's place on BETA_USER_IDS or the older
+ * JOB_RECOMMENDATIONS_ALLOWED_USER_IDS (see src/lib/beta.ts). Use this in place of
+ * recommendedJobsEnabled for pages, actions, loaders, and the Add-to-Tracker prefill.
  */
 export async function recommendedJobsAllowed(): Promise<boolean> {
   if (!recommendedJobsEnabled()) return false
-  if (recommendedJobsAllowlist().mode === "everyone") return true
+  if (!process.env.BETA_USER_IDS?.trim() && recommendedJobsAllowlist().mode === "everyone") return true
   const user = await getCurrentUser()
-  return recommendedJobsAllowedFor(user?.id ?? null)
+  return jobsAllowedFor(user?.id ?? null)
 }

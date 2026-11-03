@@ -6,11 +6,11 @@ import { connection } from "next/server"
 import { StoredPostingAnalysis } from "@/components/analyze/forms"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
-import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { loadAnalysisContext, loadPostingText } from "@/lib/analyze/data"
 import { recommendedJobsAllowed } from "@/lib/jobs/access"
 import { validateJobDescription } from "@/lib/analyze/text"
 import { isUuid } from "@/lib/records/form-state"
+import { analyzeAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Job posting" }
 export const instant = false
@@ -24,7 +24,7 @@ export default async function JobPostingPage({
     return (
       <RecordState
         title="Recommended jobs are off"
-        description="This section stays off in production until the jobs migration and feature flag are approved."
+        description="Recommended jobs are not available for your account yet. Your applications and other tracking are unchanged."
       />
     )
   }
@@ -44,7 +44,7 @@ export default async function JobPostingPage({
   }
   const description = posting.description ?? ""
   const longEnough = validateJobDescription(description).ok
-  const analysisOn = jobAnalysisEnabled()
+  const analysisOn = (await analyzeAllowed())
   const context = analysisOn ? await loadAnalysisContext() : null
 
   return (

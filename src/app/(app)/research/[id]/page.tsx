@@ -9,14 +9,14 @@ import { PageHeader } from "@/components/records/fields"
 import { Button } from "@/components/ui/button"
 import { HelpTip } from "@/components/ui/help-tip"
 import { getBrief } from "@/lib/coach/data"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import { SOURCE_KIND_LABELS } from "@/lib/coach/research"
+import { coachAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Research brief" }
 export const instant = false
 
 export default async function ResearchBriefPage({ params }: { params: Promise<{ id: string }> }) {
-  if (!careerCoachEnabled()) return <CoachOff />
+  if (!(await coachAllowed())) return <CoachOff />
   await connection()
   const { id } = await params
   const brief = await getBrief(id)

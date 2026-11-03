@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs"
 import { expect, test, type Page } from "@playwright/test"
 import { Document, Packer, Paragraph } from "docx"
 
+import { clearAiRateWindow } from "./support/psql"
 import { open, selectMatching } from "./support/user"
 
 /**
@@ -10,6 +11,8 @@ import { open, selectMatching } from "./support/user"
  * OpenAI key, so every model call goes to the local fake and none leaves the machine.
  */
 test.describe.configure({ mode: "serial" })
+
+test.beforeEach(() => clearAiRateWindow("e2e-user@example.test"))
 
 const JD =
   "Staff Platform Engineer at Northwind Analytics. You will design TypeScript services backed by PostgreSQL. " +
@@ -133,10 +136,8 @@ test("follow-up suggestion creates one task", async ({ page }) => {
 })
 
 test.describe("resume studio", () => {
-  // The production CSP allows https://*.supabase.co only, so the browser's direct
-  // upload to local Storage (http://127.0.0.1:54321) is blocked under `next start`.
-  // Only this test bypasses CSP; every other e2e test runs with the real policy.
-  test.use({ bypassCSP: true })
+  // Runs with the real CSP: connect-src names the configured Supabase origin, so the
+  // browser's direct upload to local Storage is allowed under `next start`.
 
 test("resume: upload, parse, tailor, export", async ({ page }, testInfo) => {
   const file = testInfo.outputPath("resume.docx")

@@ -51,7 +51,7 @@ A 503 or 529 response, or an overloaded message, is retried once after about two
 Automated tests do not call Gemini. To score the fictional fixtures yourself:
 
 ```bash
-GEMINI_API_KEY=your-key npx tsx scripts/eval/job-analysis-live.ts
+npx tsx --conditions=react-server scripts/eval/run.ts --live --write   # reads GEMINI_API_KEY; see docs/evals/latest.md
 ```
 
 It uses the same Google default as the app, or `JOB_ANALYSIS_GOOGLE_MODEL` when set, and the same low thinking level. The script prints a warning and the model, then per-fixture precision and recall against the expected phrases, the share of requirements dropped for grounding, and token totals. It does not write to the database. Keep the key out of the client and out of git.

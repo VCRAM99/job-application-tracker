@@ -4,17 +4,17 @@ import { connection } from "next/server"
 import { DraftForm } from "@/components/coach/draft-forms"
 import { CoachOff } from "@/components/coach/view"
 import { PageHeader, RecordState } from "@/components/records/fields"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import { listApplications } from "@/lib/records/data"
 import { isUuid } from "@/lib/records/form-state"
 import { getContact } from "@/lib/records/tracker-data"
 import { loadExecutionMode } from "@/lib/resume/data"
+import { coachAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "New draft" }
 export const instant = false
 
 export default async function NewDraftPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  if (!careerCoachEnabled()) return <CoachOff />
+  if (!(await coachAllowed())) return <CoachOff />
   await connection()
   const query = await searchParams
   const contactId = typeof query.contact === "string" && isUuid(query.contact) ? query.contact : null

@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
-vi.mock("@/lib/auth/session", () => ({ requireUser: vi.fn(async () => ({ id: "11111111-1111-4111-8111-111111111111", email: null })) }))
+vi.mock("@/lib/auth/session", () => ({ requireUser: vi.fn(async () => ({ id: "11111111-1111-4111-8111-111111111111", email: null })), getCurrentUser: vi.fn(async () => ({ id: "11111111-1111-4111-8111-111111111111", email: null })) }))
 vi.mock("@/lib/resume/flags", () => ({ resumeStudioEnabled: () => true }))
 vi.mock("@/lib/resume/run-parse", () => ({ parseResumeText: mocks.parseResumeText }))
 vi.mock("@/lib/ai/run-context", () => ({

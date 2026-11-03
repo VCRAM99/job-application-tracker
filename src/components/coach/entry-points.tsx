@@ -48,7 +48,7 @@ export async function ApplicationCoach({ applicationId }: { applicationId: strin
             {briefs.map((brief) => (
               <li key={brief.id} className="flex flex-wrap justify-between gap-2 rounded-lg border px-3 py-2">
                 <Link href={`/research/${brief.id}`} className="underline-offset-4 hover:underline">{brief.label}</Link>
-                <span className="text-xs text-muted-foreground">{brief.claims.length} claims</span>
+                <span className="text-xs text-muted-foreground">{brief.claims.length} claims · from your sources</span>
               </li>
             ))}
           </ul>

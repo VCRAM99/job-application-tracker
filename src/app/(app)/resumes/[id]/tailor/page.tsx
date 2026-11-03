@@ -5,11 +5,10 @@ import { connection } from "next/server"
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { TailorForm } from "@/components/resume/forms"
 import { ResumeStudioOff } from "@/components/resume/off"
-import { jobAnalysisEnabled } from "@/lib/ai/flags"
 import { getAnalysis } from "@/lib/analyze/data"
 import { isUuid } from "@/lib/records/form-state"
 import { getResume, loadExecutionMode } from "@/lib/resume/data"
-import { resumeStudioEnabled } from "@/lib/resume/flags"
+import { analyzeAllowed, resumesAllowed } from "@/lib/beta"
 
 export const metadata: Metadata = { title: "Tailor resume" }
 export const instant = false
@@ -21,8 +20,8 @@ export default async function TailorPage({
   params: Promise<{ id: string }>
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  if (!resumeStudioEnabled()) return <ResumeStudioOff />
-  if (!jobAnalysisEnabled()) {
+  if (!(await resumesAllowed())) return <ResumeStudioOff />
+  if (!(await analyzeAllowed())) {
     return <RecordState title="Tailoring needs fit analysis" description="Set JOB_ANALYSIS_ENABLED=true on the server to tailor a resume to an analysis." />
   }
   await connection()

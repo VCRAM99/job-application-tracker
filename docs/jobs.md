@@ -122,11 +122,11 @@ Every database command targets local Supabase. It reads `.env.development.local`
      --fields title,location,country,urls,compensation,plain_text
    ```
 
-4. **Approve** it. Defaults are `--status draft`, `--terms unclear`, `--refresh-limit 0`, and live off, so each change has to be named. `--live` needs `--status approved`, `--terms permitted`, and `--refresh-limit` from 1 to 24. The usage, attribution, retention, and fields flags are required because approval rewrites them.
+4. **Approve** it. Defaults are `--status draft`, `--terms unclear`, `--refresh-limit 0`, and live off, so each change has to be named. For a live source use `--refresh-limit 2`: the limit counts runs in a rolling 24 hours, and Vercel Hobby cron runs once a day at a jittered minute within its hour, so two daily runs can land under 24 hours apart and a limit of 1 would skip the second. `--live` needs `--status approved`, `--terms permitted`, and `--refresh-limit` from 1 to 24. The usage, attribution, retention, and fields flags are required because approval rewrites them.
 
    ```bash
    npx tsx --conditions=react-server scripts/jobs/cli.ts approve --slug greenhouse:<board-token> \
-     --status approved --terms permitted --refresh-limit 1 --live \
+     --status approved --terms permitted --refresh-limit 2 --live \
      --usage "..." --attribution "..." --retention "..." --fields title,location,country,urls,compensation,plain_text
    ```
 

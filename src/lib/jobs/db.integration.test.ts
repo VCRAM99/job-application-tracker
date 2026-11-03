@@ -90,6 +90,7 @@ describe("recommended jobs database", () => {
       "record-alerts": "record_job_alerts",
       "collect-alerts": "collect_alert_workspace",
       "list-ingestion-sources": "list_job_ingestion_sources",
+      "source-status": "job_source_status",
     }
     const result = await db.query<{ result: Record<string, unknown> }>(
       `select public.${functions[operation]}($1, $2) as result`,
@@ -547,6 +548,33 @@ describe("recommended jobs database", () => {
     const again = JSON.stringify({ now: new Date().toISOString() })
     const after = await list(again, jobOperationProof(SECRET, "list-ingestion-sources", again))
     expect(after.rows[0]?.result.sources.map((source) => source.slug)).not.toContain("greenhouse:repeat")
+  })
+
+  it("returns source run status only to a fresh signed request, with run metadata and nothing else", async () => {
+    const status = (payload: string, proof: string) =>
+      asUser(null, () =>
+        db.query<{ result: { ok: boolean; sources: Array<Record<string, unknown> & { slug: string; runs: Array<Record<string, unknown>> }> } }>(
+          "select public.job_source_status($1, $2) as result",
+          [payload, proof],
+        ),
+      )
+    const fresh = JSON.stringify({ now: new Date().toISOString(), runs: 3 })
+    const result = (await status(fresh, jobOperationProof(SECRET, "source-status", fresh))).rows[0]?.result
+    expect(result?.ok).toBe(true)
+    const repeat = result?.sources.find((source) => source.slug === "greenhouse:repeat")
+    expect(repeat).toBeTruthy()
+    expect(Object.keys(repeat!).sort()).toEqual(["approvalStatus", "liveIngestionEnabled", "refreshLimitPerDay", "runs", "slug"])
+    expect(repeat!.runs.length).toBeGreaterThan(0)
+    expect(repeat!.runs.length).toBeLessThanOrEqual(3)
+    for (const run of repeat!.runs) expect(Object.keys(run).sort()).toEqual(["error", "fetchedCount", "finishedAt", "startedAt", "status"])
+
+    const stale = JSON.stringify({ now: new Date(Date.now() - 10 * 60_000).toISOString() })
+    await expect(status(stale, jobOperationProof(SECRET, "source-status", stale))).rejects.toThrow(/stale request/)
+    // Another operation's proof, or no valid proof, is refused.
+    await expect(status(fresh, jobOperationProof(SECRET, "list-ingestion-sources", fresh))).rejects.toThrow(/not authorized/)
+    await expect(status(fresh, "0".repeat(64))).rejects.toThrow(/not authorized/)
+    // A signed-in user without the secret gets nothing either.
+    await expect(asUser(ada, () => db.query("select public.job_source_status($1, $2)", [fresh, "f".repeat(64)]))).rejects.toThrow(/not authorized/)
   })
 
   it("keeps alert deliveries private and idempotent", async () => {

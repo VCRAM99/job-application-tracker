@@ -58,6 +58,12 @@ export function isOverloaded(error: unknown): boolean {
 }
 
 export const OVERLOAD_RETRY_DELAY_MS = 2000
+/**
+ * Per-request timeout for every provider SDK. Without it the Gemini SDK waits indefinitely and the
+ * OpenAI and Anthropic SDKs wait up to 10 minutes, holding the server action and its usage
+ * reservation open. A timeout surfaces as a provider failure and the reservation is voided.
+ */
+export const PROVIDER_TIMEOUT_MS = 60_000
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 

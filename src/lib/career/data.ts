@@ -1,6 +1,5 @@
 import "server-only"
 
-import { aiFeaturesEnabled } from "@/lib/ai/flags"
 import type { FactType } from "@/lib/ai/extraction"
 import { isFactType } from "@/lib/ai/extraction"
 import type { ProviderId, StoredExecutionMode } from "@/lib/ai/types"
@@ -8,6 +7,7 @@ import { isProvider, isStoredMode } from "@/lib/ai/types"
 import { requireUser } from "@/lib/auth/session"
 import { isMissingTable } from "@/lib/records/logic"
 import { createClient } from "@/lib/supabase/server"
+import { careerAllowed } from "@/lib/beta"
 
 export type CareerFact = {
   id: string
@@ -93,7 +93,7 @@ function missing(error: QueryError): boolean {
 }
 
 export async function loadCareer(): Promise<CareerLoad> {
-  if (!aiFeaturesEnabled()) return { state: "disabled" }
+  if (!(await careerAllowed())) return { state: "disabled" }
   const user = await requireUser()
   const supabase = await createClient()
   const profile = await supabase

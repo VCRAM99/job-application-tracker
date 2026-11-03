@@ -21,12 +21,12 @@ import {
 import { loadDraftContext, userLocalDate } from "@/lib/coach/context"
 import { getDraft } from "@/lib/coach/data"
 import { droppedTotal, KIND_FORMATS, type DraftOutcome } from "@/lib/coach/drafts"
-import { careerCoachEnabled } from "@/lib/coach/flags"
 import { numberSources, type SourceKind } from "@/lib/coach/research"
 import { generateBrief, generateDraft } from "@/lib/coach/run"
 import { isUuid, type RecordFormState } from "@/lib/records/form-state"
 import { sliceChars } from "@/lib/resume/text"
 import { createClient } from "@/lib/supabase/server"
+import { coachAllowed } from "@/lib/beta"
 
 const OFF = "Career coach is turned off."
 
@@ -47,7 +47,7 @@ function revalidateDraftLinks(links: { contactId?: string | null; applicationId?
  * linked posting, and text pasted now. Nothing is fetched from the web.
  */
 export async function createResearchBrief(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!careerCoachEnabled()) return fail(OFF)
+  if (!(await coachAllowed())) return fail(OFF)
   const user = await requireUser()
   const applicationId = String(formData.get("applicationId") ?? "")
   const pasted = field(formData, "pasted", SOURCE_TEXT_MAX + 1)
@@ -120,7 +120,7 @@ export async function createResearchBrief(_previous: RecordFormState, formData: 
     reservation: usageReservationDeps(supabase, { userId: user.id, secret: run.secret, idempotencyKey: key, mode: run.mode, provider: run.provider, model: run.model }),
     company: companyName,
     sources,
-    persist: async (outcome) => {
+    persist: async (outcome, modelUsed) => {
       const inserted = await supabase
         .from("research_briefs")
         .insert({
@@ -134,7 +134,7 @@ export async function createResearchBrief(_previous: RecordFormState, formData: 
           prompt_version: RESEARCH_PROMPT_VERSION,
           schema_version: COACH_SCHEMA_VERSION,
           provider: run.provider,
-          model: run.model,
+          model: modelUsed,
           execution_mode: run.mode,
         })
         .select("id")
@@ -197,12 +197,12 @@ async function runDraft(
     run,
     reservation: usageReservationDeps(supabase, { userId: user.id, secret: run.secret, idempotencyKey: key, mode: run.mode, provider: run.provider, model: run.model }),
     context: loaded.context,
-    persist: async (outcome) => {
+    persist: async (outcome, modelUsed) => {
       if (!outcome.body.trim()) {
         empty = outcome
         return
       }
-      await save(outcome, { links: loaded.links, run: { provider: run.provider, model: run.model, mode: run.mode } })
+      await save(outcome, { links: loaded.links, run: { provider: run.provider, model: modelUsed, mode: run.mode } })
     },
   })
   if (!result.ok) return aiFailure(result.code, result.message)
@@ -213,7 +213,7 @@ async function runDraft(
 
 /** Drafts outreach, a follow-up, a thank-you, a referral request, or an application answer. Nothing is sent. */
 export async function createDraft(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!careerCoachEnabled()) return fail(OFF)
+  if (!(await coachAllowed())) return fail(OFF)
   const kind = readKind(String(formData.get("kind") ?? ""))
   if (!kind) return fail("Choose what to draft.")
   const format = readFormat(String(formData.get("format") ?? ""), kind)
@@ -270,7 +270,7 @@ export async function createDraft(_previous: RecordFormState, formData: FormData
 
 /** Replaces a draft's text with a new generation from the same inputs. Only drafts not marked sent can change. */
 export async function regenerateDraft(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!careerCoachEnabled()) return fail(OFF)
+  if (!(await coachAllowed())) return fail(OFF)
   const user = await requireUser()
   const draft = await getDraft(String(formData.get("draftId") ?? ""))
   if (!draft) return fail("That draft could not be found.")
@@ -320,7 +320,7 @@ export async function regenerateDraft(_previous: RecordFormState, formData: Form
  * contacted date, in one database call scoped to the caller.
  */
 export async function markDraftSent(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!careerCoachEnabled()) return fail(OFF)
+  if (!(await coachAllowed())) return fail(OFF)
   const user = await requireUser()
   const draftId = String(formData.get("draftId") ?? "")
   if (!isUuid(draftId) || formData.get("confirm") !== "sent") return fail("That draft could not be marked sent.")
@@ -337,7 +337,7 @@ export async function markDraftSent(_previous: RecordFormState, formData: FormDa
 }
 
 export async function setDraftArchived(_previous: RecordFormState, formData: FormData): Promise<RecordFormState> {
-  if (!careerCoachEnabled()) return fail(OFF)
+  if (!(await coachAllowed())) return fail(OFF)
   const user = await requireUser()
   const draftId = String(formData.get("draftId") ?? "")
   const archive = formData.get("archive") !== "false"
@@ -357,7 +357,7 @@ export async function setDraftArchived(_previous: RecordFormState, formData: For
 }
 
 export async function deleteDraft(formData: FormData): Promise<RecordFormState> {
-  if (!careerCoachEnabled()) return fail(OFF)
+  if (!(await coachAllowed())) return fail(OFF)
   const user = await requireUser()
   const draftId = String(formData.get("draftId") ?? "")
   if (!isUuid(draftId)) return fail("That draft could not be found.")
@@ -369,7 +369,7 @@ export async function deleteDraft(formData: FormData): Promise<RecordFormState> 
 }
 
 export async function deleteBrief(formData: FormData): Promise<RecordFormState> {
-  if (!careerCoachEnabled()) return fail(OFF)
+  if (!(await coachAllowed())) return fail(OFF)
   const user = await requireUser()
   const briefId = String(formData.get("briefId") ?? "")
   if (!isUuid(briefId)) return fail("That brief could not be found.")

@@ -12,6 +12,7 @@ export const CATALOG_FUNCTIONS: Record<JobOperation, string> = {
   "record-alerts": "record_job_alerts",
   "collect-alerts": "collect_alert_workspace",
   "list-ingestion-sources": "list_job_ingestion_sources",
+  "source-status": "job_source_status",
 }
 
 export type CatalogRpcResult = { data: unknown; error: { message: string; code?: string } | null }

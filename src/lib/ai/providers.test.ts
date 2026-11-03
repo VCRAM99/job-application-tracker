@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import { assertSupportedModel, modelsFor } from "@/lib/ai/models"
 import { mapProviderFailure } from "@/lib/ai/provider-error"
-import { completeAnthropic } from "@/lib/ai/providers/anthropic"
+import { ANTHROPIC_MAX_TOKENS, completeAnthropic } from "@/lib/ai/providers/anthropic"
 import { completeGemini } from "@/lib/ai/providers/google"
 import { completeOpenAI } from "@/lib/ai/providers/openai"
 import { AI_ERROR_MESSAGES, AiRequestError, type StructuredRequest } from "@/lib/ai/types"
@@ -161,7 +161,47 @@ describe("provider adapters", () => {
   it("lists the current default models in the registry", () => {
     expect(assertSupportedModel("google", "gemini-3.8-flash").thinkingLevel).toBe(true)
     expect(assertSupportedModel("anthropic", "claude-haiku-5-5").label).toBe("Claude Haiku 5.5")
-    expect(modelsFor("google")[0]?.id).toBe("gemini-3.8-flash")
+    expect(modelsFor("google")[0]?.id).toBe("gemini-3.5-flash-lite")
+    expect(modelsFor("openai")[0]?.id).toBe("gpt-6-luna")
+    // Legacy models stay accepted for saved settings but are not offered.
+    expect(assertSupportedModel("google", "gemini-2.5-flash").legacy).toBe(true)
+    expect(modelsFor("google").map((model) => model.id)).not.toContain("gemini-2.5-flash")
+    expect(modelsFor("openai").map((model) => model.id)).not.toContain("gpt-5.4-mini")
+  })
+
+  it("falls back once to the next Gemini model only when the first is overloaded", async () => {
+    const overloaded = Object.assign(new Error("The model is overloaded"), { status: 503 })
+    const generateContent = vi.fn().mockRejectedValueOnce(overloaded).mockResolvedValueOnce({ text: "{}", candidates: [{ finishReason: "STOP" }] })
+    const wait = vi.fn(async () => {})
+    const response = await completeGemini({ ...request, model: "gemini-3.5-flash-lite" }, { models: { generateContent } }, wait)
+    expect(generateContent.mock.calls.map((call) => call[0].model)).toEqual(["gemini-3.5-flash-lite", "gemini-3.8-flash"])
+    expect(response.modelUsed).toBe("gemini-3.8-flash")
+    expect(wait).toHaveBeenCalledOnce()
+
+    // Overloaded twice: no third call, reported as an outage.
+    const twice = vi.fn().mockRejectedValue(overloaded)
+    await expect(completeGemini({ ...request, model: "gemini-3.5-flash-lite" }, { models: { generateContent: twice } }, wait)).rejects.toMatchObject({ code: "provider_outage" })
+    expect(twice).toHaveBeenCalledTimes(2)
+
+    // Not overloaded (404, 429): no fallback. The model with no fallback never retries.
+    for (const status of [404, 429]) {
+      const failing = vi.fn().mockRejectedValue(Object.assign(new Error("nope"), { status }))
+      await expect(completeGemini({ ...request, model: "gemini-3.5-flash-lite" }, { models: { generateContent: failing } }, wait)).rejects.toBeInstanceOf(AiRequestError)
+      expect(failing).toHaveBeenCalledOnce()
+    }
+    const noFallback = vi.fn().mockRejectedValue(overloaded)
+    await expect(completeGemini({ ...request, model: "gemini-3.8-flash" }, { models: { generateContent: noFallback } }, wait)).rejects.toBeInstanceOf(AiRequestError)
+    expect(noFallback).toHaveBeenCalledOnce()
+  })
+
+  it("asks Claude for low effort with room for thinking tokens", async () => {
+    const create = vi.fn().mockResolvedValue({ content: [{ type: "text", text: "{}" }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } })
+    await completeAnthropic({ ...request, model: "claude-haiku-5-5" }, { messages: { create } })
+    const body = create.mock.calls[0]![0]
+    expect(body.max_tokens).toBe(ANTHROPIC_MAX_TOKENS)
+    expect(ANTHROPIC_MAX_TOKENS).toBeGreaterThanOrEqual(16_000)
+    expect(body.output_config.effort).toBe("low")
+    expect(body.thinking).toBeUndefined()
   })
 
   it("rejects an unsupported model before a provider call", () => {
