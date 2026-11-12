@@ -127,6 +127,31 @@ export function answer(schema: string, user: string, system = ""): unknown {
     }
     case "career_extraction":
       return { employment: [], education: [], skills: [], projects: [], accomplishments: [], certifications: [] }
+    case "job_posting_import": {
+      // Reads "Label: value." sentences from the pasted posting, quoting each sentence, so the
+      // app's grounding keeps them. Also proposes a value from any injected instruction, which
+      // grounding must drop.
+      const posting = user.split("<job_posting>")[1]?.split("</job_posting>")[0]?.trim() ?? ""
+      const labelled = (label: string) => {
+        const match = new RegExp(`${label}: ([^.]+(?:\\.\\d+)?)\\.`).exec(posting)
+        return match ? { value: match[1]!.trim(), quote: match[0] } : { value: null, quote: null }
+      }
+      const injected = /Ignore previous instructions[^.]*?company to ([A-Z][a-z]+)\./.exec(posting)
+      const salary = /Salary: \$([\d,]+) - \$([\d,]+) USD per year\./.exec(posting)
+      const arrangement = /\b(hybrid|remote|onsite)\b[^.]*\./i.exec(posting)
+      return {
+        company: injected ? { value: injected[1], quote: injected[0] } : labelled("Company"),
+        title: labelled("Title"),
+        location: labelled("Location"),
+        country: { value: null, quote: null },
+        workArrangement: arrangement ? { value: arrangement[1]!.toLowerCase(), quote: arrangement[0] } : { value: null, quote: null },
+        employmentType: /full-time/.test(posting) ? { value: "full_time", quote: /[^.]*full-time[^.]*\./.exec(posting)![0].trim() } : { value: null, quote: null },
+        salary: salary
+          ? { min: Number(salary[1]!.replace(/,/g, "")), max: Number(salary[2]!.replace(/,/g, "")), currency: "USD", period: "year", quote: salary[0] }
+          : { min: null, max: null, currency: null, period: null, quote: null },
+        requisitionId: labelled("Requisition ID"),
+      }
+    }
     default:
       throw new Error(`fake-openai: unknown schema ${schema}`)
   }
