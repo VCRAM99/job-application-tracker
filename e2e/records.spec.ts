@@ -150,11 +150,17 @@ test("daily tasks: create a habit and check it off", async ({ page }) => {
   for (const day of ["Sat", "Sun"]) await page.getByRole("checkbox", { name: day }).check()
   await page.getByRole("button", { name: "Create task" }).click()
   await page.waitForURL((url) => url.pathname === "/daily-tasks")
-  const checklist = page.getByRole("list").filter({ has: page.getByRole("button", { name: /^Review job boards/ }) })
-  await checklist.getByRole("button", { name: "Review job boards Mark complete." }).click()
-  await expect(checklist.getByRole("button", { name: /^Review job boards/ })).not.toHaveAccessibleName("Review job boards Mark complete.")
+  // The new habit is scheduled today only if today is a Saturday or Sunday; move to the next Saturday.
+  const habit = page.getByRole("checkbox", { name: "Review job boards" })
+  for (let step = 0; step < 7 && !(await habit.count()); step++) await page.getByRole("button", { name: "Next day" }).click()
+  await habit.click()
+  await expect(habit).toHaveAttribute("aria-checked", "true")
+  const day = await page.locator("[data-selected-date]:visible").getAttribute("data-selected-date")
   await page.reload()
-  await expect(page.getByRole("button", { name: /^Review job boards/ }).first()).not.toHaveAccessibleName("Review job boards Mark complete.")
+  for (let step = 0; step < 7 && (await page.locator("[data-selected-date]:visible").getAttribute("data-selected-date")) !== day; step++) {
+    await page.getByRole("button", { name: "Next day" }).click()
+  }
+  await expect(page.getByRole("checkbox", { name: "Review job boards" })).toHaveAttribute("aria-checked", "true")
 })
 
 test("theme toggle switches and persists", async ({ page }) => {

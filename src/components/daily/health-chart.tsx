@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
 import { datesInRange } from "@/lib/daily/calendar"
 import { addCalendarDays } from "@/lib/records/logic"
@@ -27,6 +27,7 @@ export function HealthChart({
   steps,
   weight,
   weightUnit = "kg",
+  hidden = [],
 }: {
   today: string
   calories: Row[]
@@ -36,7 +37,10 @@ export function HealthChart({
   steps: Row[]
   weight: Row[]
   weightUnit?: WeightUnit
+  /** Metrics turned off in Daily Tasks preferences: their series are left out. */
+  hidden?: readonly string[]
 }) {
+  const shown = SERIES.filter((series) => !hidden.includes(series.key === "calories" || series.key === "protein" ? "food" : series.key))
   const [range, setRange] = useState<7 | 30 | 90>(30)
   const [visible, setVisible] = useState<Record<string, boolean>>({
     calories: true,
@@ -97,7 +101,7 @@ export function HealthChart({
         ))}
       </div>
       <div className="flex flex-wrap gap-3 text-sm">
-        {SERIES.map((series) => (
+        {shown.map((series) => (
           <label key={series.key} className="inline-flex items-center gap-2">
             <input
               type="checkbox"
@@ -114,7 +118,7 @@ export function HealthChart({
       <p className="text-xs text-muted-foreground">
         Relative trends (normalized 0–100). Tooltips show the recorded values and units. Missing days are gaps, and weight is only plotted on days you measured it.
       </p>
-      {data.every((row) => SERIES.every((series) => row[series.key] == null)) ? (
+      {data.every((row) => shown.every((series) => row[series.key] == null)) ? (
         <p className="text-sm text-muted-foreground">No health entries in this range.</p>
       ) : null}
       <div className="h-64 w-full">
@@ -130,7 +134,7 @@ export function HealthChart({
                 return (
                   <div className="rounded-lg border bg-popover px-3 py-2 text-xs">
                     <p className="font-medium">{row.fullDate}</p>
-                    {SERIES.filter((series) => visible[series.key]).map((series) => {
+                    {shown.filter((series) => visible[series.key]).map((series) => {
                       const value = row[`${series.key}Raw` as keyof typeof row]
                       const shown = series.key === "weight" && typeof value === "number"
                         ? `${kgToDisplay(value, weightUnit)} ${weightUnit}`
@@ -145,8 +149,7 @@ export function HealthChart({
                 )
               }}
             />
-            <Legend />
-            {SERIES.filter((series) => visible[series.key]).map((series) => (
+            {shown.filter((series) => visible[series.key]).map((series) => (
               <Line
                 key={series.key}
                 type="monotone"
