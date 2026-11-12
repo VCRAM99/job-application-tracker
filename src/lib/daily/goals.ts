@@ -28,6 +28,18 @@ export const METRIC_LABELS: Record<HealthMetric, string> = {
 export const DEFAULT_GOAL_MODE: GoalMode = "bulk"
 export const DEFAULT_PROTEIN_DIRECTION: ProteinDirection = "follow"
 
+/** Input limits, matching the database checks, shared by the forms and the server actions. */
+export const LIMITS = {
+  calories: 20000,
+  protein: 1000,
+  /** One water entry, in mL (positive to add, negative to undo). */
+  waterEntry: 5000,
+  waterGoal: 20000,
+  waterIncrement: 5000,
+  sleepMinutes: 1440,
+  steps: 200000,
+} as const
+
 /** From this share of the target on, a total counts as close to it. */
 export const CLOSE_RATIO = 0.9
 
@@ -61,7 +73,11 @@ export type TargetDirection = "limit" | "reach"
 
 export function targetStatus(value: number, target: number | null, direction: TargetDirection): TargetStatus {
   if (target == null || !Number.isFinite(target) || target <= 0) return { tone: "none", label: "No target", ratio: null }
-  const ratio = Math.max(0, value) / target
+  // Totals of decimal entries (16.4 + 47.8 + 35.8) drift by a hair; compare at the 0.1 shown.
+  const total = Math.round(Math.max(0, value) * 10) / 10
+  const goal = Math.round(target * 10) / 10
+  if (goal <= 0) return { tone: "none", label: "No target", ratio: null }
+  const ratio = total / goal
   if (direction === "limit") {
     if (ratio > 1) return { tone: "over", label: "Over", ratio }
     if (ratio >= CLOSE_RATIO) return { tone: "close", label: "Close", ratio }

@@ -158,3 +158,22 @@ test("puts Health Insights and Weekly Insights side by side on desktop", async (
   expect(Math.abs(health!.y - weekly!.y)).toBeLessThan(2)
   expect(weekly!.x).toBeGreaterThan(health!.x + health!.width - 1)
 })
+
+test("shows a task added or paused from this page, even when Next restores the earlier page", async ({ page }) => {
+  await open(page, "/daily-tasks")
+  // Client-side navigation away and back: Next keeps the earlier page and restores it.
+  await page.getByRole("button", { name: "Add daily task" }).click()
+  await page.getByLabel("Title").fill("E2E restored habit")
+  for (const day of ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]) {
+    const box = page.getByRole("checkbox", { name: day })
+    if (!(await box.isChecked())) await box.check()
+  }
+  await page.getByRole("button", { name: "Create task" }).click()
+  await page.waitForURL((url) => url.pathname === "/daily-tasks")
+  await expect(page.getByRole("checkbox", { name: "E2E restored habit" })).toBeVisible()
+
+  await page.getByRole("button", { name: /Manage recurring tasks/ }).click()
+  const row = page.getByRole("listitem").filter({ hasText: "E2E restored habit" }).filter({ has: page.getByRole("button", { name: "Pause" }) })
+  await row.getByRole("button", { name: "Pause" }).click()
+  await expect(page.getByRole("checkbox", { name: "E2E restored habit" })).toHaveCount(0)
+})

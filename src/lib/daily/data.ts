@@ -87,22 +87,6 @@ export async function listRecurringTasks(): Promise<DataResult<RecurringTaskRow[
   }
 }
 
-export async function listCompletions(from: string, to: string): Promise<DataResult<Array<{ taskId: string; localDate: string }>>> {
-  const user = await requireUser()
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from("recurring_task_completions")
-    .select("task_id, local_date")
-    .eq("user_id", user.id)
-    .gte("local_date", from)
-    .lte("local_date", to)
-  if (error) return failure(error)
-  return {
-    ok: true,
-    data: (data ?? []).map((row) => ({ taskId: row.task_id, localDate: row.local_date })),
-  }
-}
-
 type GoalRow = {
   calorie_target: number | null
   protein_target: number | string | null

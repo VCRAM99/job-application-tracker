@@ -35,8 +35,15 @@ const median = (values: number[]) => {
   return Math.round((sorted[Math.floor(sorted.length / 2)] ?? Number.NaN) * 10) / 10
 }
 
+/** Its own process group, so stopping it also stops the `next start` it launches. */
 function start(command: string, args: string[], env: NodeJS.ProcessEnv): ChildProcess {
-  return spawn(command, args, { cwd: ROOT, env, stdio: "ignore" })
+  return spawn(command, args, { cwd: ROOT, env, stdio: "ignore", detached: true })
+}
+
+function stop(child: ChildProcess) {
+  try {
+    if (child.pid) process.kill(-child.pid, "SIGTERM")
+  } catch {}
 }
 
 async function waitFor(url: string) {
@@ -319,7 +326,7 @@ async function main() {
     }
   } finally {
     await browser.close()
-    app.kill("SIGTERM")
+    stop(app)
   }
 }
 

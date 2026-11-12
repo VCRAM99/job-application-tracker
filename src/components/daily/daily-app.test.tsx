@@ -194,4 +194,89 @@ describe("Daily Tasks page", () => {
     expect(screen.getByText("Oatmeal")).toBeTruthy()
     expect(actions.saveFoodEntry).toHaveBeenCalledWith(expect.objectContaining({ description: "Oatmeal", calories: 1700 }))
   })
+
+  it("loads today again if a far jump replaced the window while the user went back to today", async () => {
+    const far = deferred<unknown>()
+    const back = deferred<unknown>()
+    actions.loadDailyRange.mockReturnValueOnce(far.promise).mockReturnValueOnce(back.promise)
+    await renderApp()
+    fireEvent.change(screen.getByLabelText("Choose a date"), { target: { value: "2024-01-15" } })
+    fireEvent.click(screen.getByRole("button", { name: "Today" }))
+    await act(async () => far.resolve({ ok: true, data: { from: "2023-12-01", to: "2024-02-29", completions: [], food: [], water: [], sleep: [], steps: [], weight: [] } }))
+    // Today is no longer in the loaded window: it is requested again instead of a skeleton forever.
+    expect(actions.loadDailyRange).toHaveBeenCalledTimes(2)
+    await act(async () => back.resolve({ ok: true, data: { from: "2026-09-28", to: "2026-12-27", completions: [], food: [], water: [], sleep: [], steps: [], weight: [] } }))
+    expect(document.querySelector("[data-day-loading]")).toBeNull()
+    expect(screen.getByRole("checkbox", { name: "Stretch" })).toBeTruthy()
+  })
+
+  it("offers Retry when a day fails to load", async () => {
+    actions.loadDailyRange.mockResolvedValueOnce({ ok: false, message: "Those days could not be loaded." }).mockResolvedValueOnce({ ok: true, data: { from: "2024-12-01", to: "2025-02-28", completions: [], food: [], water: [], sleep: [], steps: [], weight: [] } })
+    await renderApp()
+    fireEvent.change(screen.getByLabelText("Choose a date"), { target: { value: "2025-01-15" } })
+    await act(async () => {})
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }))
+    await act(async () => {})
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull()
+    expect(document.querySelector("[data-day-loading]")).toBeNull()
+  })
+
+  it("saves a typed target when preferences close with Escape", async () => {
+    actions.saveDailyPreferences.mockImplementation(async (next: DailyGoals) => ({ ok: true, data: next }))
+    await renderApp()
+    fireEvent.click(screen.getByRole("button", { name: "Daily Tasks preferences" }))
+    const field = screen.getByLabelText("Calorie target")
+    field.focus()
+    fireEvent.change(field, { target: { value: "1800" } })
+    fireEvent.keyDown(document, { key: "Escape" })
+    await act(async () => {})
+    expect(actions.saveDailyPreferences).toHaveBeenCalledWith(expect.objectContaining({ calorieTarget: 1800 }))
+  })
+
+  it("rejects an out-of-range target with a reason instead of saving it", async () => {
+    await renderApp()
+    fireEvent.click(screen.getByRole("button", { name: "Daily Tasks preferences" }))
+    const field = screen.getByLabelText("Sleep target")
+    fireEvent.change(field, { target: { value: "0" } })
+    fireEvent.blur(field)
+    expect(field.getAttribute("aria-invalid")).toBe("true")
+    expect(screen.getByText(/1–1,440/)).toBeTruthy()
+    expect(actions.saveDailyPreferences).not.toHaveBeenCalled()
+  })
+
+  it("leaves the arrow keys to a focused chart", async () => {
+    await renderApp()
+    const chart = document.createElement("div")
+    chart.className = "recharts-wrapper"
+    chart.tabIndex = 0
+    document.body.appendChild(chart)
+    fireEvent.keyDown(chart, { key: "ArrowRight" })
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
+    document.body.appendChild(svg)
+    fireEvent.keyDown(svg, { key: "ArrowRight" })
+    expect(document.querySelector("[data-selected-date]")?.getAttribute("data-selected-date")).toBe(TODAY)
+    chart.remove()
+    svg.remove()
+  })
+
+  it("keeps the undo notice while it is hovered", async () => {
+    vi.useFakeTimers()
+    actions.deleteHealthEntry.mockResolvedValue({ ok: true, data: null })
+    await renderApp()
+    fireEvent.click(screen.getByRole("button", { name: "Delete Oatmeal" }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    const undo = screen.getByRole("button", { name: "Undo" })
+    fireEvent.mouseEnter(undo.parentElement!)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20_000)
+    })
+    expect(screen.getByRole("button", { name: "Undo" })).toBeTruthy()
+    fireEvent.mouseLeave(undo.parentElement!)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(9_000)
+    })
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull()
+  })
 })

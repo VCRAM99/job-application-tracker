@@ -3,12 +3,11 @@
 import { requireUser } from "@/lib/auth/session"
 import { compareIso, isIsoDate } from "@/lib/daily/calendar"
 import { foodFromRow, getDailyPreference, goalsFromRow, loadDailyWindow, weightFromRow } from "@/lib/daily/data"
-import { HEALTH_METRICS, parseHiddenMetrics, type GoalMode, type HealthMetric, type ProteinDirection } from "@/lib/daily/goals"
+import { HEALTH_METRICS, LIMITS, parseHiddenMetrics, type GoalMode, type HealthMetric, type ProteinDirection } from "@/lib/daily/goals"
 import { canAddWater, waterTotal } from "@/lib/daily/health"
 import type { AmountEntry, DailyGoals, DailyWindow, FoodEntry, WeightEntry } from "@/lib/daily/model"
-import { isMissingTable } from "@/lib/records/logic"
 import { isUuid } from "@/lib/records/form-state"
-import { addCalendarDays } from "@/lib/records/logic"
+import { addCalendarDays, isMissingTable } from "@/lib/records/logic"
 import { createClient } from "@/lib/supabase/server"
 
 /**
@@ -23,7 +22,8 @@ const fail = (message: string): Result<never> => ({ ok: false, message })
 const ok = <T>(data: T): Result<T> => ({ ok: true, data })
 
 function failureMessage(error: { code?: string; message?: string } | null, fallback: string): string {
-  if (isMissingTable(error)) return "Daily tasks are not available yet. Apply the latest migration, then reload."
+  // PGRST204: a column the app sends is not in the database yet (the app deployed before its migration).
+  if (isMissingTable(error) || error?.code === "PGRST204") return "Daily tasks are not available yet. Apply the latest migration, then reload."
   return fallback
 }
 
@@ -66,8 +66,8 @@ export async function setTaskCompletion(taskId: string, date: string, completed:
 export type FoodInput = { id?: string; date: string; description: string; calories: number; protein: number; entryTime: string }
 
 export async function saveFoodEntry(input: FoodInput): Promise<Result<FoodEntry>> {
-  const calories = wholeNumber(input?.calories, 0, 20000)
-  const protein = decimal(input?.protein, 0, 1000)
+  const calories = wholeNumber(input?.calories, 0, LIMITS.calories)
+  const protein = decimal(input?.protein, 0, LIMITS.protein)
   if (!isIsoDate(input?.date) || calories == null || protein == null) return fail("Enter calories (0–20,000) and protein (0–1,000 g).")
   const time = typeof input.entryTime === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(input.entryTime) ? input.entryTime : null
   const description = typeof input.description === "string" ? input.description.trim().slice(0, 200) || null : null
@@ -96,12 +96,18 @@ export type AmountKind = keyof typeof AMOUNT_TABLES
  * zero. Sleep and steps are positive entries that can be edited.
  */
 export async function saveAmountEntry(kind: AmountKind, input: { id?: string; date: string; amount: number }): Promise<Result<AmountEntry>> {
+  if (!Object.hasOwn(AMOUNT_TABLES, kind) || !isIsoDate(input?.date)) return fail("That entry could not be saved.")
   const spec = AMOUNT_TABLES[kind]
-  if (!spec || !isIsoDate(input?.date)) return fail("That entry could not be saved.")
   const amount =
-    kind === "water" ? wholeNumber(input.amount, -20000, 20000) : kind === "sleep" ? wholeNumber(input.amount, 1, 1440) : wholeNumber(input.amount, 1, 200000)
+    kind === "water"
+      ? wholeNumber(input.amount, -LIMITS.waterEntry, LIMITS.waterEntry)
+      : kind === "sleep"
+        ? wholeNumber(input.amount, 1, LIMITS.sleepMinutes)
+        : wholeNumber(input.amount, 1, LIMITS.steps)
   if (amount == null || amount === 0) {
-    return fail(kind === "sleep" ? "Enter between 1 minute and 24 hours." : kind === "steps" ? "Enter a whole number of steps." : "Enter a whole number of milliliters.")
+    return fail(
+      kind === "sleep" ? "Enter between 1 minute and 24 hours." : kind === "steps" ? "Enter a whole number of steps, up to 200,000." : "Enter a whole number of milliliters, up to 5,000 at a time.",
+    )
   }
   const user = await requireUser()
   const supabase = await createClient()
@@ -141,8 +147,8 @@ const ENTRY_TABLES = { food: "food_entries", water: "water_entries", sleep: "sle
 export type EntryKind = keyof typeof ENTRY_TABLES
 
 export async function deleteHealthEntry(kind: EntryKind, id: string): Promise<Result> {
+  if (!Object.hasOwn(ENTRY_TABLES, kind) || !isUuid(id)) return fail("That entry could not be deleted.")
   const table = ENTRY_TABLES[kind]
-  if (!table || !isUuid(id)) return fail("That entry could not be deleted.")
   const user = await requireUser()
   const supabase = await createClient()
   const { error } = await supabase.from(table).delete().eq("user_id", user.id).eq("id", id)
@@ -167,13 +173,18 @@ const optional = (value: unknown, max: number, whole = true) =>
   value == null ? { ok: true as const, value: null } : (whole ? wholeNumber(value, 0, max) : decimal(value, 0, max)) == null ? { ok: false as const } : { ok: true as const, value: whole ? (value as number) : Math.round((value as number) * 10) / 10 }
 
 export async function saveDailyPreferences(input: PreferencesInput): Promise<Result<DailyGoals>> {
-  const calorie = optional(input?.calorieTarget, 20000)
-  const protein = optional(input?.proteinTarget, 1000, false)
-  const water = optional(input?.waterGoalMl, 20000)
-  const sleep = input?.sleepTargetMinutes == null ? { ok: true as const, value: null } : wholeNumber(input.sleepTargetMinutes, 1, 1440) == null ? { ok: false as const } : { ok: true as const, value: input.sleepTargetMinutes }
-  const steps = optional(input?.stepTarget, 200000)
-  const increment = wholeNumber(input?.waterIncrementMl, 1, 5000)
-  if (!calorie.ok || !protein.ok || !water.ok || !sleep.ok || !steps.ok || increment == null) return fail("Check the targets: whole numbers, 0 or more.")
+  const calorie = optional(input?.calorieTarget, LIMITS.calories)
+  const protein = optional(input?.proteinTarget, LIMITS.protein, false)
+  const water = optional(input?.waterGoalMl, LIMITS.waterGoal)
+  const sleep = input?.sleepTargetMinutes == null ? { ok: true as const, value: null } : wholeNumber(input.sleepTargetMinutes, 1, LIMITS.sleepMinutes) == null ? { ok: false as const } : { ok: true as const, value: input.sleepTargetMinutes }
+  const steps = optional(input?.stepTarget, LIMITS.steps)
+  const increment = wholeNumber(input?.waterIncrementMl, 1, LIMITS.waterIncrement)
+  if (!calorie.ok) return fail("Calorie target: a whole number up to 20,000.")
+  if (!protein.ok) return fail("Protein target: up to 1,000 g.")
+  if (!water.ok) return fail("Water goal: a whole number up to 20,000 mL.")
+  if (!sleep.ok) return fail("Sleep target: 1 to 1,440 minutes.")
+  if (!steps.ok) return fail("Step target: a whole number up to 200,000.")
+  if (increment == null) return fail("Water button: 1 to 5,000 mL.")
   if (input.goalMode !== "cut" && input.goalMode !== "bulk") return fail("Choose Cutting or Bulking.")
   if (input.proteinDirection !== "follow" && input.proteinDirection !== "reach") return fail("Choose how protein is read.")
   if (!Array.isArray(input.hiddenMetrics) || input.hiddenMetrics.some((metric) => !HEALTH_METRICS.includes(metric))) return fail("Unknown metric.")

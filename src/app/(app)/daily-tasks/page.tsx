@@ -12,6 +12,7 @@ import { deleteRecurringTask, setRecurringStatus } from "@/lib/daily/actions"
 import { WEEKDAY_LABELS, localDateInTimeZone } from "@/lib/daily/calendar"
 import { getDailyPreference, listRecurringTasks, loadDailyGoals, loadDailyWindow } from "@/lib/daily/data"
 import { initialRange } from "@/lib/daily/model"
+import { createHash } from "node:crypto"
 import { addCalendarDays } from "@/lib/records/logic"
 
 export const metadata: Metadata = { title: "Daily Tasks" }
@@ -22,6 +23,10 @@ export const metadata: Metadata = { title: "Daily Tasks" }
  * and health entries), so changing day in the browser needs no request. The window starts a day
  * wider than needed on each side, because "today" depends on the timezone read in the same batch.
  */
+function dailyVersion(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16)
+}
+
 export default async function DailyTasksPage() {
   // Per-request page: today depends on the clock, so read it only after opting out of prerendering.
   await connection()
@@ -68,6 +73,10 @@ export default async function DailyTasksPage() {
         />
       ) : (
         <DailyTasksApp
+          // The client keeps its own copy of tasks, goals, and days. When the server sends different
+          // ones (a task paused, added, or deleted; health turned on in Settings; a preserved page
+          // restored by Next), remount so the page shows them instead of the old copy.
+          key={dailyVersion({ tasks: tasks.data, healthEnabled, goals: goals.ok ? goals.data : null })}
           initial={{
             tasks: tasks.data.map((task) => ({ ...task, description: task.description ?? null })),
             goals: goals.ok ? goals.data : { calorieTarget: null, proteinTarget: null, waterGoalMl: null, waterIncrementMl: 250, sleepTargetMinutes: null, stepTarget: null, weightUnit: "kg", goalMode: "bulk", proteinDirection: "follow", hiddenMetrics: [] },

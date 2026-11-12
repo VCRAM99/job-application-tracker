@@ -52,10 +52,16 @@ function useToday(timezone: string | null, serverToday: string): string {
 
 /** ←/→ change day unless the user is typing or a control that uses the arrows has focus. */
 function isTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false
-  if (target.isContentEditable) return true
+  if (!(target instanceof Element)) return false
+  if (target instanceof HTMLElement && target.isContentEditable) return true
   const tag = target.tagName
-  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.closest('[role="dialog"], [role="radiogroup"], [role="slider"]') != null
+  // Charts (recharts' keyboard layer) and anything marked data-own-arrows use the arrows themselves.
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    target.closest('[role="dialog"], [role="radiogroup"], [role="slider"], .recharts-wrapper, svg, [data-own-arrows]') != null
+  )
 }
 
 export function DailyTasksApp({
@@ -77,6 +83,7 @@ export function DailyTasksApp({
   const [picked, setPicked] = useState<string | null>(null)
   const selected = picked ?? today
   const loading = useRef(new Set<string>())
+  const [loadFailed, setLoadFailed] = useState(false)
 
   function ensureLoaded(date: string) {
     const range = rangeToLoad(state.window, date)
@@ -84,12 +91,19 @@ export function DailyTasksApp({
     const key = `${range.from}:${range.to}`
     if (loading.current.has(key)) return
     loading.current.add(key)
+    setLoadFailed(false)
     void loadDailyRange(range.from, range.to)
       .then((result) => {
         if (result.ok) apply({ type: "window", window: result.data })
-        else notify(result.message)
+        else {
+          setLoadFailed(true)
+          notify(result.message)
+        }
       })
-      .catch(() => notify("Those days could not be loaded."))
+      .catch(() => {
+        setLoadFailed(true)
+        notify("Those days could not be loaded.")
+      })
       .finally(() => loading.current.delete(key))
   }
 
@@ -101,9 +115,9 @@ export function DailyTasksApp({
 
   // The key handler reads the current day from component state, never from the DOM: Next can keep
   // a hidden copy of this page mounted (Activity), and a DOM lookup could find that copy first.
-  const latest = useRef({ goTo, selected })
+  const latest = useRef({ goTo, selected, ensure: ensureLoaded })
   useEffect(() => {
-    latest.current = { goTo, selected }
+    latest.current = { goTo, selected, ensure: ensureLoaded }
   })
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -119,6 +133,13 @@ export function DailyTasksApp({
   }, [])
 
   const ready = inWindow(view.window, selected)
+  // Whenever the selected day is not loaded (a far jump replaced the window, a load failed and the
+  // day changed, or the page stayed open past the loaded range), load it. ensureLoaded skips ranges
+  // already in flight, and a failed load waits for Retry instead of looping.
+  const inView = ready
+  useEffect(() => {
+    if (!inView && !loadFailed) latest.current.ensure(selected)
+  }, [inView, loadFailed, selected])
   const goals = view.goals
   const hidden = new Set(goals.hiddenMetrics)
   const completions = new Set(view.window.completions)
@@ -196,11 +217,20 @@ export function DailyTasksApp({
       <DayNav date={selected} today={today} timezone={timezone} onChange={goTo} />
 
       {!ready ? (
-        <div data-day-loading className="flex flex-col gap-2" aria-busy="true" aria-label="Loading this day">
-          {[0, 1, 2].map((index) => (
-            <div key={index} className="h-14 animate-pulse rounded-xl bg-muted/60" />
-          ))}
-        </div>
+        loadFailed ? (
+          <div className="flex flex-col items-center gap-3 rounded-xl bg-muted/40 px-4 py-6 text-sm" role="alert">
+            <p>This day could not be loaded.</p>
+            <button type="button" className="pressable pressable-quiet rounded-lg border px-3 py-1.5" onClick={() => ensureLoaded(selected)}>
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div data-day-loading className="flex flex-col gap-2" aria-busy="true" aria-label="Loading this day">
+            {[0, 1, 2].map((index) => (
+              <div key={index} className="h-14 animate-pulse rounded-xl bg-muted/60" />
+            ))}
+          </div>
+        )
       ) : (
         <>
           <section aria-labelledby="checklist-heading" className="flex flex-col gap-3">

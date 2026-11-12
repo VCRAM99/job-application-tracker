@@ -5,7 +5,7 @@ import dynamic from "next/dynamic"
 import { useId, useState, type FormEvent, type ReactNode } from "react"
 
 import { isPending } from "@/components/daily/store"
-import { targetStatus, type TargetDirection, type TargetTone } from "@/lib/daily/goals"
+import { LIMITS, targetStatus, type TargetDirection, type TargetTone } from "@/lib/daily/goals"
 import { canAddWater, formatCount, formatSleep, kgToDisplay, sleepMinutes, sumNumbers, waterTotal, type WeightUnit } from "@/lib/daily/health"
 import type { AmountEntry, FoodEntry, WeightEntry } from "@/lib/daily/model"
 
@@ -67,7 +67,7 @@ export function TargetMeter({
         {display ?? formatCount(value)}
         {display ? null : <span className="ml-1 text-sm font-normal text-muted-foreground">{unit}</span>}
       </p>
-      <p className="text-xs text-muted-foreground tabular-nums">{target == null ? "No target" : `of ${targetDisplay ?? `${formatCount(target)} ${unit}`}`}</p>
+      <p className="text-xs text-muted-foreground tabular-nums">{status.tone === "none" || target == null ? "No target" : `of ${targetDisplay ?? `${formatCount(target)} ${unit}`}`}</p>
       {status.ratio != null && target != null ? (
         <div
           className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
@@ -231,7 +231,7 @@ export function WaterCard({ entries, goal, increment, onAdd, onInvalid }: { entr
         onSubmit={(event) => {
           event.preventDefault()
           const amount = numberFrom(event.currentTarget, "amount")
-          if (!Number.isInteger(amount) || amount === 0) return onInvalid("Enter a whole number of milliliters.")
+          if (!Number.isInteger(amount) || amount === 0 || Math.abs(amount) > LIMITS.waterEntry) return onInvalid("Enter a whole number of milliliters, up to 5,000 at a time.")
           if (!canAddWater(total, amount)) return onInvalid("That would make the day's water total negative.")
           onAdd(amount)
           event.currentTarget.reset()

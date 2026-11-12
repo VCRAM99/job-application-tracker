@@ -37,6 +37,14 @@ describe("target status at the exact thresholds", () => {
     for (const target of [null, 0, -5, Number.NaN]) expect(targetStatus(100, target, "limit")).toEqual({ tone: "none", label: "No target", ratio: null })
   })
 
+  it("compares decimal totals at the 0.1 shown, not their floating-point sum", () => {
+    // 16.4 + 47.8 + 35.8 is 99.99999999999999 in floating point; it shows, and counts, as 100.
+    expect(targetStatus(16.4 + 47.8 + 35.8, 100, "reach")).toMatchObject({ tone: "good", label: "Reached" })
+    // 16.1 + 48.2 + 35.7 is 100.00000000000001: at the limit, not over it.
+    expect(targetStatus(16.1 + 48.2 + 35.7, 100, "limit")).toMatchObject({ tone: "close", label: "Close" })
+    expect(targetStatus(5, 0.04, "reach")).toMatchObject({ tone: "none" })
+  })
+
   it("treats a negative total as zero", () => {
     expect(targetStatus(-50, 2000, "limit")).toMatchObject({ tone: "good", ratio: 0 })
   })

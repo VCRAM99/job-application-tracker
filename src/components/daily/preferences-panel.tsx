@@ -4,18 +4,18 @@ import { Settings2, X } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useId, useRef, useState, type ReactNode } from "react"
 
-import { CLOSE_RATIO, HEALTH_METRICS, METRIC_LABELS, type GoalMode, type HealthMetric, type ProteinDirection } from "@/lib/daily/goals"
+import { CLOSE_RATIO, HEALTH_METRICS, LIMITS, METRIC_LABELS, type GoalMode, type HealthMetric, type ProteinDirection } from "@/lib/daily/goals"
 import type { DailyGoals } from "@/lib/daily/model"
 
 type NumberKey = "calorieTarget" | "proteinTarget" | "waterGoalMl" | "waterIncrementMl" | "sleepTargetMinutes" | "stepTarget"
 
-const NUMBER_FIELDS: Array<{ key: NumberKey; label: string; unit: string; decimal?: boolean; metric: HealthMetric; required?: boolean }> = [
-  { key: "calorieTarget", label: "Calorie target", unit: "kcal", metric: "food" },
-  { key: "proteinTarget", label: "Protein target", unit: "g", decimal: true, metric: "food" },
-  { key: "waterGoalMl", label: "Water goal", unit: "mL", metric: "water" },
-  { key: "waterIncrementMl", label: "Water button", unit: "mL", metric: "water", required: true },
-  { key: "sleepTargetMinutes", label: "Sleep target", unit: "min", metric: "sleep" },
-  { key: "stepTarget", label: "Step target", unit: "steps", metric: "steps" },
+const NUMBER_FIELDS: Array<{ key: NumberKey; label: string; unit: string; decimal?: boolean; metric: HealthMetric; required?: boolean; min?: number; max: number }> = [
+  { key: "calorieTarget", label: "Calorie target", unit: "kcal", metric: "food", max: LIMITS.calories },
+  { key: "proteinTarget", label: "Protein target", unit: "g", decimal: true, metric: "food", max: LIMITS.protein },
+  { key: "waterGoalMl", label: "Water goal", unit: "mL", metric: "water", max: LIMITS.waterGoal },
+  { key: "waterIncrementMl", label: "Water button", unit: "mL", metric: "water", required: true, min: 1, max: LIMITS.waterIncrement },
+  { key: "sleepTargetMinutes", label: "Sleep target", unit: "min", metric: "sleep", min: 1, max: LIMITS.sleepMinutes },
+  { key: "stepTarget", label: "Step target", unit: "steps", metric: "steps", max: LIMITS.steps },
 ]
 
 function Segmented<T extends string>({ legend, value, options, onChange, name }: { legend: string; value: T; options: Array<{ value: T; label: string }>; onChange: (value: T) => void; name: string }) {
@@ -59,15 +59,24 @@ export function PreferencesPanel({ goals, healthEnabled, onChange }: { goals: Da
   useEffect(() => {
     if (!open) return
     panel.current?.querySelector<HTMLElement>("input, button:not([data-close])")?.focus()
+    // Blur first: a target being typed saves on blur, and closing would otherwise unmount it unsaved.
+    const commitFocused = () => {
+      const active = document.activeElement
+      if (active instanceof HTMLElement && panel.current?.contains(active)) active.blur()
+    }
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        commitFocused()
         setOpen(false)
         trigger.current?.focus()
       }
     }
     const onPointer = (event: PointerEvent) => {
       const target = event.target as Node
-      if (!panel.current?.contains(target) && !trigger.current?.contains(target)) setOpen(false)
+      if (!panel.current?.contains(target) && !trigger.current?.contains(target)) {
+        commitFocused()
+        setOpen(false)
+      }
     }
     document.addEventListener("keydown", onKey)
     document.addEventListener("pointerdown", onPointer)
@@ -142,9 +151,10 @@ export function PreferencesPanel({ goals, healthEnabled, onChange }: { goals: Da
                             commit({ hiddenMetrics: HEALTH_METRICS.filter((item) => (item === metric ? !event.currentTarget.checked : hidden.has(item))) })
                           }
                         />
+                        {/* Off: outlined track and a muted knob (3:1 or more against the panel); on: filled. */}
                         <span
                           aria-hidden="true"
-                          className="relative h-5 w-9 rounded-full bg-muted transition-colors peer-checked:bg-[var(--tone-good)] peer-focus-visible:ring-2 peer-focus-visible:ring-ring after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-background after:shadow after:transition-transform peer-checked:after:translate-x-4"
+                          className="relative h-5 w-9 shrink-0 rounded-full border-2 border-muted-foreground bg-transparent transition-colors peer-checked:border-[var(--tone-good)] peer-checked:bg-[var(--tone-good)] peer-focus-visible:ring-2 peer-focus-visible:ring-ring after:absolute after:top-0.5 after:left-0.5 after:size-3 after:rounded-full after:bg-muted-foreground after:transition-transform peer-checked:after:translate-x-4 peer-checked:after:bg-background"
                         />
                       </label>
                     </li>
@@ -182,7 +192,7 @@ export function PreferencesPanel({ goals, healthEnabled, onChange }: { goals: Da
               <Section title="Targets">
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                   {NUMBER_FIELDS.filter((item) => !hidden.has(item.metric)).map((item) => (
-                    <NumberField key={item.key} label={item.label} unit={item.unit} decimal={item.decimal} required={item.required} value={goals[item.key]} onCommit={(value) => commit({ [item.key]: value } as Partial<DailyGoals>)} />
+                    <NumberField key={item.key} label={item.label} unit={item.unit} decimal={item.decimal} required={item.required} min={item.min ?? 0} max={item.max} value={goals[item.key]} onCommit={(value) => commit({ [item.key]: value } as Partial<DailyGoals>)} />
                   ))}
                   {hidden.has("weight") ? null : (
                     <label className="flex flex-col gap-1 text-xs text-muted-foreground">
@@ -205,7 +215,9 @@ export function PreferencesPanel({ goals, healthEnabled, onChange }: { goals: Da
 }
 
 /** Saves on blur or Enter when the value changed and is valid; an invalid entry reverts. */
-function NumberField({ label, unit, value, decimal, required, onCommit }: { label: string; unit: string; value: number | null; decimal?: boolean; required?: boolean; onCommit: (value: number | null) => void }) {
+function NumberField({ label, unit, value, decimal, required, min, max, onCommit }: { label: string; unit: string; value: number | null; decimal?: boolean; required?: boolean; min: number; max: number; onCommit: (value: number | null) => void }) {
+  const [invalid, setInvalid] = useState(false)
+  const id = useId()
   const [draft, setDraft] = useState(value == null ? "" : String(value))
   const [shown, setShown] = useState(value)
   // A saved value from elsewhere (or a rollback) replaces the draft.
@@ -220,11 +232,9 @@ function NumberField({ label, unit, value, decimal, required, onCommit }: { labe
       return
     }
     const parsed = Number(trimmed)
-    const valid = Number.isFinite(parsed) && parsed >= 0 && (decimal || Number.isInteger(parsed)) && (!required || parsed > 0)
-    if (!valid) {
-      setDraft(value == null ? "" : String(value))
-      return
-    }
+    const valid = trimmed !== "" && Number.isFinite(parsed) && parsed >= min && parsed <= max && (decimal || Number.isInteger(parsed))
+    setInvalid(!valid)
+    if (!valid) return
     if (parsed !== value) onCommit(decimal ? Math.round(parsed * 10) / 10 : parsed)
   }
   return (
@@ -237,7 +247,12 @@ function NumberField({ label, unit, value, decimal, required, onCommit }: { labe
           inputMode={decimal ? "decimal" : "numeric"}
           value={draft}
           placeholder="None"
-          onChange={(event) => setDraft(event.currentTarget.value)}
+          aria-invalid={invalid || undefined}
+          aria-describedby={invalid ? `${id}-error` : undefined}
+          onChange={(event) => {
+            setDraft(event.currentTarget.value)
+            setInvalid(false)
+          }}
           onBlur={save}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
@@ -248,6 +263,13 @@ function NumberField({ label, unit, value, decimal, required, onCommit }: { labe
         />
         <span className="shrink-0">{unit}</span>
       </span>
+      {invalid ? (
+        <span id={`${id}-error`} className="text-[var(--tone-over)]">
+          {decimal ? "" : "Whole number, "}
+          {min}–{max.toLocaleString("en-US")}
+          {required ? "" : ", or empty"}
+        </span>
+      ) : null}
     </label>
   )
 }

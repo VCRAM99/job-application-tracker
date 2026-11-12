@@ -23,6 +23,7 @@ export function Checklist({ items, onToggle }: { items: ChecklistItem[]; onToggl
               role="checkbox"
               aria-checked={item.completed}
               aria-label={item.title}
+              aria-describedby={item.description ? `task-description-${item.id}` : undefined}
               onClick={() => onToggle(item)}
               className={`pressable group flex min-h-14 w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition-colors ${
                 item.completed ? "bg-[color-mix(in_oklch,var(--tone-good)_10%,transparent)]" : "bg-muted/40 hover:bg-muted/70"
@@ -31,14 +32,14 @@ export function Checklist({ items, onToggle }: { items: ChecklistItem[]; onToggl
               <span
                 aria-hidden="true"
                 className={`flex size-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
-                  item.completed ? "border-[var(--tone-good)] bg-[var(--tone-good)] text-background" : "border-muted-foreground/40 group-hover:border-muted-foreground"
+                  item.completed ? "border-[var(--tone-good)] bg-[var(--tone-good)] text-background" : "border-muted-foreground"
                 }`}
               >
                 {item.completed ? <Check key="done" className="daily-check-mark size-3.5" strokeWidth={3} /> : null}
               </span>
               <span className="min-w-0 flex-1">
                 <span className={`block text-sm font-medium transition-colors ${item.completed ? "text-muted-foreground line-through decoration-1" : ""}`}>{item.title}</span>
-                {item.description ? <span className="mt-0.5 block text-xs text-muted-foreground">{item.description}</span> : null}
+                {item.description ? <span id={`task-description-${item.id}`} className="mt-0.5 block text-xs text-muted-foreground">{item.description}</span> : null}
               </span>
             </button>
           </li>

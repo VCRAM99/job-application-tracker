@@ -64,8 +64,8 @@ export function useDailyStore(initial: DailyState) {
 
   const notify = useCallback((message: string, action?: Toast["action"]) => {
     const id = nextToast.current++
+    // Toasts dismiss themselves (see Toasts), pausing while hovered or focused.
     setToasts((current) => [...current.slice(-2), { id, message, action }])
-    window.setTimeout(() => setToasts((current) => current.filter((toast) => toast.id !== id)), action ? 7000 : 5000)
   }, [])
 
   const dismiss = useCallback((id: number) => setToasts((current) => current.filter((toast) => toast.id !== id)), [])
