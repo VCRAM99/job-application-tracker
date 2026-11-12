@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useActionState } from "react"
 
 import { AuthFrame, Field, FormStatus } from "@/components/auth/auth-frame"
+import { Turnstile } from "@/components/auth/turnstile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { AuthFormState } from "@/lib/auth/form-state"
@@ -100,6 +101,7 @@ export function SignupForm({
             }
           />
         </Field>
+        <Turnstile action="signup" resetSignal={state} />
         <Button type="submit" className="w-full" disabled={pending}>
           {pending ? "Creating account…" : "Create account"}
         </Button>

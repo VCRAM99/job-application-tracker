@@ -3,6 +3,7 @@
 import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
+import { captchaTokenFrom } from "@/lib/auth/captcha"
 import { isConfirmedAccount, isRecoveryProof, unconfirmedLoginMessage } from "@/lib/auth/access"
 import { mapAuthError, mapPasswordChangeError } from "@/lib/auth/errors"
 import type { AuthFormState } from "@/lib/auth/form-state"
@@ -43,7 +44,12 @@ export async function login(formData: FormData): Promise<AuthFormState> {
   if (!parsed.success) return invalidForm(parsed.error)
 
   const supabase = await createClient()
-  const { data, error } = await supabase.auth.signInWithPassword(parsed.data)
+  // Supabase verifies the Turnstile token only once CAPTCHA is on in Attack Protection.
+  const captchaToken = captchaTokenFrom(formData)
+  const { data, error } = await supabase.auth.signInWithPassword({
+    ...parsed.data,
+    ...(captchaToken ? { options: { captchaToken } } : {}),
+  })
 
   if (error) {
     return {
@@ -81,6 +87,7 @@ export async function signup(formData: FormData): Promise<AuthFormState> {
     password: parsed.data.password,
     options: {
       emailRedirectTo: `${getSiteUrl()}/auth/confirm?next=/dashboard`,
+      captchaToken: captchaTokenFrom(formData),
     },
   })
 
@@ -134,6 +141,7 @@ export async function requestPasswordReset(
   const supabase = await createClient()
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: `${getSiteUrl()}/auth/confirm?next=/reset-password`,
+    captchaToken: captchaTokenFrom(formData),
   })
 
   if (error) {

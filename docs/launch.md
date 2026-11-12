@@ -36,7 +36,7 @@ These are recommended settings in the hosted dashboard. The repository does not 
 | | Token verifications per 5 minutes per IP | 30 |
 | Authentication → Sessions | Refresh token rotation, reuse interval | On, 10 seconds |
 | Authentication → URL Configuration | Site URL and Redirect URLs | As in [setup.md](setup.md) |
-| Authentication → Attack Protection | CAPTCHA | **Leave off for now.** The forms do not send a CAPTCHA token yet, so turning it on would block every sign-in. It is listed as a follow-up. |
+| Authentication → Attack Protection | CAPTCHA | **Leave off until step 7.** Turning it on before the site key is live blocks every sign-in. |
 
 **Check:** sign out and sign in again. A new test sign-up still gets the confirmation email.
 
@@ -152,6 +152,26 @@ npx tsx --conditions=react-server scripts/jobs/cli.ts status --target production
 
 For any live source still at `--refresh-limit 1`, consider re-approving with `--refresh-limit 2`. Vercel Hobby cron fires at a jittered minute inside its hour, so two daily runs can land under 24 hours apart, and a limit of 1 (counted over a rolling 24 hours) would skip one. See [jobs.md](jobs.md).
 
+## 7. CAPTCHA (Cloudflare Turnstile)
+
+Sign-up, sign-in, and the password-reset request show a Turnstile check when `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is set. The app forwards the token to Supabase Auth; **Supabase decides whether a token is required.** Do the steps in this order: if Supabase CAPTCHA is turned on before the deployed forms send tokens, nobody can sign in.
+
+1. Cloudflare dashboard → Turnstile → **Add widget**.
+   - Name it "Job Tracker".
+   - Add your production hostname, and Vercel preview domains if you want the check on previews.
+   - Widget mode: **Managed**. Copy the **site key** and the **secret key**.
+2. Vercel: set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` to the site key. The key is inlined at build time, so **redeploy**.
+3. **Check:**
+   - `/login`, `/signup`, and `/forgot-password` each show the check, and sign-in still works (Supabase is not enforcing yet).
+   - The response's `Content-Security-Policy` header lists `https://challenges.cloudflare.com` in `script-src` and `frame-src`.
+   - The browser console shows no CSP errors.
+4. Supabase dashboard → Authentication → Attack Protection → **Enable CAPTCHA protection**. Choose provider **Turnstile** and paste the **secret key**. Save.
+5. **Check:**
+   - Sign in, sign up with a test address, and request a reset: all three work.
+   - With the Turnstile script blocked (for example an ad blocker on `challenges.cloudflare.com`), sign-in fails with "The security check did not pass."
+
+**Rollback:** turn CAPTCHA off in Supabase **first**, then unset `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and redeploy.
+
 ## Rollback
 
 Each switch is independent. Unset the variable (or set it to `false`) and redeploy.
@@ -164,6 +184,7 @@ Each switch is independent. Unset the variable (or set it to `false`) and redepl
 | Recommended Jobs | `JOB_RECOMMENDATIONS_ENABLED` |
 | AI accounting (stops every AI call at once) | Run `update public.ai_accounting_gate set secret = null where id = 1;` |
 | Sentry | `SENTRY_DSN` (and redeploy) |
+| CAPTCHA | Supabase Attack Protection → CAPTCHA off **first**, then `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (and redeploy) |
 
 Turning a flag off hides the feature and refuses its actions; saved data stays private and returns when the flag is turned back on. The migration needs no rollback: `job_source_status` is a read-only function, and the upload cap only refuses a user's 31st stored file. To lift the cap, recreate the "insert own resume files" policy without the `resume_file_count()` condition, using the original definition in `20261102120000_resume_studio.sql`.
 

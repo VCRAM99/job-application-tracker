@@ -54,6 +54,12 @@ function keyNames(file: string): string[] {
 const SHADOWED_FILES = [".env", ".env.local", ".env.production", ".env.production.local"]
 
 /** Flag sets for the two e2e servers. */
+/** Cloudflare's published Turnstile test site key: always passes, renders a visible widget. */
+export const TURNSTILE_TEST_SITE_KEY = "1x00000000000000000000AA"
+
+/** `npm run test:e2e` sets E2E_TURNSTILE=1; perf builds leave it unset so no third-party script loads. */
+export const e2eTurnstile = () => process.env.E2E_TURNSTILE === "1"
+
 export function serverEnv(variant: "on" | "off"): Record<string, string> {
   const dev = localDevEnv()
   const shadow: Record<string, string> = {}
@@ -83,6 +89,8 @@ export function serverEnv(variant: "on" | "off"): Record<string, string> {
     NODE_ENV: "production",
     NEXT_TELEMETRY_DISABLED: "1",
     NEXT_PUBLIC_SITE_URL: `http://127.0.0.1:${variant === "on" ? APP_PORT : FLAGS_OFF_PORT}`,
+    // Inlined at build time; local Supabase does not enforce CAPTCHA, so the token is accepted and ignored.
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: e2eTurnstile() ? TURNSTILE_TEST_SITE_KEY : "",
     // Every user the flag allows: the e2e user's id changes after a reset.
     JOB_RECOMMENDATIONS_ALLOWED_USER_IDS: "",
     JOB_INGESTION_ENABLED: "false",
