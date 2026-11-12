@@ -1,7 +1,7 @@
 import { assertSupportedModel, defaultModelFor, findModel } from "@/lib/ai/models"
 import type { ProviderId } from "@/lib/ai/types"
 
-export const PROMPT_VERSION = "job-fit-2026-10-23"
+export const PROMPT_VERSION = "job-fit-2026-11-11"
 export const SCHEMA_VERSION = "job-fit-schema-1"
 export const MAX_REQUIREMENTS = 40
 

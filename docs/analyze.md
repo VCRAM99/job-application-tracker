@@ -56,6 +56,25 @@ npx tsx --conditions=react-server scripts/eval/run.ts --live --write   # reads G
 
 It uses the same Google default as the app, or `JOB_ANALYSIS_GOOGLE_MODEL` when set, and the same low thinking level. The script prints a warning and the model, then per-fixture precision and recall against the expected phrases, the share of requirements dropped for grounding, and token totals. It does not write to the database. Keep the key out of the client and out of git.
 
+### Extraction precision (V2 wrap-up, prompt version `job-fit-2026-11-11`)
+
+The M6c report listed live precision at 60%, below the 70% target. Printing every unmatched requirement (`--verbose`) showed that all 12 "false positives" were real requirements: explicit `Required:`/`Preferred:` lines, or location rules, that the short fixtures' expected lists left out. Those labels are now complete.
+
+The old prompt was then scored on the completed labels, plus three realistic tuning postings and four held-out realistic postings that have about-us copy, duties, benefits, pay, equal-opportunity text, and repeated requirements. It was precise, but in realistic postings it missed location, onsite or hybrid rules, and screening conditions.
+
+The new prompt says what counts as a requirement (including those conditions) and what does not (duties, benefits, pay, about-us, equal-opportunity text, application steps). It also asks for each requirement once. Grounding now also drops boilerplate quotes and repeated requirements (`src/lib/analyze/filter.ts`), so a model mistake there cannot reach the analysis. The grounding rule itself (a contiguous quote from the posting) is unchanged.
+
+Live results, `gemini-3.5-flash-lite`, one-to-one matching:
+
+| Set | Before: precision / recall | After: precision / recall |
+|---|---|---|
+| Short fixtures (labels completed) | 100% / 100% | 96.4% / 90% |
+| Realistic, tuning (3 postings) | 100% / 86.4% | 100% / 100% |
+| Realistic, held out (4 postings, never used to choose a change) | 100% / 85.2% | 96.4% / 100% |
+| All | 100% / 91.1% | 97.4% / 96.2% |
+
+**Trade-off.** The short "buzzword" fixture's three `Required:` lines ("leverage paradigm-shifting synergies…") now read to the model as duties and are not extracted, which costs 10 points of recall on that set. A second live run of the "after" prompt gave the same pattern (held out 96.4% / 100%). Live output varies a little from run to run.
+
 ## Limitations
 
 - Years of experience are the merged span of verified employment dates. Overlapping roles are not double counted, and undated roles do not add years.

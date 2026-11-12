@@ -1,4 +1,5 @@
 import { MAX_REQUIREMENTS } from "@/lib/analyze/constants"
+import { isBoilerplateQuote, isDuplicateRequirement } from "@/lib/analyze/filter"
 import { normalizeJobText } from "@/lib/analyze/text"
 import type { GroundedRequirement, RawRequirement } from "@/lib/analyze/types"
 
@@ -12,6 +13,11 @@ export function groundRequirements(
     const quote = normalizeJobText(requirement.evidenceQuote)
     const start = quote ? normalizedJd.indexOf(quote) : -1
     if (!quote || start < 0) {
+      dropped += 1
+      continue
+    }
+    // Pay, benefits, and equal-opportunity text are not requirements; a repeated requirement is kept once.
+    if (isBoilerplateQuote(quote) || isDuplicateRequirement({ ...requirement, evidenceQuote: quote }, kept)) {
       dropped += 1
       continue
     }

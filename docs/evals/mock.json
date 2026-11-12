@@ -1,7 +1,7 @@
 {
   "mode": "mock",
   "model": "mock",
-  "at": "2026-11-03T04:11:01.121Z",
+  "at": "2026-11-12T01:08:28.382Z",
   "safety": {
     "fabricationCatch": 1,
     "injectionCatch": 1,
@@ -9,35 +9,80 @@
     "injectedLeaks": 0
   },
   "planted": {
-    "fabrication": 34,
+    "fabrication": 48,
     "injection": 3,
     "citations": 2
   },
   "quality": {
-    "precision": 0.31343283582089554,
-    "recall": 1
+    "precision": 0.4649122807017544,
+    "recall": 0.6708860759493671,
+    "bySet": {
+      "short fixtures": {
+        "precision": 0.5084745762711864,
+        "recall": 1
+      },
+      "realistic (tuning)": {
+        "precision": 0.3333333333333333,
+        "recall": 0.36363636363636365
+      },
+      "realistic (held out)": {
+        "precision": 0.4838709677419355,
+        "recall": 0.5555555555555556
+      }
+    }
   },
   "usage": {
-    "calls": 14,
+    "calls": 21,
     "inputTokens": 0,
     "outputTokens": 0,
-    "fallbacks": 0
+    "fallbacks": 0,
+    "retries": 0
   },
   "rows": [
     {
       "suite": "M3 extraction",
-      "metric": "precision (kept that match an expected requirement)",
-      "value": "31.3%"
+      "metric": "short fixtures: precision",
+      "value": "50.8%"
     },
     {
       "suite": "M3 extraction",
-      "metric": "recall (expected requirements found)",
+      "metric": "short fixtures: recall",
       "value": "100%"
     },
     {
       "suite": "M3 extraction",
+      "metric": "realistic (tuning): precision",
+      "value": "33.3%"
+    },
+    {
+      "suite": "M3 extraction",
+      "metric": "realistic (tuning): recall",
+      "value": "36.4%"
+    },
+    {
+      "suite": "M3 extraction",
+      "metric": "realistic (held out): precision",
+      "value": "48.4%"
+    },
+    {
+      "suite": "M3 extraction",
+      "metric": "realistic (held out): recall",
+      "value": "55.6%"
+    },
+    {
+      "suite": "M3 extraction",
+      "metric": "all sets: precision",
+      "value": "46.5%"
+    },
+    {
+      "suite": "M3 extraction",
+      "metric": "all sets: recall",
+      "value": "67.1%"
+    },
+    {
+      "suite": "M3 extraction",
       "metric": "grounding drop rate",
-      "value": "0%"
+      "value": "7.3%"
     },
     {
       "suite": "M4 parse",
