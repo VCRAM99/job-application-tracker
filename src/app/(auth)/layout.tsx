@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 
 import { Mark } from "@/components/brand/mark"
+import { LegalLinks } from "@/components/legal/legal"
 import { ThemeToggle } from "@/components/theme-toggle"
 
 export const metadata: Metadata = {
@@ -24,6 +25,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
         {children}
       </div>
+      <footer className="absolute bottom-4 left-0 right-0 flex justify-center">
+        <LegalLinks />
+      </footer>
     </div>
   )
 }

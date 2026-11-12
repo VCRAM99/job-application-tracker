@@ -1,6 +1,6 @@
 # Launch runbook (Job Tracker 2.0 beta)
 
-These are the exact steps to turn on the V2 features in production for a closed beta: Gemini only, and users bring their own key (BYOK). Do them in order, and run each step's check before moving on. Every step can be undone by unsetting the flag it adds (see [Rollback](#rollback)).
+These are the exact steps to turn on the V2 features in production: first for a closed beta, then for everyone (`BETA_USER_IDS=*`, step 4). Gemini only, and users bring their own key (BYOK). Do them in order, and run each step's check before moving on. Every step can be undone by unsetting the flag it adds (see [Rollback](#rollback)).
 
 **What merging the M6c PR does on its own:**
 
@@ -77,7 +77,7 @@ Add these for **Production**. Leave everything not listed unset.
 
 | Name | Value | Notes |
 |---|---|---|
-| `BETA_USER_IDS` | Your UUID, comma-separated with any other beta users' UUIDs | Gates every V2 feature. Unset means nobody on Vercel. One malformed entry closes V2 to everyone. |
+| `BETA_USER_IDS` | Closed beta: your UUID, comma-separated with other beta users' UUIDs. **Public launch: `*`** | Gates every V2 feature, including Jobs. `*` on its own means every signed-in user (never a signed-out request). Unset means nobody on Vercel. One malformed entry closes V2 to everyone; `*` mixed with UUIDs counts as malformed. With `*`, a set `JOB_RECOMMENDATIONS_ALLOWED_USER_IDS` only narrows Jobs to its listed users, so unset it to open Jobs to everyone. |
 | `AI_FEATURES_ENABLED` | `true` | Career AI (profile extraction, settings). Needed by every AI feature. |
 | `AI_CREDENTIALS_KEY` | Value from step 2 | Server-only. Never use a `NEXT_PUBLIC_` name. |
 | `AI_CREDENTIALS_KEY_VERSION` | `1` | |
@@ -89,6 +89,8 @@ Add these for **Production**. Leave everything not listed unset.
 | `JOB_RECOMMENDATIONS_ENABLED` | `true` (already set) | Keep `JOB_RECOMMENDATIONS_ALLOWED_USER_IDS` as is; BETA users get Jobs too. |
 
 Leave the existing jobs variables as they are: `JOB_INGESTION_ENABLED`, `JOB_REFRESH_ENABLED`, `JOB_SCHEDULER_SECRET`, `JOB_CATALOG_WRITE_SECRET`, `JOB_EMAIL_DELIVERY_ENABLED` and `JOB_EMAIL_FROM`.
+
+Also set **`NEXT_PUBLIC_CONTACT_EMAIL`** to the address that receives privacy and account-deletion requests. `/privacy` and `/terms` show it, and the address is inlined at build time, so redeploy after setting it. Without it, those pages say no contact address has been published.
 
 **Do not set:** `AI_MANAGED_ENABLED`, `AI_MANAGED_MONTHLY_*`, `AI_PLATFORM_*_API_KEY`, `JOB_ANALYSIS_MOCK_PROVIDER`, or `PERF_TIMING`.
 
@@ -110,8 +112,12 @@ Redeploy.
 3. **Fit analysis:** paste a job description (200+ characters) and analyze. You get requirements with quotes and the visible qualification disclaimer.
 4. **Resume Studio:** upload a PDF or DOCX, parse it, tailor it to the analysis, accept an edit, and download the PDF and DOCX.
 5. **Coach:** from the analysis, generate questions; from an application, draft a message. It shows "AI draft" and "Not sent", and nothing is sent.
-6. **As a non-beta account** (a second test account): only V1 appears in the nav. Typing `/analyze`, `/resumes`, `/career`, or `/jobs` shows the off state, not the feature.
-7. **Rate limit:** more than 6 AI runs in a minute shows "You have reached the AI request limit for now."
+6. **As a non-beta account** (a second test account), while the list holds UUIDs: only V1 appears in the nav. Typing `/analyze`, `/resumes`, `/career`, or `/jobs` shows the off state, not the feature.
+7. **Public launch** (`BETA_USER_IDS=*`):
+   - Do step 7 (CAPTCHA) first, and set `NEXT_PUBLIC_CONTACT_EMAIL` (below). Sign-ups are open to anyone.
+   - Then set `*`, unset `JOB_RECOMMENDATIONS_ALLOWED_USER_IDS` if Jobs should be open too, and redeploy.
+   - Check that a brand-new test account sees Jobs, Fit, Resumes, and Career, and that `/privacy` and `/terms` load while signed out.
+8. **Rate limit:** more than 6 AI runs in a minute shows "You have reached the AI request limit for now."
 
 ## 5. Sentry (optional, recommended)
 
@@ -172,6 +178,17 @@ Sign-up, sign-in, and the password-reset request show a Turnstile check when `NE
 
 **Rollback:** turn CAPTCHA off in Supabase **first**, then unset `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and redeploy.
 
+## 8. Account deletion requests
+
+There is no self-service "Delete account" button: deleting a Supabase Auth user needs either a service-role key, which the app never holds, or a new database function, which means a migration. Until that exists, handle requests from the address in `NEXT_PUBLIC_CONTACT_EMAIL` as follows:
+
+1. Confirm the request comes from the account's email address.
+2. Supabase → Storage → `resumes` → delete the folder named after the user's id. Uploaded files are not linked to the user row, so this is the one manual step.
+3. Supabase → Authentication → Users → the user → **Delete user**. Every table that holds the user's rows (43 of them) references `auth.users` with `on delete cascade`, so all of their records go with the account. `src/lib/account/export.test.ts` checks this against the migrations.
+4. **Check:** in the SQL Editor, `select count(*) from public.applications where user_id = '<id>';` returns 0.
+
+Users can download everything first from Settings → Your data → **Download my data (JSON)**.
+
 ## Rollback
 
 Each switch is independent. Unset the variable (or set it to `false`) and redeploy.
@@ -179,6 +196,7 @@ Each switch is independent. Unset the variable (or set it to `false`) and redepl
 | To turn off | Unset |
 |---|---|
 | Every V2 feature for everyone | `BETA_USER_IDS` (closed when unset on Vercel), or set it to a single malformed value such as `none` |
+| V2 for the public, back to a closed beta | Replace `*` in `BETA_USER_IDS` with the beta users' UUIDs |
 | All AI features | `AI_FEATURES_ENABLED`. Fit analysis, Resume Studio, the coach, and career AI all depend on it. |
 | One AI feature | `JOB_ANALYSIS_ENABLED`, `RESUME_STUDIO_ENABLED`, or `CAREER_COACH_ENABLED` |
 | Recommended Jobs | `JOB_RECOMMENDATIONS_ENABLED` |

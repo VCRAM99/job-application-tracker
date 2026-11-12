@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs"
+import { readFileSync, writeFileSync } from "node:fs"
 
 import { expect, test } from "@playwright/test"
 
@@ -165,4 +165,18 @@ test("theme toggle switches and persists", async ({ page }) => {
   await expect(page.locator("html")).toHaveClass(toLight ? /\blight\b/ : /\bdark\b/)
   await page.reload()
   await expect(page.getByRole("button", { name: toLight ? "Switch to dark mode" : "Switch to light mode" }).first()).toBeVisible()
+})
+
+test("settings: download my data as JSON", async ({ page }) => {
+  await open(page, "/settings")
+  const download = page.waitForEvent("download")
+  await page.getByRole("link", { name: "Download my data (JSON)" }).click()
+  const file = await download
+  expect(file.suggestedFilename()).toMatch(/^job-tracker-export-\d{4}-\d{2}-\d{2}\.json$/)
+  const data = JSON.parse(readFileSync((await file.path())!, "utf8")) as { format: string; tables: Record<string, unknown[]>; errors: string[] }
+  expect(data.format).toBe("job-tracker-export")
+  expect(data.errors).toEqual([])
+  expect(data.tables.applications!.length).toBeGreaterThan(0)
+  // Key material is never part of the export.
+  expect(JSON.stringify(data)).not.toMatch(/ciphertext|auth_tag/)
 })

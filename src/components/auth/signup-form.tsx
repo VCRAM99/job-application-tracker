@@ -102,6 +102,17 @@ export function SignupForm({
           />
         </Field>
         <Turnstile action="signup" resetSignal={state} />
+        <p className="text-xs text-muted-foreground">
+          By creating an account, you agree to the{" "}
+          <Link href="/terms" className="text-foreground underline underline-offset-4">
+            Terms
+          </Link>{" "}
+          and acknowledge the{" "}
+          <Link href="/privacy" className="text-foreground underline underline-offset-4">
+            Privacy notice
+          </Link>
+          .
+        </p>
         <Button type="submit" className="w-full" disabled={pending}>
           {pending ? "Creating account…" : "Create account"}
         </Button>

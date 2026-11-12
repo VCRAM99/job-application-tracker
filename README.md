@@ -63,7 +63,8 @@ flowchart LR
 - **Every query runs as the user.** The app has no service-role client. Row Level Security scopes every table to its owner. The few writes that must cross users, such as AI usage accounting and the shared job catalog, go through `SECURITY DEFINER` functions that require an HMAC proof signed with a server-only secret.
 - **The model proposes; code verifies.** Requirements must be quoted word for word from the posting. Resume edits and drafts may only use facts the user accepted. Research claims must cite text the user provided. Anything that fails a check is dropped before it is saved, and the model never produces a score.
 - **Bring your own key.** Provider keys are encrypted with AES-256-GCM using a server key, are never sent back to the browser, and never appear in logs or Sentry. Gemini is the only live-verified provider. OpenAI and Anthropic stay hidden unless an operator enables them, and then they carry a "Beta — not live-verified" label.
-- **Closed beta.** `BETA_USER_IDS` gates every V2 page, action, and AI run on the server. If the list is malformed, nobody gets access.
+- **Beta, then public.** `BETA_USER_IDS` gates every V2 page, action, and AI run on the server: a list of user ids for a closed beta, or `*` for every signed-in user. If the list is malformed, nobody gets access.
+- **Your data.** [Privacy](src/app/privacy/page.tsx) and [terms](src/app/terms/page.tsx) pages, linked from every page footer and from sign-up, are plain-language templates for the owner to review. Settings → Your data downloads everything an account owns as JSON. Deleting the account removes every record (all 43 user tables cascade); the runbook covers the uploaded files.
 - **Abuse limits.** Each user gets 6 AI runs per minute and 80 per day, counted from the usage log. A strict CSP limits connections to the configured Supabase origin, along with HSTS and COOP. Sentry is opt-in and scrubs emails, keys, tokens, and ids.
 - **Caching rule.** Only public, user-independent data may ever be shared-cached, and a test enforces this.
 
@@ -121,7 +122,8 @@ Measured with Lighthouse's simulated mobile throttling. Since the M6a optimizati
 |---|---|
 | Tracking, daily tasks, import/export, health | **Production, active** |
 | Recommended jobs | **Production, active** for the allowlisted user; beta users once `BETA_USER_IDS` is set |
-| Career profile, fit analysis, Resume Studio, coach, paste-a-job | **Beta**: built and verified, off until the [launch runbook](docs/launch.md) steps |
+| Career profile, fit analysis, Resume Studio, coach, paste-a-job | **Beta**: built and verified, off until the [launch runbook](docs/launch.md) steps; `BETA_USER_IDS=*` opens them to everyone |
+| Privacy and terms pages, JSON data export | Ready; set `NEXT_PUBLIC_CONTACT_EMAIL` before a public launch. Account deletion is an operator step (runbook step 8) |
 | Gemini (BYOK) | **Beta**: live-verified (evals and walkthroughs) |
 | OpenAI, Anthropic | **Not live-verified**: mock-tested only, hidden in production |
 | Managed AI | Built; unreachable unless enabled |

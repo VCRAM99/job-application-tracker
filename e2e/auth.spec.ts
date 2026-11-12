@@ -55,3 +55,14 @@ test("Turnstile renders on sign-in, sign-up, and reset request, and sign-in stil
   await page.waitForURL("**/dashboard")
   expect(violations).toEqual([])
 })
+
+test("privacy and terms load signed out and are linked from sign-up and every auth page", async ({ page }) => {
+  await openAuth(page, "/signup")
+  await expect(page.getByRole("link", { name: "Terms" }).first()).toBeVisible()
+  await page.getByRole("link", { name: "Privacy notice" }).click()
+  await expect(page.getByRole("heading", { level: 1, name: "Privacy" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Delete your data" })).toBeVisible()
+  await page.getByRole("navigation", { name: "Legal" }).getByRole("link", { name: "Terms" }).click()
+  await expect(page.getByRole("heading", { level: 1, name: "Terms" })).toBeVisible()
+  await expect(page).toHaveURL(/\/terms$/)
+})

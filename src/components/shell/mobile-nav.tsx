@@ -3,6 +3,7 @@
 import { Menu } from "lucide-react"
 import { useState } from "react"
 
+import { LegalLinks } from "@/components/legal/legal"
 import { signOut } from "@/lib/auth/actions"
 import { NAV_ITEMS } from "@/lib/navigation"
 import { NavLinks } from "@/components/shell/nav-links"
@@ -34,10 +35,11 @@ export function MobileNav({ items = NAV_ITEMS }: { items?: readonly NavItem[] })
         <div className="px-3 py-3">
           <NavLinks items={items} onNavigate={() => setOpen(false)} />
         </div>
-        <form action={signOut} className="mt-auto border-t p-3">
+        <form action={signOut} className="mt-auto flex flex-col gap-3 border-t p-3">
           <Button type="submit" variant="outline" className="w-full">
             Sign out
           </Button>
+          <LegalLinks />
         </form>
       </SheetContent>
     </Sheet>

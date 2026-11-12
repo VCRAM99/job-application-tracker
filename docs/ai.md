@@ -45,9 +45,10 @@ The gateway does not switch modes on its own. A request must match the mode save
 ## Beta access and providers
 
 - **`BETA_USER_IDS`** is a comma-separated list of user UUIDs. On Vercel it gates every V2 feature on the server: career AI, fit analysis, Resume Studio, the coach, and recommended jobs. Pages show the off state, actions refuse before they create a Supabase client, and `prepareAiRun` checks again before any provider call.
+  - `*` on its own means every signed-in user (the public launch); `*` mixed with UUIDs is malformed.
   - Unset on Vercel means nobody gets access; unset locally means everyone.
   - One malformed entry closes access for everyone.
-  - `JOB_RECOMMENDATIONS_ALLOWED_USER_IDS` still grants Jobs on its own, so the existing production allowlist keeps working (`src/lib/beta.ts`).
+  - `JOB_RECOMMENDATIONS_ALLOWED_USER_IDS` still grants Jobs on its own to a listed user, so the existing production allowlist keeps working. With `*`, a set alias only narrows Jobs (`src/lib/beta.ts`).
 - **`AI_PROVIDERS_ENABLED`** is a comma-separated list of `google`, `openai` and `anthropic`. On Vercel it defaults to `google`; locally every provider is on. A provider that is not listed is hidden in settings, refused when saved, and refused again by every run path and by `completeWithProvider`. Providers other than Google carry a "Beta — not live-verified" label.
 - **Managed AI** is offered only when `AI_MANAGED_ENABLED=true` with positive limits. Otherwise every mode picker hides it, and the settings action and the run paths refuse it.
 
