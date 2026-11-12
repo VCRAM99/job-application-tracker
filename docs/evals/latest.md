@@ -6,11 +6,11 @@ Extraction is scored on three fictional sets: the short M3 fixtures, three reali
 
 ## Mock (deterministic, CI)
 
-Model: `mock` · run 2026-11-12 · 21 calls
+Model: `mock` · run 2026-11-12 · 25 calls
 
 | Safety metric | Value | Threshold | |
 |---|---|---|---|
-| Fabrication catch (planted employers, titles, numbers, degrees, skills, unknown ids) | 100% of 48 | 100% | pass |
+| Fabrication catch (planted employers, titles, numbers, degrees, skills, unknown ids) | 100% of 56 | 100% | pass |
 | Injection catch (instructions in pasted text and contact notes) | 100% of 3 | 100% | pass |
 | Citation validity (kept research quotes found word for word in their source) | 100% of 2 | 100% | pass |
 | Planted strings in kept output | 0 | 0 | pass |
@@ -19,13 +19,13 @@ Model: `mock` · run 2026-11-12 · 21 calls
 |---|---|---|
 | M3 extraction | short fixtures: precision | 50.8% |
 | M3 extraction | short fixtures: recall | 100% |
-| M3 extraction | realistic (tuning): precision | 33.3% |
-| M3 extraction | realistic (tuning): recall | 36.4% |
-| M3 extraction | realistic (held out): precision | 48.4% |
-| M3 extraction | realistic (held out): recall | 55.6% |
-| M3 extraction | all sets: precision | 46.5% |
-| M3 extraction | all sets: recall | 67.1% |
-| M3 extraction | grounding drop rate | 7.3% |
+| M3 extraction | realistic (tuning): precision | 41.8% |
+| M3 extraction | realistic (tuning): recall | 46.9% |
+| M3 extraction | realistic (held out): precision | 62.5% |
+| M3 extraction | realistic (held out): recall | 64.5% |
+| M3 extraction | all sets: precision | 50% |
+| M3 extraction | all sets: recall | 66.4% |
+| M3 extraction | drop rate (grounding, boilerplate, repeats) | 5.8% |
 | M4 parse | grounding drops (items not in the resume text) | 1 |
 | M4 tailor | kept / dropped edits | 1 / 0 |
 | M5 research | kept / dropped claims | 2 / 0 |
@@ -34,36 +34,36 @@ Model: `mock` · run 2026-11-12 · 21 calls
 
 ## Live (Gemini)
 
-Model: `gemini-3.5-flash-lite` · run 2026-11-12 · 21 calls · 9243 input / 7421 output tokens · 0 overload fallbacks
+Model: `gemini-3.5-flash-lite` · run 2026-11-12 · 25 calls · 11282 input / 9638 output tokens · 0 overload fallbacks
 
 | Safety metric | Value | Threshold | |
 |---|---|---|---|
-| Fabrication catch (planted employers, titles, numbers, degrees, skills, unknown ids) | 100% of 48 | 100% | pass |
+| Fabrication catch (planted employers, titles, numbers, degrees, skills, unknown ids) | 100% of 56 | 100% | pass |
 | Injection catch (instructions in pasted text and contact notes) | 100% of 3 | 100% | pass |
 | Citation validity (kept research quotes found word for word in their source) | 100% of 4 | 100% | pass |
 | Planted strings in kept output | 0 | 0 | pass |
 
 | Quality target (live) | Value | Target | |
 |---|---|---|---|
-| Extraction precision | 97.4% | 70% | met |
-| Extraction recall | 96.2% | 70% | met |
+| Extraction precision | 97.2% | 70% | met |
+| Extraction recall | 96.4% | 70% | met |
 | short fixtures: precision / recall | 96.4% / 90% | 70% / 70% | met |
-| realistic (tuning): precision / recall | 100% / 100% | 70% / 70% | met |
-| realistic (held out): precision / recall | 96.4% / 100% | 70% / 70% | met |
+| realistic (tuning): precision / recall | 96.1% / 100% | 70% / 70% | met |
+| realistic (held out): precision / recall | 100% / 96.8% | 70% / 70% | met |
 
 | Suite | Quality metric | Value |
 |---|---|---|
 | M3 extraction | short fixtures: precision | 96.4% |
 | M3 extraction | short fixtures: recall | 90% |
-| M3 extraction | realistic (tuning): precision | 100% |
+| M3 extraction | realistic (tuning): precision | 96.1% |
 | M3 extraction | realistic (tuning): recall | 100% |
-| M3 extraction | realistic (held out): precision | 96.4% |
-| M3 extraction | realistic (held out): recall | 100% |
-| M3 extraction | all sets: precision | 97.4% |
-| M3 extraction | all sets: recall | 96.2% |
-| M3 extraction | grounding drop rate | 1.3% |
+| M3 extraction | realistic (held out): precision | 100% |
+| M3 extraction | realistic (held out): recall | 96.8% |
+| M3 extraction | all sets: precision | 97.2% |
+| M3 extraction | all sets: recall | 96.4% |
+| M3 extraction | drop rate (grounding, boilerplate, repeats) | 1.8% |
 | M4 parse | grounding drops (items not in the resume text) | 0 |
 | M4 tailor | kept / dropped edits | 1 / 0 |
 | M5 research | kept / dropped claims | 4 / 0 |
-| M5 questions | kept / dropped | 14 / 1 |
+| M5 questions | kept / dropped | 12 / 2 |
 | M5 draft | kept / dropped sentences | 5 / 0 |

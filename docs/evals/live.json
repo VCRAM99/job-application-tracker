@@ -1,7 +1,7 @@
 {
   "mode": "live",
   "model": "gemini-3.5-flash-lite",
-  "at": "2026-11-12T01:09:22.689Z",
+  "at": "2026-11-12T01:43:21.174Z",
   "safety": {
     "fabricationCatch": 1,
     "injectionCatch": 1,
@@ -9,34 +9,34 @@
     "injectedLeaks": 0
   },
   "planted": {
-    "fabrication": 48,
+    "fabrication": 56,
     "injection": 3,
     "citations": 4
   },
   "quality": {
-    "precision": 0.9743589743589743,
-    "recall": 0.9620253164556962,
+    "precision": 0.9724770642201835,
+    "recall": 0.9636363636363636,
     "bySet": {
       "short fixtures": {
         "precision": 0.9642857142857143,
         "recall": 0.9
       },
       "realistic (tuning)": {
-        "precision": 1,
+        "precision": 0.9607843137254902,
         "recall": 1
       },
       "realistic (held out)": {
-        "precision": 0.9642857142857143,
-        "recall": 1
+        "precision": 1,
+        "recall": 0.967741935483871
       }
     }
   },
   "usage": {
-    "calls": 21,
-    "inputTokens": 9243,
-    "outputTokens": 7421,
+    "calls": 25,
+    "inputTokens": 11282,
+    "outputTokens": 9638,
     "fallbacks": 0,
-    "retries": 2
+    "retries": 5
   },
   "rows": [
     {
@@ -52,7 +52,7 @@
     {
       "suite": "M3 extraction",
       "metric": "realistic (tuning): precision",
-      "value": "100%"
+      "value": "96.1%"
     },
     {
       "suite": "M3 extraction",
@@ -62,27 +62,27 @@
     {
       "suite": "M3 extraction",
       "metric": "realistic (held out): precision",
-      "value": "96.4%"
-    },
-    {
-      "suite": "M3 extraction",
-      "metric": "realistic (held out): recall",
       "value": "100%"
     },
     {
       "suite": "M3 extraction",
+      "metric": "realistic (held out): recall",
+      "value": "96.8%"
+    },
+    {
+      "suite": "M3 extraction",
       "metric": "all sets: precision",
-      "value": "97.4%"
+      "value": "97.2%"
     },
     {
       "suite": "M3 extraction",
       "metric": "all sets: recall",
-      "value": "96.2%"
+      "value": "96.4%"
     },
     {
       "suite": "M3 extraction",
-      "metric": "grounding drop rate",
-      "value": "1.3%"
+      "metric": "drop rate (grounding, boilerplate, repeats)",
+      "value": "1.8%"
     },
     {
       "suite": "M4 parse",
@@ -102,7 +102,7 @@
     {
       "suite": "M5 questions",
       "metric": "kept / dropped",
-      "value": "14 / 1"
+      "value": "12 / 2"
     },
     {
       "suite": "M5 draft",

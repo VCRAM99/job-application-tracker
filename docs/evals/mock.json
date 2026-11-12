@@ -1,7 +1,7 @@
 {
   "mode": "mock",
   "model": "mock",
-  "at": "2026-11-12T01:08:28.382Z",
+  "at": "2026-11-12T01:41:53.782Z",
   "safety": {
     "fabricationCatch": 1,
     "injectionCatch": 1,
@@ -9,30 +9,30 @@
     "injectedLeaks": 0
   },
   "planted": {
-    "fabrication": 48,
+    "fabrication": 56,
     "injection": 3,
     "citations": 2
   },
   "quality": {
-    "precision": 0.4649122807017544,
-    "recall": 0.6708860759493671,
+    "precision": 0.5,
+    "recall": 0.6636363636363637,
     "bySet": {
       "short fixtures": {
         "precision": 0.5084745762711864,
         "recall": 1
       },
       "realistic (tuning)": {
-        "precision": 0.3333333333333333,
-        "recall": 0.36363636363636365
+        "precision": 0.41818181818181815,
+        "recall": 0.46938775510204084
       },
       "realistic (held out)": {
-        "precision": 0.4838709677419355,
-        "recall": 0.5555555555555556
+        "precision": 0.625,
+        "recall": 0.6451612903225806
       }
     }
   },
   "usage": {
-    "calls": 21,
+    "calls": 25,
     "inputTokens": 0,
     "outputTokens": 0,
     "fallbacks": 0,
@@ -52,37 +52,37 @@
     {
       "suite": "M3 extraction",
       "metric": "realistic (tuning): precision",
-      "value": "33.3%"
+      "value": "41.8%"
     },
     {
       "suite": "M3 extraction",
       "metric": "realistic (tuning): recall",
-      "value": "36.4%"
+      "value": "46.9%"
     },
     {
       "suite": "M3 extraction",
       "metric": "realistic (held out): precision",
-      "value": "48.4%"
+      "value": "62.5%"
     },
     {
       "suite": "M3 extraction",
       "metric": "realistic (held out): recall",
-      "value": "55.6%"
+      "value": "64.5%"
     },
     {
       "suite": "M3 extraction",
       "metric": "all sets: precision",
-      "value": "46.5%"
+      "value": "50%"
     },
     {
       "suite": "M3 extraction",
       "metric": "all sets: recall",
-      "value": "67.1%"
+      "value": "66.4%"
     },
     {
       "suite": "M3 extraction",
-      "metric": "grounding drop rate",
-      "value": "7.3%"
+      "metric": "drop rate (grounding, boilerplate, repeats)",
+      "value": "5.8%"
     },
     {
       "suite": "M4 parse",
