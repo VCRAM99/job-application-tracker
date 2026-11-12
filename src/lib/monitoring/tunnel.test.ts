@@ -75,6 +75,16 @@ describe("POST /monitoring", () => {
     expect(upstream).not.toHaveBeenCalled()
   })
 
+  it("passes on Sentry's rate-limit headers so the SDK can back off", async () => {
+    vi.stubEnv("SENTRY_DSN", DSN)
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 429, headers: { "Retry-After": "60", "X-Sentry-Rate-Limits": "60:error:organization", "Set-Cookie": "x=1" } })))
+    const response = await post(envelope(DSN))
+    expect(response.status).toBe(429)
+    expect(response.headers.get("retry-after")).toBe("60")
+    expect(response.headers.get("x-sentry-rate-limits")).toBe("60:error:organization")
+    expect(response.headers.get("set-cookie")).toBeNull()
+  })
+
   it("reports an upstream failure without details", async () => {
     vi.stubEnv("SENTRY_DSN", DSN)
     vi.stubGlobal("fetch", vi.fn(async () => {

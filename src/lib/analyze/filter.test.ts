@@ -26,6 +26,8 @@ describe("isBoilerplateQuote", () => {
     "Benefits include unlimited PTO, a home-office stipend, parental leave, and an annual offsite.",
     "What we offer: shift differential, free bread, paid holidays, and a 401(k) match.",
     "To apply, send a resume.",
+    "Health, dental, and vision coverage from day one.",
+    "We offer 401(k) plans with a 4% match.",
   ])("drops %s", (quote) => {
     expect(isBoilerplateQuote(quote)).toBe(true)
   })
@@ -40,6 +42,12 @@ describe("isBoilerplateQuote", () => {
     "A current food safety certification (for example, ServSafe or equivalent).",
     "Location: hybrid, three days a week in our fictional Lisbon office.",
     "A background check is required before the start date.",
+    // Review findings: requirements that only mention a benefit or apply word stay.
+    "Ability to apply statistical methods to messy data.",
+    "Current dental assistant certification required.",
+    "Knowledge of parental leave and FMLA regulations.",
+    "Experience managing budgets of $5-10M.",
+    "Track record of closing $1M–$3M enterprise deals.",
   ])("keeps %s", (quote) => {
     expect(isBoilerplateQuote(quote)).toBe(false)
   })
@@ -52,6 +60,19 @@ describe("isDuplicateRequirement", () => {
     expect(isDuplicateRequirement({ text: "Strong TypeScript skills are a must", evidenceQuote: "Strong TypeScript skills are a must for this role.", category: "skill", normalizedSkills: ["TypeScript"] }, [typescript])).toBe(true)
     expect(isDuplicateRequirement({ text: "6+ years of product management experience", evidenceQuote: "We're looking for 6+ years of product management experience." }, [{ text: "6+ years of product management experience", evidenceQuote: "6+ years of product management experience." }])).toBe(true)
     expect(isDuplicateRequirement({ text: "Strong SQL", evidenceQuote: "Strong SQL, including window functions." }, [{ text: "Strong SQL", evidenceQuote: "Strong SQL, including window functions." }])).toBe(true)
+  })
+
+  it("keeps separate requirements that share one quote", () => {
+    const line = "Required: Python, SQL, and Airflow."
+    const python = { text: "Python", evidenceQuote: line, kind: "required", category: "skill", normalizedSkills: ["Python"] }
+    expect(isDuplicateRequirement({ text: "SQL", evidenceQuote: line, kind: "required", category: "skill", normalizedSkills: ["SQL"] }, [python])).toBe(false)
+    expect(isDuplicateRequirement({ text: "Airflow", evidenceQuote: line, kind: "required", category: "skill", normalizedSkills: ["Airflow"] }, [python])).toBe(false)
+    expect(isDuplicateRequirement({ text: "Python", evidenceQuote: line, kind: "required", category: "skill", normalizedSkills: ["Python"] }, [python])).toBe(true)
+  })
+
+  it("never merges a required requirement into a preferred one", () => {
+    const preferred = { text: "Kubernetes or Terraform", evidenceQuote: "Nice to have: Kubernetes or Terraform.", kind: "preferred", category: "skill", normalizedSkills: ["Kubernetes", "Terraform"] }
+    expect(isDuplicateRequirement({ text: "Kubernetes in production", evidenceQuote: "Required: Kubernetes in production.", kind: "required", category: "skill", normalizedSkills: ["Kubernetes"] }, [preferred])).toBe(false)
   })
 
   it("keeps separate requirements, including two from one line", () => {

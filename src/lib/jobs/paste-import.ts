@@ -120,7 +120,9 @@ const INSTRUCTION_LIKE = [
   /\b(ignore|disregard|forget|override)\b.{0,40}\b(instructions?|prompt|rules|above|previous|prior)\b/i,
   /\bsystem prompt\b|\b(system|assistant|developer)\s*:/i,
   /\byou are (now )?(an?|the) (ai|assistant|model|language model|chatbot)\b/i,
-  /\b(set|change|fill|mark|output|respond|return|answer|reply|print|write)\b.{0,30}\b(company|employer|job title|salary|field|location|json)\b/i,
+  // An imperative aimed at a field: "set the company to …", "respond with company …".
+  /\b(set|change|fill|mark|output|respond|return|answer|reply|print)\b.{0,20}\b(company|employer|job title|salary|field|location|json)\b.{0,15}\b(to|as|with|=)\b/i,
+  /\b(set|change|fill|mark|output|respond|return|answer|reply|print)\b.{0,10}\b(to|as|with)\b.{0,10}\b(company|employer|job title|salary|field|location|json)\b/i,
 ]
 const instructionLike = (quote: string) => INSTRUCTION_LIKE.some((pattern) => pattern.test(quote))
 
@@ -153,8 +155,10 @@ const EMPLOYMENT_WORDS: Record<string, RegExp> = {
   contract: /\bcontract(or)?\b|\bfreelance\b|\bfixed[- ]term\b/i,
   internship: /\bintern(ship)?\b|\bco-?op\b/i,
 }
+// A bare "$" is US dollars only when no other dollar or currency marker is in the quote.
+const OTHER_DOLLARS = /\b(CA|C|A|AU|NZ|HK|S|SG|MX)\$|\b(cad|aud|nzd|hkd|sgd|mxn)\b|€|£|₹/i
 const CURRENCY_WORDS: Record<string, RegExp> = {
-  USD: /\$|\busd\b/i,
+  USD: /\bUS\$|\busd\b|(?<![A-Za-z])\$/i,
   CAD: /\bcad\b|\bca?\$/i,
   EUR: /€|\beur\b|\beuros?\b/i,
   GBP: /£|\bgbp\b|\bpounds?\b/i,
@@ -209,7 +213,10 @@ export function groundImport(postingText: string, raw: RawImport): { fields: Imp
     const written = numbersIn(salaryQuote)
     const appears = (value: number | null) => value === null || written.includes(value)
     const code = raw.salary.currency?.trim().toUpperCase() ?? ""
-    const currencyNamed = /^[A-Z]{3}$/.test(code) && (CURRENCY_WORDS[code] ?? new RegExp(`\\b${code}\\b`, "i")).test(salaryQuote)
+    const currencyNamed =
+      /^[A-Z]{3}$/.test(code) &&
+      (CURRENCY_WORDS[code] ?? new RegExp(`\\b${code}\\b`, "i")).test(salaryQuote) &&
+      !(code === "USD" && !/\bUS\$|\busd\b/i.test(salaryQuote) && OTHER_DOLLARS.test(salaryQuote))
     if (appears(raw.salary.min) && appears(raw.salary.max) && currencyNamed) {
       salaryMin = raw.salary.min
       salaryMax = raw.salary.max

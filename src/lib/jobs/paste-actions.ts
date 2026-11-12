@@ -90,7 +90,7 @@ export async function importPastedPosting(_previous: PasteImportState, formData:
     return { status: "error", message: AI_ERROR_MESSAGES[result.code] ?? result.message }
   }
   // A repeated submit of the same form (same nonce) finds the finished reservation and no output.
-  if (result.kind === "already-complete") return { status: "error", message: "This posting was already read. Paste it again to read it once more." }
+  if (result.kind === "already-complete") return { status: "error", message: "These fields were already filled in from this text. Edit the form below, or reload the page to read the posting again." }
   const outcome = grounded as ReturnType<typeof groundImport> | null
   if (!outcome) throw new AiRequestError("transient")
   const prefill = importPrefill(outcome.fields, url)

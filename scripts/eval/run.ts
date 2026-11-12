@@ -24,7 +24,8 @@ import { completeGemini } from "../../src/lib/ai/providers/google"
 import { AiRequestError, type StructuredRequest } from "../../src/lib/ai/types"
 import { analysisModelFor } from "../../src/lib/analyze/constants"
 import { JOB_FIXTURES, type JobFixture } from "../../src/lib/analyze/fixtures"
-import { HELD_OUT_FIXTURES, TUNING_FIXTURES } from "../../src/lib/analyze/fixtures-realistic"
+import { HELD_OUT_FIXTURES } from "../../src/lib/analyze/fixtures-heldout"
+import { TUNING_FIXTURES, TUNING_FIXTURES_ROUND_TWO } from "../../src/lib/analyze/fixtures-realistic"
 import { groundRequirements } from "../../src/lib/analyze/ground"
 import { EXTRACTION_SYSTEM_PROMPT, extractionUserMessage } from "../../src/lib/analyze/prompt"
 import { EXTRACTION_JSON_SCHEMA, parseExtraction } from "../../src/lib/analyze/schema"
@@ -191,7 +192,7 @@ async function scoreExtraction(setName: string, fixtures: JobFixture[]): Promise
 async function m3Extraction() {
   const sets: Array<[string, JobFixture[]]> = [
     ["short fixtures", JOB_FIXTURES],
-    ["realistic (tuning)", TUNING_FIXTURES],
+    ["realistic (tuning)", [...TUNING_FIXTURES, ...TUNING_FIXTURES_ROUND_TWO]],
     ["realistic (held out)", HELD_OUT_FIXTURES],
   ]
   const total: ExtractionScore = { kept: 0, dropped: 0, truePositives: 0, expected: 0, found: 0 }
@@ -203,7 +204,7 @@ async function m3Extraction() {
   }
   record("M3 extraction", "all sets: precision", pct(rate(total.truePositives, total.kept)))
   record("M3 extraction", "all sets: recall", pct(rate(total.found, total.expected)))
-  record("M3 extraction", "grounding drop rate", pct(rate(total.dropped, total.kept + total.dropped)))
+  record("M3 extraction", "drop rate (grounding, boilerplate, repeats)", pct(rate(total.dropped, total.kept + total.dropped)))
   return { precision: rate(total.truePositives, total.kept), recall: rate(total.found, total.expected), bySet }
 }
 

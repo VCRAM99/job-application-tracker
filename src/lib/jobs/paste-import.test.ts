@@ -65,6 +65,29 @@ describe("groundImport", () => {
     expect(hourly.fields).toMatchObject({ salaryMin: 28, salaryMax: 32, salaryPeriod: "unknown" })
   })
 
+  it("does not read other dollars as US dollars", () => {
+    for (const quote of ["Salary: CA$120,000–CA$150,000 per year", "Salary: A$90k - A$110k per year", "Salary: $120,000 - $150,000 CAD per year"]) {
+      const text = normalizeJobText(`Fictional Co. ${quote}. Required: SQL.`)
+      const result = groundImport(text, raw({ salary: { min: 120000, max: 150000, currency: "USD", period: "year", quote } }))
+      expect(result.fields.currency).toBeNull()
+    }
+    const us = normalizeJobText("Fictional Co. Salary: US$120,000 - US$150,000 per year. Required: SQL.")
+    expect(groundImport(us, raw({ salary: { min: 120000, max: 150000, currency: "USD", period: "year", quote: "Salary: US$120,000 - US$150,000 per year" } })).fields.currency).toBe("USD")
+  })
+
+  it("does not mistake ordinary sentences for injected instructions", () => {
+    const text = normalizeJobText("Fictional Co. Pay: $90,000 - $110,000 USD per year; the final offer is set based on location. Title: Writer, to write docs for our company.")
+    const result = groundImport(
+      text,
+      raw({
+        salary: { min: 90000, max: 110000, currency: "USD", period: "year", quote: "Pay: $90,000 - $110,000 USD per year; the final offer is set based on location." },
+        title: { value: "Writer", quote: "Title: Writer, to write docs for our company." },
+      }),
+    )
+    expect(result.fields.salaryMin).toBe(90000)
+    expect(result.fields.title).toBe("Writer")
+  })
+
   it("leaves blank anything not supported by the text", () => {
     const result = groundImport(
       POSTING,

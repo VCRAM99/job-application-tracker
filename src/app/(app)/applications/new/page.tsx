@@ -8,6 +8,7 @@ import {
 import { PageHeader, RecordState } from "@/components/records/fields"
 import { NewApplicationWithImport } from "@/components/jobs/paste-import"
 import { analyzeAllowed } from "@/lib/beta"
+import { savedExecutionMode } from "@/lib/jobs/paste-data"
 import { linkedApplicationId, loadTrackerPosting } from "@/lib/jobs/data"
 import { planCompany, prefillFromPosting } from "@/lib/jobs/prefill"
 import { createApplication } from "@/lib/records/actions"
@@ -26,6 +27,7 @@ export default async function NewApplicationPage({
   const postingId = typeof params.posting === "string" ? params.posting : ""
   const assistedSource = params.source === "linkedin" || params.source === "indeed" ? params.source : ""
   const [companies, pasteImport] = await Promise.all([listCompanyOptions(), analyzeAllowed()])
+  const importMode = pasteImport ? await savedExecutionMode() : "byok"
 
   if (!companies.ok) {
     return (
@@ -109,6 +111,9 @@ export default async function NewApplicationPage({
           action={createApplication}
           companies={companies.data}
           openImport={params.paste === "1"}
+          executionMode={importMode}
+          nonce={crypto.randomUUID()}
+          notice={notice}
           values={{
             ...prefill,
             companyMode: companyId || companies.data.length > 0 ? "existing" : "new",

@@ -7,9 +7,9 @@ import type { JobFixture } from "@/lib/analyze/fixtures"
  * requirements. `expected` lists every requirement a candidate is judged on (required and
  * preferred qualifications, plus location and work-authorization rules) and nothing else.
  *
- * TUNING_FIXTURES were used while changing the extraction prompt and filters.
- * HELD_OUT_FIXTURES were written before that work started and were only scored before and after,
- * never used to choose a change.
+ * TUNING_FIXTURES and TUNING_FIXTURES_ROUND_TWO were used while changing the extraction prompt and
+ * filters. HELD_OUT_FIXTURES (fixtures-heldout.ts) were written after the filters were final,
+ * committed before any eval run, and scored once.
  */
 
 const quarry = `About Quarry Lane Health
@@ -231,9 +231,14 @@ We offer: health insurance, continuing-education days, uniform allowance, and pe
 Full-time, onsite in fictional Juniper Row, Vermont. Some Saturdays required.
 Juniper Row Veterinary is fictional and this posting is not an offer of employment.`
 
-export const HELD_OUT_FIXTURES: JobFixture[] = [
+/**
+ * These four were first presented as held out, but the boilerplate filter was written in the same
+ * session and includes phrases that appear only in them, so they are tuning data. The independent
+ * review caught this; HELD_OUT_FIXTURES below are new.
+ */
+export const TUNING_FIXTURES_ROUND_TWO: JobFixture[] = [
   {
-    id: "fernhill-embedded-heldout",
+    id: "fernhill-embedded-tuning",
     title: "Embedded Software Engineer",
     company: "Fernhill Robotics",
     jd: fernhill,
@@ -249,7 +254,7 @@ export const HELD_OUT_FIXTURES: JobFixture[] = [
     ],
   },
   {
-    id: "saltmarsh-librarian-heldout",
+    id: "saltmarsh-librarian-tuning",
     title: "Teen Services Librarian",
     company: "Saltmarsh Public Library",
     jd: saltmarsh,
@@ -263,7 +268,7 @@ export const HELD_OUT_FIXTURES: JobFixture[] = [
     ],
   },
   {
-    id: "cobalt-pm-heldout",
+    id: "cobalt-pm-tuning",
     title: "Senior Product Manager, Payments",
     company: "Cobalt Finch",
     jd: cobalt,
@@ -278,7 +283,7 @@ export const HELD_OUT_FIXTURES: JobFixture[] = [
     ],
   },
   {
-    id: "juniper-vettech-heldout",
+    id: "juniper-vettech-tuning",
     title: "Registered Veterinary Technician",
     company: "Juniper Row Veterinary",
     jd: juniper,
