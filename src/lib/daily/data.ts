@@ -3,6 +3,8 @@ import "server-only"
 import { requireUser } from "@/lib/auth/session"
 import type { DataResult } from "@/lib/records/data"
 import { isMissingTable } from "@/lib/records/logic"
+import { parseGoalMode, parseHiddenMetrics, parseProteinDirection } from "@/lib/daily/goals"
+import { completionKey, type DailyGoals, type DailyWindow, type FoodEntry, type WeightEntry } from "@/lib/daily/model"
 import { createClient } from "@/lib/supabase/server"
 
 function failure(error: { code?: string; message?: string } | null): DataResult<never> {
@@ -85,55 +87,91 @@ export async function listRecurringTasks(): Promise<DataResult<RecurringTaskRow[
   }
 }
 
-export async function listCompletions(from: string, to: string): Promise<DataResult<Array<{ taskId: string; localDate: string }>>> {
-  const user = await requireUser()
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from("recurring_task_completions")
-    .select("task_id, local_date")
-    .eq("user_id", user.id)
-    .gte("local_date", from)
-    .lte("local_date", to)
-  if (error) return failure(error)
+type GoalRow = {
+  calorie_target: number | null
+  protein_target: number | string | null
+  water_goal_ml: number | null
+  water_increment_ml: number | null
+  sleep_target_minutes: number | null
+  step_target: number | null
+  weight_unit: string | null
+  goal_mode?: string | null
+  protein_direction?: string | null
+  hidden_metrics?: string[] | null
+}
+
+/** Saved targets with defaults for anything unset, including users who never saved targets. */
+export function goalsFromRow(row: GoalRow | null): DailyGoals {
   return {
-    ok: true,
-    data: (data ?? []).map((row) => ({ taskId: row.task_id, localDate: row.local_date })),
+    calorieTarget: row?.calorie_target ?? null,
+    proteinTarget: row?.protein_target == null ? null : Number(row.protein_target),
+    waterGoalMl: row?.water_goal_ml ?? null,
+    waterIncrementMl: row?.water_increment_ml ?? emptyGoals.waterIncrementMl,
+    sleepTargetMinutes: row?.sleep_target_minutes ?? null,
+    stepTarget: row?.step_target ?? null,
+    weightUnit: row?.weight_unit === "lb" ? "lb" : "kg",
+    goalMode: parseGoalMode(row?.goal_mode),
+    proteinDirection: parseProteinDirection(row?.protein_direction),
+    hiddenMetrics: parseHiddenMetrics(row?.hidden_metrics),
   }
 }
 
-export async function getHealthBundle(from: string, to: string) {
+export async function loadDailyGoals(): Promise<DataResult<DailyGoals>> {
   const user = await requireUser()
   const supabase = await createClient()
-  const [goals, food, water, sleep, steps, weight] = await Promise.all([
-    supabase.from("health_goals").select("*").eq("user_id", user.id).maybeSingle(),
-    supabase.from("food_entries").select("*").eq("user_id", user.id).gte("local_date", from).lte("local_date", to),
-    supabase.from("water_entries").select("*").eq("user_id", user.id).gte("local_date", from).lte("local_date", to),
-    supabase.from("sleep_entries").select("*").eq("user_id", user.id).gte("local_date", from).lte("local_date", to),
-    supabase.from("step_entries").select("*").eq("user_id", user.id).gte("local_date", from).lte("local_date", to),
-    supabase.from("weight_entries").select("*").eq("user_id", user.id).gte("measured_on", from).lte("measured_on", to),
-  ])
-  const error = goals.error || food.error || water.error || sleep.error || steps.error || weight.error
+  const { data, error } = await supabase.from("health_goals").select("*").eq("user_id", user.id).maybeSingle()
   if (error) return failure(error)
-  const goal = goals.data
+  return { ok: true, data: goalsFromRow(data) }
+}
+
+/**
+ * Every completion and health entry for [from, to], in one parallel batch. Health rows are read
+ * only when health tracking is on. Each query still filters by user_id, on top of RLS.
+ */
+export async function loadDailyWindow(from: string, to: string, health: boolean): Promise<DataResult<DailyWindow>> {
+  const user = await requireUser()
+  const supabase = await createClient()
+  const ranged = (table: string, column = "local_date") =>
+    health
+      ? supabase.from(table).select("*").eq("user_id", user.id).gte(column, from).lte(column, to)
+      : Promise.resolve({ data: [] as Record<string, unknown>[], error: null })
+  const [completions, food, water, sleep, steps, weight] = await Promise.all([
+    supabase.from("recurring_task_completions").select("task_id, local_date").eq("user_id", user.id).gte("local_date", from).lte("local_date", to),
+    ranged("food_entries"),
+    ranged("water_entries"),
+    ranged("sleep_entries"),
+    ranged("step_entries"),
+    ranged("weight_entries", "measured_on"),
+  ])
+  const error = completions.error || food.error || water.error || sleep.error || steps.error || weight.error
+  if (error) return failure(error)
+  type Row = Record<string, unknown>
   return {
-    ok: true as const,
+    ok: true,
     data: {
-      goals: goal
-        ? {
-            calorieTarget: goal.calorie_target,
-            proteinTarget: goal.protein_target == null ? null : Number(goal.protein_target),
-            waterGoalMl: goal.water_goal_ml,
-            waterIncrementMl: goal.water_increment_ml,
-            sleepTargetMinutes: goal.sleep_target_minutes,
-            stepTarget: goal.step_target,
-            weightUnit: goal.weight_unit as "kg" | "lb",
-          }
-        : emptyGoals,
-      food: food.data ?? [],
-      water: water.data ?? [],
-      sleep: sleep.data ?? [],
-      steps: steps.data ?? [],
-      weight: weight.data ?? [],
+      from,
+      to,
+      completions: (completions.data ?? []).map((row) => completionKey(String(row.task_id), String(row.local_date))),
+      food: ((food.data ?? []) as Row[]).map(foodFromRow),
+      water: ((water.data ?? []) as Row[]).map((row) => ({ id: String(row.id), date: String(row.local_date), amount: Number(row.amount_ml) })),
+      sleep: ((sleep.data ?? []) as Row[]).map((row) => ({ id: String(row.id), date: String(row.local_date), amount: Number(row.minutes) })),
+      steps: ((steps.data ?? []) as Row[]).map((row) => ({ id: String(row.id), date: String(row.local_date), amount: Number(row.steps) })),
+      weight: ((weight.data ?? []) as Row[]).map(weightFromRow),
     },
   }
+}
+
+export function foodFromRow(row: Record<string, unknown>): FoodEntry {
+  return {
+    id: String(row.id),
+    date: String(row.local_date),
+    description: row.description == null ? null : String(row.description),
+    calories: Number(row.calories),
+    protein: Number(row.protein),
+    entryTime: row.entry_time == null ? null : String(row.entry_time).slice(0, 5),
+  }
+}
+
+export function weightFromRow(row: Record<string, unknown>): WeightEntry {
+  return { id: String(row.id), date: String(row.measured_on), kg: Number(row.weight_kg) }
 }

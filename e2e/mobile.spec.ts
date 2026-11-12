@@ -20,3 +20,18 @@ test("mobile navigation opens and navigates", async ({ page }) => {
   await page.waitForURL("**/applications")
   await expect(page.getByRole("heading", { level: 1, name: "Applications" })).toBeVisible()
 })
+
+test("daily tasks: insights stack and the preferences panel fits a phone", async ({ page }) => {
+  await open(page, "/daily-tasks")
+  const weekly = await page.getByRole("region", { name: "Weekly Insights" }).boundingBox()
+  const health = page.getByRole("region", { name: "Health Insights" })
+  if (await health.count()) {
+    const box = await health.boundingBox()
+    expect(weekly!.y).toBeGreaterThan(box!.y + box!.height - 1)
+  }
+  await page.getByRole("button", { name: "Daily Tasks preferences" }).click()
+  const panel = await page.getByRole("dialog", { name: "Preferences" }).boundingBox()
+  const width = page.viewportSize()!.width
+  expect(panel!.x).toBeGreaterThanOrEqual(0)
+  expect(panel!.x + panel!.width).toBeLessThanOrEqual(width)
+})
