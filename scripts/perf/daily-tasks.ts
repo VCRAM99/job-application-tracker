@@ -237,6 +237,17 @@ function screenshotData(email: string) {
     insert into public.food_entries (user_id, local_date, description, calories, protein, entry_time) values
       (${user}, ${today}, 'Sample: oatmeal with berries', 380, 14, '08:10'),
       (${user}, ${today}, 'Sample: chicken rice bowl', 640, 46, '12:45');
+    delete from public.water_entries where user_id = ${user} and local_date = ${today};
+    delete from public.sleep_entries where user_id = ${user} and local_date = ${today};
+    delete from public.step_entries where user_id = ${user} and local_date = ${today};
+    insert into public.water_entries (user_id, local_date, amount_ml) values (${user}, ${today}, 1500), (${user}, ${today}, 750);
+    insert into public.sleep_entries (user_id, local_date, minutes) values (${user}, ${today}, 445);
+    insert into public.step_entries (user_id, local_date, steps) values (${user}, ${today}, 4200);
+    -- Targets so each status shows: calories close to a cutting limit, protein under it,
+    -- water reached, sleep close, steps below.
+    insert into public.health_goals (user_id, calorie_target, protein_target, water_goal_ml, sleep_target_minutes, step_target, goal_mode, protein_direction)
+      values (${user}, 1100, 120, 2000, 480, 8000, 'cut', 'reach')
+      on conflict (user_id) do update set calorie_target = 1100, protein_target = 120, water_goal_ml = 2000, sleep_target_minutes = 480, step_target = 8000, goal_mode = 'cut', protein_direction = 'reach', hidden_metrics = null;
     insert into public.recurring_task_completions (user_id, task_id, local_date)
       select ${user}, id, ${today} from public.recurring_tasks where user_id = ${user} and title in ('Perf habit: stretch', 'Perf habit: read');
   `)
