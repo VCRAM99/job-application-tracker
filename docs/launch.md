@@ -134,7 +134,7 @@ Redeploy.
 
 **Checks:**
 
-- `https://<your-domain>/monitoring` exists (it answers POST; a GET may return 405).
+- `https://<your-domain>/monitoring` is the tunnel. A GET returns 405. A POST forwards only envelopes for your own DSN (same host, project, and key) of at most 256 KB; anything else gets 403, 413, or 400.
 - The browser console shows no CSP errors.
 - Trigger a harmless error (for example an AI run with a revoked key); a Sentry issue appears with tags such as `code` and `provider`, and no request body, cookies, email, or key.
 
@@ -187,5 +187,3 @@ Each switch is independent. Unset the variable (or set it to `false`) and redepl
 | CAPTCHA | Supabase Attack Protection → CAPTCHA off **first**, then `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (and redeploy) |
 
 Turning a flag off hides the feature and refuses its actions; saved data stays private and returns when the flag is turned back on. The migration needs no rollback: `job_source_status` is a read-only function, and the upload cap only refuses a user's 31st stored file. To lift the cap, recreate the "insert own resume files" policy without the `resume_file_count()` condition, using the original definition in `20261102120000_resume_studio.sql`.
-
-**Known Sentry tunnel limitation.** The `/monitoring` route rewrites to Sentry's ingest for any `o`/`p` pair, so the domain could relay events to other Sentry projects (a limitation of the SDK's rewrite tunnel). Nothing user-specific is exposed. If it matters, unset `SENTRY_DSN`, or switch to a route-handler tunnel pinned to your DSN.

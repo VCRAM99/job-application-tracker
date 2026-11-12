@@ -61,7 +61,7 @@ Sentry is loaded only when `SENTRY_DSN` is set (`src/instrumentation.ts`, `src/i
 - `scrubEvent` keeps only the method and path of the request, and drops users, extras, spans and stack-frame source and variables.
 - It redacts emails, API keys, JWTs, bearer tokens and UUIDs in messages and tags.
 - Provider failures are reported once per run, tagged with code, provider and model only.
-- Browser events go through the `/monitoring` tunnel, so the CSP needs no Sentry host.
+- Browser events go through the same-origin `/monitoring` route handler (`src/app/monitoring/route.ts`), so the CSP needs no Sentry host. It forwards an envelope only when its DSN matches `SENTRY_DSN` (host, project id, and public key), caps bodies at 256 KB, logs nothing, and returns 404 when Sentry is off. Unlike the SDK's rewrite tunnel, it cannot relay to other Sentry projects.
 
 ## Bring your own key
 
