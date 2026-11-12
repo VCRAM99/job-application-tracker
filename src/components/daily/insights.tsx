@@ -1,6 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
+import { useEffect, useRef, useState } from "react"
 
 import { HelpTip } from "@/components/ui/help-tip"
 import { SCHEDULE_CHANGE_NOTE } from "@/lib/daily/calendar"
@@ -66,6 +67,34 @@ export function WeeklyInsights({ insights, className }: { insights: ReturnType<t
   )
 }
 
+/**
+ * Mounts its children only once the panel is near the viewport. The chart sits at the bottom of the
+ * page, so recharts and its first render stay off the critical path of the first paint.
+ */
+function WhenVisible({ children, placeholderClass }: { children: React.ReactNode; placeholderClass: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const element = ref.current
+    if (!element || typeof IntersectionObserver === "undefined") {
+      setVisible(true)
+      return
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisible(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: "200px" },
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  return <div ref={ref}>{visible ? children : <div className={placeholderClass} aria-hidden="true" />}</div>
+}
+
 export function HealthInsights({
   today,
   weightUnit,
@@ -79,7 +108,9 @@ export function HealthInsights({
 }) {
   return (
     <Panel title="Health Insights" help="Relative trends for the last 7, 30, or 90 days, each scaled 0–100. Tooltips show the recorded values.">
-      <HealthChart today={today} weightUnit={weightUnit} hidden={hidden} {...series} />
+      <WhenVisible placeholderClass="h-80 w-full">
+        <HealthChart today={today} weightUnit={weightUnit} hidden={hidden} {...series} />
+      </WhenVisible>
     </Panel>
   )
 }

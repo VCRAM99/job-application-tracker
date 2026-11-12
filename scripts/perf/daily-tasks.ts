@@ -5,7 +5,7 @@
  *   npm run perf:seed
  *   npx tsx --conditions=react-server scripts/perf/daily-tasks.ts before   # or: after
  *
- * Writes perf-results/daily-<label>.json and docs/ui/daily-tasks/<label>/*.webp.
+ * Writes perf-results/daily-timings-<label>.json and docs/ui/daily-tasks/<label>/*.webp.
  *
  * For each interaction, a capture-phase pointerdown listener in the page records t0. Then:
  * - "click → UI": the first animation frame where the expected change is on screen (checked
@@ -268,7 +268,11 @@ async function screenshots(browserContext: (theme: "dark" | "light", mobile: boo
     const page = await context.newPage()
     await page.goto(`${BASE}/daily-tasks`)
     await page.waitForLoadState("networkidle")
-    await page.waitForTimeout(800)
+    // The chart mounts when scrolled into view; scroll through once so the full-page shot has it.
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+    await page.waitForTimeout(1200)
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.waitForTimeout(400)
     const png = await page.screenshot({ fullPage: true })
     await sharp(png).webp({ quality: 80 }).toFile(path.join(dir, `${name}.webp`))
     await context.close()
@@ -320,7 +324,7 @@ async function main() {
     })
 
     mkdirSync(path.join(ROOT, "perf-results"), { recursive: true })
-    writeFileSync(path.join(ROOT, "perf-results", `daily-${label}.json`), `${JSON.stringify({ label, at: new Date().toISOString(), repeats: REPEATS, timings }, null, 2)}\n`)
+    writeFileSync(path.join(ROOT, "perf-results", `daily-timings-${label}.json`), `${JSON.stringify({ label, at: new Date().toISOString(), repeats: REPEATS, timings }, null, 2)}\n`)
     for (const [name, run] of Object.entries(timings)) {
       console.log(name, JSON.stringify({ toggleUi: run.toggleHabit.clickToUiMs, toggleConfirmed: run.toggleHabit.clickToConfirmedMs, foodUi: run.addFood.clickToUiMs, foodConfirmed: run.addFood.clickToConfirmedMs, nextDay: run.nextDay.clickToUiMs }))
     }
