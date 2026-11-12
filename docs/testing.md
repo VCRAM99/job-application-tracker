@@ -43,6 +43,8 @@ This builds the app once (`e2e/support/serve.ts build`), then Playwright:
 
 `npm run test:e2e:nobuild` reuses the last build.
 
+`npm run test:e2e` builds with Cloudflare's published Turnstile test site key (`E2E_TURNSTILE=1`), so the signed-out pages load the real widget from `challenges.cloudflare.com` under the production CSP; it needs internet access. The test key always passes, and local Supabase does not enforce CAPTCHA, so the token is accepted and ignored. Perf builds leave the key out, and `serve.ts start` refuses a build that does not match the run.
+
 **No live AI calls.** The app server gets `OPENAI_BASE_URL=http://127.0.0.1:3199/v1`, and the e2e user's provider is OpenAI with a fake key. Every structured call goes to the fake. The fake answers by schema name with deterministic output that the app's validators accept, and it reuses `src/lib/analyze/mock.ts` for fit analysis. Platform keys and `GEMINI_API_KEY` are empty in the server env.
 
 **No production values.** `next build` and `next start` run in production mode, which reads `.env.local`. Next never overrides a variable that is already set, so `e2e/support/local-env.ts` starts them with every key named in `.env.local`, `.env`, and `.env.production*` preset to an empty value, then fills in the local values from `.env.development.local`. Only key names are read from those files. After the build, `serve.ts` checks that the browser bundle names `http://127.0.0.1:54321` and no `*.supabase.co` project.

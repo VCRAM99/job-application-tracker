@@ -10,7 +10,7 @@ import { spawn, spawnSync } from "node:child_process"
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import path from "node:path"
 
-import { APP_PORT, FLAGS_OFF_PORT, LOCAL_SUPABASE_URL, ROOT, serverEnv } from "./local-env"
+import { APP_PORT, e2eTurnstile, FLAGS_OFF_PORT, LOCAL_SUPABASE_URL, ROOT, serverEnv, TURNSTILE_TEST_SITE_KEY } from "./local-env"
 
 const NEXT = path.join(ROOT, "node_modules/.bin/next")
 
@@ -26,6 +26,13 @@ function files(dir: string): string[] {
  * build made with `npm run build` (which reads `.env.local`) would talk to the hosted project.
  * The browser bundle must name the local stack, and no bundle may name a hosted project.
  */
+/** True when the build in .next inlines the Turnstile test key (an e2e build, not a perf build). */
+function buildHasTurnstile(): boolean {
+  return files(path.join(ROOT, ".next/static"))
+    .filter((file) => file.endsWith(".js"))
+    .some((file) => readFileSync(file, "utf8").includes(TURNSTILE_TEST_SITE_KEY))
+}
+
 function checkBundle() {
   const read = (dir: string) =>
     files(path.join(ROOT, dir))
@@ -47,6 +54,16 @@ if (command === "build") {
 } else if (command === "start" && (variant === "on" || variant === "off")) {
   // `test:e2e:nobuild` and `perf:measure` reuse whatever build is in .next.
   checkBundle()
+  // The Turnstile key is inlined at build time, so the build must match this run: e2e builds load
+  // Cloudflare's widget; perf builds must not, or the login page would measure a third-party script.
+  if (buildHasTurnstile() !== e2eTurnstile()) {
+    console.error(
+      e2eTurnstile()
+        ? "This build has no Turnstile key. Rebuild with `npm run test:e2e` (or E2E_TURNSTILE=1 npx tsx e2e/support/serve.ts build)."
+        : "This build includes the Turnstile test key (an e2e build). Rebuild with `npx tsx e2e/support/serve.ts build` before measuring.",
+    )
+    process.exit(1)
+  }
   const port = variant === "on" ? APP_PORT : FLAGS_OFF_PORT
   const child = spawn(NEXT, ["start", "-p", String(port), "-H", "127.0.0.1"], { cwd: ROOT, env: serverEnv(variant) as NodeJS.ProcessEnv, stdio: "inherit" })
   for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => child.kill(signal))

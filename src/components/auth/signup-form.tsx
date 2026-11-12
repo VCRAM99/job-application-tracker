@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useActionState } from "react"
 
 import { AuthFrame, Field, FormStatus } from "@/components/auth/auth-frame"
+import { Turnstile } from "@/components/auth/turnstile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { AuthFormState } from "@/lib/auth/form-state"
@@ -100,6 +101,18 @@ export function SignupForm({
             }
           />
         </Field>
+        <Turnstile action="signup" resetSignal={state} />
+        <p className="text-xs text-muted-foreground">
+          By creating an account, you agree to the{" "}
+          <Link href="/terms" className="text-foreground underline underline-offset-4">
+            Terms
+          </Link>{" "}
+          and acknowledge the{" "}
+          <Link href="/privacy" className="text-foreground underline underline-offset-4">
+            Privacy notice
+          </Link>
+          .
+        </p>
         <Button type="submit" className="w-full" disabled={pending}>
           {pending ? "Creating account…" : "Create account"}
         </Button>

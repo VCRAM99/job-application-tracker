@@ -56,6 +56,32 @@ npx tsx --conditions=react-server scripts/eval/run.ts --live --write   # reads G
 
 It uses the same Google default as the app, or `JOB_ANALYSIS_GOOGLE_MODEL` when set, and the same low thinking level. The script prints a warning and the model, then per-fixture precision and recall against the expected phrases, the share of requirements dropped for grounding, and token totals. It does not write to the database. Keep the key out of the client and out of git.
 
+### Extraction precision (V2 wrap-up, prompt version `job-fit-2026-11-11`)
+
+The M6c report listed live precision at 60%, below the 70% target. Printing every unmatched requirement (`--verbose`) showed that all 12 "false positives" were real requirements: explicit `Required:`/`Preferred:` lines, or location rules, that the short fixtures' expected lists left out. Those labels are now complete, and matching is one-to-one, so a repeated requirement counts as a false positive.
+
+On completed labels and realistic postings (about-us copy, duties, benefits, pay, equal-opportunity text, repeated requirements), the old prompt was precise but missed location, onsite or hybrid rules, and screening conditions.
+
+The new prompt says what counts as a requirement (including those conditions) and what does not (duties, benefits, pay, about-us, equal-opportunity text, application steps), and asks for each requirement once. Grounding now also drops boilerplate quotes and repeated requirements (`src/lib/analyze/filter.ts`), so a model mistake there cannot reach the analysis. Both filters only remove items, so the grounding rule (a contiguous quote from the posting) is unchanged. A boilerplate pattern needs benefits, pay, or apply context, so a requirement that merely mentions such a word ("dental assistant certification", "budgets of $5-10M") is kept. A duplicate must be the same kind (required or preferred), with close wording or no new skill.
+
+**Held-out set.** The four realistic postings first used as the held-out set turned out to be tuning data: the independent review found that the boilerplate filter, written in the same session, named phrases that appear only in them. They now count as tuning (seven tuning postings in all). Four new held-out postings (`src/lib/analyze/fixtures-heldout.ts`: a transit GIS analyst, a frontend contractor, a clinical research coordinator, and a warehouse lead) were written after the filters were final, committed before any eval run, and scored once with each prompt.
+
+Live results, `gemini-3.5-flash-lite`, one-to-one matching, same labels for both columns:
+
+| Set | Old prompt: precision / recall | New prompt: precision / recall |
+|---|---|---|
+| Short fixtures (labels completed) | 96.7% / 96.7% | 96.4% / 90% |
+| Realistic, tuning (7 postings) | 100% / 85.7% | 96.1% / 100% |
+| **Realistic, held out (4 new postings)** | **100% / 83.9%** | **100% / 96.8%** |
+| All | 99% / 88.2% | 97.2% / 96.4% |
+
+**Trade-off.**
+- **Short set:** the "buzzword" fixture's three `Required:` lines ("leverage paradigm-shifting synergies…") now read to the model as duties and are not extracted, which costs recall on that set.
+- **Tuning set:** the new prompt also extracts a few condition-like lines that are not labeled (a "hybrid schedule" perk, "Some Saturdays required").
+- **Held out:** the one miss is a location named only in the opening sentence ("…in our fictional Reno, Nevada distribution center").
+
+Live output varies a little from run to run.
+
 ## Limitations
 
 - Years of experience are the merged span of verified employment dates. Overlapping roles are not double counted, and undated roles do not add years.

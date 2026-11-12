@@ -4,6 +4,7 @@ import { connection } from "next/server"
 
 import { AnalyzeForm } from "@/components/analyze/forms"
 import { PageHeader, RecordState } from "@/components/records/fields"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { jobAnalysisMockProvider } from "@/lib/ai/flags"
 import { analysisBlockedReason } from "@/lib/analyze/readiness"
@@ -87,6 +88,11 @@ export default async function AnalyzePage({
       <PageHeader
         title="Qualification match"
         help="Compare a job description with career facts you have verified. The estimate is calculated in the app."
+        action={
+          <Button variant="outline" nativeButton={false} render={<Link href="/applications/new?paste=1" />}>
+            Add application from posting
+          </Button>
+        }
       />
       <Card>
         <CardHeader>

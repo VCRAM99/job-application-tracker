@@ -6,6 +6,9 @@ import {
   emptyApplicationForm,
 } from "@/components/records/application-form"
 import { PageHeader, RecordState } from "@/components/records/fields"
+import { NewApplicationWithImport } from "@/components/jobs/paste-import"
+import { analyzeAllowed } from "@/lib/beta"
+import { savedExecutionMode } from "@/lib/jobs/paste-data"
 import { linkedApplicationId, loadTrackerPosting } from "@/lib/jobs/data"
 import { planCompany, prefillFromPosting } from "@/lib/jobs/prefill"
 import { createApplication } from "@/lib/records/actions"
@@ -23,7 +26,8 @@ export default async function NewApplicationPage({
   const requested = typeof params.company === "string" ? params.company : ""
   const postingId = typeof params.posting === "string" ? params.posting : ""
   const assistedSource = params.source === "linkedin" || params.source === "indeed" ? params.source : ""
-  const companies = await listCompanyOptions()
+  const [companies, pasteImport] = await Promise.all([listCompanyOptions(), analyzeAllowed()])
+  const importMode = pasteImport ? await savedExecutionMode() : "byok"
 
   if (!companies.ok) {
     return (
@@ -101,20 +105,37 @@ export default async function NewApplicationPage({
             : "Choose a company you already track, or create one with the application."
         }
       />
-      <ApplicationForm
-        action={createApplication}
-        companies={companies.data}
-        submitLabel="Create application"
-        cancelHref={trackedId ? "/jobs" : "/applications"}
-        postingId={trackedId}
-        lockSavedStatus={Boolean(trackedId)}
-        companyNotice={notice}
-        values={{
-          ...prefill,
-          companyMode: prefill.companyId || companyId || companies.data.length > 0 ? prefill.companyMode || "existing" : "new",
-          companyId: prefill.companyId || companyId,
-        }}
-      />
+      {pasteImport && !trackedId && !assistedSource ? (
+        // Paste-a-job import: behind the AI and fit-analysis flags and the beta list.
+        <NewApplicationWithImport
+          action={createApplication}
+          companies={companies.data}
+          openImport={params.paste === "1"}
+          executionMode={importMode}
+          nonce={crypto.randomUUID()}
+          notice={notice}
+          values={{
+            ...prefill,
+            companyMode: companyId || companies.data.length > 0 ? "existing" : "new",
+            companyId,
+          }}
+        />
+      ) : (
+        <ApplicationForm
+          action={createApplication}
+          companies={companies.data}
+          submitLabel="Create application"
+          cancelHref={trackedId ? "/jobs" : "/applications"}
+          postingId={trackedId}
+          lockSavedStatus={Boolean(trackedId)}
+          companyNotice={notice}
+          values={{
+            ...prefill,
+            companyMode: prefill.companyId || companyId || companies.data.length > 0 ? prefill.companyMode || "existing" : "new",
+            companyId: prefill.companyId || companyId,
+          }}
+        />
+      )}
     </div>
   )
 }

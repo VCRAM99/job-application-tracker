@@ -125,7 +125,7 @@ export function AnalysisResult({
         </dl>
         {analysis.droppedRequirementCount > 0 ? (
           <p className="text-sm text-muted-foreground">
-            {analysis.droppedRequirementCount} extracted {analysis.droppedRequirementCount === 1 ? "requirement was" : "requirements were"} dropped because the quote was not found in the job text or the list was over the cap.
+            {analysis.droppedRequirementCount} extracted {analysis.droppedRequirementCount === 1 ? "requirement was" : "requirements were"} dropped: the quote was not in the job text, it repeated an earlier requirement, it was pay or benefits text, or the list was over the cap.
           </p>
         ) : null}
       </section>

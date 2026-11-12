@@ -1,6 +1,6 @@
 # Launch runbook (Job Tracker 2.0 beta)
 
-These are the exact steps to turn on the V2 features in production for a closed beta: Gemini only, and users bring their own key (BYOK). Do them in order, and run each step's check before moving on. Every step can be undone by unsetting the flag it adds (see [Rollback](#rollback)).
+These are the exact steps to turn on the V2 features in production: first for a closed beta, then for everyone (`BETA_USER_IDS=*`, step 4). Gemini only, and users bring their own key (BYOK). Do them in order, and run each step's check before moving on. Every step can be undone by unsetting the flag it adds (see [Rollback](#rollback)).
 
 **What merging the M6c PR does on its own:**
 
@@ -36,7 +36,7 @@ These are recommended settings in the hosted dashboard. The repository does not 
 | | Token verifications per 5 minutes per IP | 30 |
 | Authentication → Sessions | Refresh token rotation, reuse interval | On, 10 seconds |
 | Authentication → URL Configuration | Site URL and Redirect URLs | As in [setup.md](setup.md) |
-| Authentication → Attack Protection | CAPTCHA | **Leave off for now.** The forms do not send a CAPTCHA token yet, so turning it on would block every sign-in. It is listed as a follow-up. |
+| Authentication → Attack Protection | CAPTCHA | **Leave off until step 7.** Turning it on before the site key is live blocks every sign-in. |
 
 **Check:** sign out and sign in again. A new test sign-up still gets the confirmation email.
 
@@ -77,7 +77,7 @@ Add these for **Production**. Leave everything not listed unset.
 
 | Name | Value | Notes |
 |---|---|---|
-| `BETA_USER_IDS` | Your UUID, comma-separated with any other beta users' UUIDs | Gates every V2 feature. Unset means nobody on Vercel. One malformed entry closes V2 to everyone. |
+| `BETA_USER_IDS` | Closed beta: your UUID, comma-separated with other beta users' UUIDs. **Public launch: `*`** | Gates every V2 feature, including Jobs. `*` on its own means every signed-in user (never a signed-out request). Unset means nobody on Vercel. One malformed entry closes V2 to everyone; `*` mixed with UUIDs counts as malformed. With `*`, a set `JOB_RECOMMENDATIONS_ALLOWED_USER_IDS` only narrows Jobs to its listed users, so unset it to open Jobs to everyone. |
 | `AI_FEATURES_ENABLED` | `true` | Career AI (profile extraction, settings). Needed by every AI feature. |
 | `AI_CREDENTIALS_KEY` | Value from step 2 | Server-only. Never use a `NEXT_PUBLIC_` name. |
 | `AI_CREDENTIALS_KEY_VERSION` | `1` | |
@@ -89,6 +89,8 @@ Add these for **Production**. Leave everything not listed unset.
 | `JOB_RECOMMENDATIONS_ENABLED` | `true` (already set) | Keep `JOB_RECOMMENDATIONS_ALLOWED_USER_IDS` as is; BETA users get Jobs too. |
 
 Leave the existing jobs variables as they are: `JOB_INGESTION_ENABLED`, `JOB_REFRESH_ENABLED`, `JOB_SCHEDULER_SECRET`, `JOB_CATALOG_WRITE_SECRET`, `JOB_EMAIL_DELIVERY_ENABLED` and `JOB_EMAIL_FROM`.
+
+Also set **`NEXT_PUBLIC_CONTACT_EMAIL`** to the address that receives privacy and account-deletion requests. `/privacy` and `/terms` show it, and the address is inlined at build time, so redeploy after setting it. Without it, those pages say no contact address has been published.
 
 **Do not set:** `AI_MANAGED_ENABLED`, `AI_MANAGED_MONTHLY_*`, `AI_PLATFORM_*_API_KEY`, `JOB_ANALYSIS_MOCK_PROVIDER`, or `PERF_TIMING`.
 
@@ -110,8 +112,12 @@ Redeploy.
 3. **Fit analysis:** paste a job description (200+ characters) and analyze. You get requirements with quotes and the visible qualification disclaimer.
 4. **Resume Studio:** upload a PDF or DOCX, parse it, tailor it to the analysis, accept an edit, and download the PDF and DOCX.
 5. **Coach:** from the analysis, generate questions; from an application, draft a message. It shows "AI draft" and "Not sent", and nothing is sent.
-6. **As a non-beta account** (a second test account): only V1 appears in the nav. Typing `/analyze`, `/resumes`, `/career`, or `/jobs` shows the off state, not the feature.
-7. **Rate limit:** more than 6 AI runs in a minute shows "You have reached the AI request limit for now."
+6. **As a non-beta account** (a second test account), while the list holds UUIDs: only V1 appears in the nav. Typing `/analyze`, `/resumes`, `/career`, or `/jobs` shows the off state, not the feature.
+7. **Public launch** (`BETA_USER_IDS=*`):
+   - Do step 7 (CAPTCHA) first, and set `NEXT_PUBLIC_CONTACT_EMAIL` (below). Sign-ups are open to anyone.
+   - Then set `*`, unset `JOB_RECOMMENDATIONS_ALLOWED_USER_IDS` if Jobs should be open too, and redeploy.
+   - Check that a brand-new test account sees Jobs, Fit, Resumes, and Career, and that `/privacy` and `/terms` load while signed out.
+8. **Rate limit:** more than 6 AI runs in a minute shows "You have reached the AI request limit for now."
 
 ## 5. Sentry (optional, recommended)
 
@@ -134,7 +140,7 @@ Redeploy.
 
 **Checks:**
 
-- `https://<your-domain>/monitoring` exists (it answers POST; a GET may return 405).
+- `https://<your-domain>/monitoring` is the tunnel. A GET returns 405. A POST forwards only envelopes for your own DSN (same host, project, and key) of at most 256 KB; anything else gets 403, 413, or 400.
 - The browser console shows no CSP errors.
 - Trigger a harmless error (for example an AI run with a revoked key); a Sentry issue appears with tags such as `code` and `provider`, and no request body, cookies, email, or key.
 
@@ -152,6 +158,37 @@ npx tsx --conditions=react-server scripts/jobs/cli.ts status --target production
 
 For any live source still at `--refresh-limit 1`, consider re-approving with `--refresh-limit 2`. Vercel Hobby cron fires at a jittered minute inside its hour, so two daily runs can land under 24 hours apart, and a limit of 1 (counted over a rolling 24 hours) would skip one. See [jobs.md](jobs.md).
 
+## 7. CAPTCHA (Cloudflare Turnstile)
+
+Sign-up, sign-in, and the password-reset request show a Turnstile check when `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is set. The app forwards the token to Supabase Auth; **Supabase decides whether a token is required.** Do the steps in this order: if Supabase CAPTCHA is turned on before the deployed forms send tokens, nobody can sign in.
+
+1. Cloudflare dashboard → Turnstile → **Add widget**.
+   - Name it "Job Tracker".
+   - Add your production hostname, and Vercel preview domains if you want the check on previews.
+   - Widget mode: **Managed**. Copy the **site key** and the **secret key**.
+2. Vercel: set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` to the site key. The key is inlined at build time, so **redeploy**.
+3. **Check:**
+   - `/login`, `/signup`, and `/forgot-password` each show the check, and sign-in still works (Supabase is not enforcing yet).
+   - The response's `Content-Security-Policy` header lists `https://challenges.cloudflare.com` in `script-src` and `frame-src`.
+   - The browser console shows no CSP errors.
+4. Supabase dashboard → Authentication → Attack Protection → **Enable CAPTCHA protection**. Choose provider **Turnstile** and paste the **secret key**. Save.
+5. **Check:**
+   - Sign in, sign up with a test address, and request a reset: all three work.
+   - With the Turnstile script blocked (for example an ad blocker on `challenges.cloudflare.com`), sign-in fails with "The security check did not pass."
+
+**Rollback:** turn CAPTCHA off in Supabase **first**, then unset `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and redeploy.
+
+## 8. Account deletion requests
+
+There is no self-service "Delete account" button: deleting a Supabase Auth user needs either a service-role key, which the app never holds, or a new database function, which means a migration. Until that exists, handle requests from the address in `NEXT_PUBLIC_CONTACT_EMAIL` as follows:
+
+1. Confirm the request comes from the account's email address.
+2. Supabase → Storage → `resumes` → delete the folder named after the user's id. Uploaded files are not linked to the user row, so this is the one manual step.
+3. Supabase → Authentication → Users → the user → **Delete user**. Every table that holds the user's rows (43 of them) references `auth.users` with `on delete cascade`, so all of their records go with the account. `src/lib/account/export.test.ts` checks this against the migrations.
+4. **Check:** in the SQL Editor, `select count(*) from public.applications where user_id = '<id>';` returns 0.
+
+Users can download everything first from Settings → Your data → **Download my data (JSON)**.
+
 ## Rollback
 
 Each switch is independent. Unset the variable (or set it to `false`) and redeploy.
@@ -159,12 +196,12 @@ Each switch is independent. Unset the variable (or set it to `false`) and redepl
 | To turn off | Unset |
 |---|---|
 | Every V2 feature for everyone | `BETA_USER_IDS` (closed when unset on Vercel), or set it to a single malformed value such as `none` |
+| V2 for the public, back to a closed beta | Replace `*` in `BETA_USER_IDS` with the beta users' UUIDs |
 | All AI features | `AI_FEATURES_ENABLED`. Fit analysis, Resume Studio, the coach, and career AI all depend on it. |
 | One AI feature | `JOB_ANALYSIS_ENABLED`, `RESUME_STUDIO_ENABLED`, or `CAREER_COACH_ENABLED` |
 | Recommended Jobs | `JOB_RECOMMENDATIONS_ENABLED` |
 | AI accounting (stops every AI call at once) | Run `update public.ai_accounting_gate set secret = null where id = 1;` |
 | Sentry | `SENTRY_DSN` (and redeploy) |
+| CAPTCHA | Supabase Attack Protection → CAPTCHA off **first**, then `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (and redeploy) |
 
 Turning a flag off hides the feature and refuses its actions; saved data stays private and returns when the flag is turned back on. The migration needs no rollback: `job_source_status` is a read-only function, and the upload cap only refuses a user's 31st stored file. To lift the cap, recreate the "insert own resume files" policy without the `resume_file_count()` condition, using the original definition in `20261102120000_resume_studio.sql`.
-
-**Known Sentry tunnel limitation.** The `/monitoring` route rewrites to Sentry's ingest for any `o`/`p` pair, so the domain could relay events to other Sentry projects (a limitation of the SDK's rewrite tunnel). Nothing user-specific is exposed. If it matters, unset `SENTRY_DSN`, or switch to a route-handler tunnel pinned to your DSN.

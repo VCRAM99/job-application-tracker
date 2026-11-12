@@ -28,6 +28,7 @@ A private workspace for running a job search: applications, companies, contacts,
 - **Resume Studio.** Upload a PDF or DOCX, parse it, and tailor it to an analysis. Each edit is a proposal that must cite your facts and the posting. You accept or reject edits one by one, then export to PDF or DOCX.
 - **Interview & networking coach.** Interview questions from an analysis, a STAR story bank, typed practice with notes, company research from text you provide, outreach drafts, and follow-up suggestions. Nothing is ever sent for you.
 - **Recommended jobs.** A shared catalog from approved public job boards, private preferences, and optional alerts.
+- **Paste a job posting.** For Workday, LinkedIn, or company-site postings that cannot be ingested: paste the text, and AI fills in company, title, location, arrangement, employment type, salary, and requisition ID. Only values found in your text are kept. You review the form before saving, duplicates are caught, and fit analysis is one click away. The app never opens the link.
 
 ## How it works
 
@@ -62,7 +63,8 @@ flowchart LR
 - **Every query runs as the user.** The app has no service-role client. Row Level Security scopes every table to its owner. The few writes that must cross users, such as AI usage accounting and the shared job catalog, go through `SECURITY DEFINER` functions that require an HMAC proof signed with a server-only secret.
 - **The model proposes; code verifies.** Requirements must be quoted word for word from the posting. Resume edits and drafts may only use facts the user accepted. Research claims must cite text the user provided. Anything that fails a check is dropped before it is saved, and the model never produces a score.
 - **Bring your own key.** Provider keys are encrypted with AES-256-GCM using a server key, are never sent back to the browser, and never appear in logs or Sentry. Gemini is the only live-verified provider. OpenAI and Anthropic stay hidden unless an operator enables them, and then they carry a "Beta — not live-verified" label.
-- **Closed beta.** `BETA_USER_IDS` gates every V2 page, action, and AI run on the server. If the list is malformed, nobody gets access.
+- **Beta, then public.** `BETA_USER_IDS` gates every V2 page, action, and AI run on the server: a list of user ids for a closed beta, or `*` for every signed-in user. If the list is malformed, nobody gets access.
+- **Your data.** [Privacy](src/app/privacy/page.tsx) and [terms](src/app/terms/page.tsx) pages, linked from every page footer and from sign-up, are plain-language templates for the owner to review. Settings → Your data downloads everything an account owns as JSON. Deleting the account removes every record (all 43 user tables cascade); the runbook covers the uploaded files.
 - **Abuse limits.** Each user gets 6 AI runs per minute and 80 per day, counted from the usage log. A strict CSP limits connections to the configured Supabase origin, along with HSTS and COOP. Sentry is opt-in and scrubs emails, keys, tokens, and ids.
 - **Caching rule.** Only public, user-independent data may ever be shared-cached, and a test enforces this.
 
@@ -83,19 +85,20 @@ More detail: [architecture](docs/architecture.md) · [AI](docs/ai.md) · [fit an
 
 | Layer | Command | Count / gate |
 |---|---|---|
-| Unit, component, in-memory DB (PGlite), local Supabase RLS | `npm test` | 570 tests |
-| End to end (Playwright, `next start`, fake provider) | `npm run test:e2e` | Core flows on every feature, CSP enforced |
+| Unit, component, in-memory DB (PGlite), local Supabase RLS | `npm test` | 652 tests in 86 files |
+| End to end (Playwright, `next start`, fake provider, Turnstile test key) | `npm run test:e2e` | 43 tests: core flows on every feature, with the production CSP enforced |
 | AI evals (prompts + validators, planted fabrications/injections) | `npm run test:eval` | CI fails below 100% safety |
 | Lint, types, build | `npm run lint`, `npm run typecheck`, `npm run build` | CI |
 
 The latest eval run is in [docs/evals/latest.md](docs/evals/latest.md):
 
 - **Live Gemini run** (`gemini-3.5-flash-lite`):
-  - 100% of 34 planted fabrications dropped;
+  - 100% of 56 planted fabrications dropped;
   - 100% of 3 prompt injections dropped;
   - 100% citation validity;
-  - extraction recall 100%;
-  - extraction precision 60%, below the 70% target and tracked as a limitation.
+  - requirement extraction, all sets: precision 97.2%, recall 96.4%;
+  - on four held-out postings never used for tuning: precision 100%, recall 96.8% (83.9% recall with the previous prompt).
+- **Correction.** The 60% precision reported at M6c came from incomplete gold labels, not model errors. How this was found and fixed is in [docs/analyze.md](docs/analyze.md#extraction-precision-v2-wrap-up-prompt-version-job-fit-2026-11-11).
 - **Mock suite:** runs in CI and fails if a safety check is weakened. Breaking the edit validator drops the fabrication catch to 88% and fails the build.
 
 ## Performance
@@ -104,43 +107,41 @@ Measured with Lighthouse plus Postgres statement stats on a seeded dataset (300 
 
 | Page | First-load JS (KB, transfer) | Lighthouse perf | a11y | LCP (ms) | Supabase calls |
 |---|---|---|---|---|---|
-| Dashboard | 217.8 | 93 | 100 | 3247 | 12 |
-| Applications list | 183.5 | 95 | 100 | 2952 | 5 |
-| Jobs | 187.6 | 92 | 100 | 3317 | 8 |
-| Fit analysis result | 186.4 | 95 | 100 | 2966 | 12 |
-| Resumes | 184.6 | 96 | 100 | 2796 | 6 |
-| Career | 221.3 | 94 | 96 | 3134 | 15 |
+| Dashboard | 217.6 | 93 | 100 | 3248 | 12 |
+| Applications list | 183.3 | 94 | 100 | 3096 | 5 |
+| Jobs | 187.4 | 95 | 100 | 2957 | 8 |
+| Fit analysis result | 186.2 | 95 | 100 | 2956 | 12 |
+| Resumes | 184.4 | 94 | 100 | 3084 | 6 |
+| Career | 221.1 | 94 | 96 | 3091 | 15 |
 
-Measured with Lighthouse's simulated mobile throttling. Since the M6a optimization pass, Daily Tasks first-load JS fell from 291 to 191 KB, and each page now makes 2 auth calls per render. Full history: [baseline](docs/perf/baseline.md) → [M6a](docs/perf/after.md) → [M6b](docs/perf/m6b.md) → [M6c](docs/perf/m6c.md).
+Measured with Lighthouse's simulated mobile throttling. Since the M6a optimization pass, Daily Tasks first-load JS fell from 291 to 191 KB, and each page now makes 2 auth calls per render. Full history: [baseline](docs/perf/baseline.md) → [M6a](docs/perf/after.md) → [M6b](docs/perf/m6b.md) → [M6c](docs/perf/m6c.md) → [V2](docs/perf/v2.md).
 
 ## Status
 
 | Capability | Status |
 |---|---|
-| Tracking, daily tasks, import/export, health | Live |
-| Recommended jobs | Live for allowlisted beta users |
-| Career profile, fit analysis, Resume Studio, coach | Built and verified; behind beta + flags (see [launch runbook](docs/launch.md)) |
-| Gemini (BYOK) | Live-verified |
-| OpenAI, Anthropic | Built and mock-tested; hidden in production, not live-verified |
+| Tracking, daily tasks, import/export, health | **Production, active** |
+| Recommended jobs | **Production, active** for the allowlisted user; beta users once `BETA_USER_IDS` is set |
+| Career profile, fit analysis, Resume Studio, coach, paste-a-job | **Beta**: built and verified, off until the [launch runbook](docs/launch.md) steps; `BETA_USER_IDS=*` opens them to everyone |
+| Privacy and terms pages, JSON data export | Ready; set `NEXT_PUBLIC_CONTACT_EMAIL` before a public launch. Account deletion is an operator step (runbook step 8) |
+| Gemini (BYOK) | **Beta**: live-verified (evals and walkthroughs) |
+| OpenAI, Anthropic | **Not live-verified**: mock-tested only, hidden in production |
 | Managed AI | Built; unreachable unless enabled |
-| Sentry | Ready; active only with `SENTRY_DSN` |
+| CAPTCHA (Cloudflare Turnstile) | Ready; off until `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is set, then Supabase CAPTCHA (runbook step 7) |
+| Sentry | Ready; active only with `SENTRY_DSN`; the tunnel relays only to your project |
 
 ## Limitations
 
-- Extraction precision on live Gemini is 60%, which means some extra low-value requirements get through. Recall is 100%, and grounding checks keep out anything not quoted from the posting.
-- Resume PDF export covers Latin, Latin Extended, and Vietnamese scripts. CJK, Arabic, and similar scripts are not covered yet.
-- CAPTCHA is not wired into sign-up; Supabase Auth rate limits are the defense for now.
-- Production `npm audit` reports 0 high or critical advisories, plus 17 low or moderate ones (2 low, 15 moderate). They come from `shadcn` (a CLI, used only for a CSS import), `exceljs`'s archiver and uuid, and `@sentry/nextjs`'s build-time bundler plugin (`glob`). Fixing them would need breaking major upgrades.
-- Rate limits count runs, not provider calls. One run can make up to 3 attempts plus 1 repair, and each can repeat once on the Gemini fallback. With BYOK that only spends the user's own key. Rate limits also fail open if the usage table cannot be read, so that a database blip does not block every user.
-- Usage-accounting rows record the requested model. Saved results (analyses, resume versions, coach outputs) record the model that actually answered, including after a fallback.
-- No independent security audit or certification. The security review was internal (see the M6c PR).
+- **Extraction misses:** it still misses a location named only in a posting's opening sentence, and treats buzzword-only "requirements" as duties. Live output varies a little from run to run.
+- **PDF fonts:** the resume PDF export covers Latin, Latin Extended, and Vietnamese scripts. CJK, Arabic, and similar scripts are not covered yet.
+- **npm audit:** production reports 0 high or critical advisories, plus 8 low or moderate ones. They are in CLI-only `shadcn` dependencies and `exceljs`'s `uuid`, which is called without the vulnerable argument. Fixing them would need breaking major changes ([docs/dependencies.md](docs/dependencies.md)).
+- **Rate limits:** they count runs, not provider calls. One run can make up to 3 attempts plus 1 repair, and each can repeat once on the Gemini fallback. With BYOK that only spends the user's own key. They also fail open if the usage table cannot be read.
+- **Model provenance:** usage-accounting rows record the requested model. Saved results record the model that actually answered.
+- **Reviews:** no independent security audit or certification; the reviews were internal, by a separate reviewer agent (see the M6c and V2 wrap-up PRs).
 
 ## Roadmap
 
-- Improve extraction precision with a deduplication and specificity pass, and live-verify a second provider.
-- Add CAPTCHA tokens to the auth forms, then turn on Supabase CAPTCHA.
-- Add CJK fonts to the PDF export.
-- Open the beta more widely, then consider managed AI with spend caps.
+See [docs/roadmap.md](docs/roadmap.md): managed AI with spend caps, live-verifying OpenAI and Anthropic, an email alert sender, more job-board sources, resume templates, OCR, cover letters, and a local AI companion. A portfolio write-up is in [docs/case-study.md](docs/case-study.md), and release notes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Local development
 

@@ -1,4 +1,5 @@
 import { Mark } from "@/components/brand/mark"
+import { LegalLinks } from "@/components/legal/legal"
 import { signOut } from "@/lib/auth/actions"
 import type { AuthenticatedUser } from "@/lib/auth/session"
 import { NAV_ITEMS } from "@/lib/navigation"
@@ -57,6 +58,7 @@ export function AppShell({
               <SignOutButton />
             </div>
           </div>
+          <LegalLinks className="px-1" />
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">

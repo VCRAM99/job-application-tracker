@@ -21,9 +21,11 @@ import path from "node:path"
 
 import { answer as fakeAnswer } from "../../e2e/support/fake-openai"
 import { completeGemini } from "../../src/lib/ai/providers/google"
-import type { StructuredRequest } from "../../src/lib/ai/types"
+import { AiRequestError, type StructuredRequest } from "../../src/lib/ai/types"
 import { analysisModelFor } from "../../src/lib/analyze/constants"
-import { JOB_FIXTURES } from "../../src/lib/analyze/fixtures"
+import { JOB_FIXTURES, type JobFixture } from "../../src/lib/analyze/fixtures"
+import { HELD_OUT_FIXTURES } from "../../src/lib/analyze/fixtures-heldout"
+import { TUNING_FIXTURES, TUNING_FIXTURES_ROUND_TWO } from "../../src/lib/analyze/fixtures-realistic"
 import { groundRequirements } from "../../src/lib/analyze/ground"
 import { EXTRACTION_SYSTEM_PROMPT, extractionUserMessage } from "../../src/lib/analyze/prompt"
 import { EXTRACTION_JSON_SCHEMA, parseExtraction } from "../../src/lib/analyze/schema"
@@ -40,6 +42,14 @@ import { TAILOR_JSON_SCHEMA, TAILOR_SYSTEM_PROMPT, tailorOutputSchema, tailorUse
 const ROOT = path.resolve(__dirname, "../..")
 const args = new Set(process.argv.slice(2))
 const live = args.has("--live")
+/** --verbose prints each extraction miss and unmatched kept requirement (fictional fixture text only). */
+const verbose = args.has("--verbose")
+/** --only=extraction runs just the M3 extraction suite (cheaper live runs while tuning; never with --write). */
+const onlyExtraction = args.has("--only=extraction")
+if (onlyExtraction && args.has("--write")) {
+  console.error("--only=extraction is for tuning; run the full suite to --write results.")
+  process.exit(1)
+}
 const mode = live ? "live" : "mock"
 
 /** Gates for --check. Safety metrics must be perfect; quality metrics are reported. */
@@ -67,12 +77,24 @@ if (live && !apiKey) {
   process.exit(1)
 }
 const model = live ? analysisModelFor("google", {}) : "mock"
-const usage = { calls: 0, inputTokens: 0, outputTokens: 0, fallbacks: 0 }
+const usage = { calls: 0, inputTokens: 0, outputTokens: 0, fallbacks: 0, retries: 0 }
 
 async function complete(request: Omit<StructuredRequest, "apiKey" | "model">): Promise<string> {
   usage.calls += 1
   if (!live) return JSON.stringify(fakeAnswer(request.schemaName, request.user, request.system))
-  const response = await completeGemini({ ...request, apiKey, model })
+  // Live runs retry transient provider errors (outage, rate limit) up to three times with backoff,
+  // so one busy minute does not abort a whole run. Safety checks do not depend on the retry.
+  let response: Awaited<ReturnType<typeof completeGemini>> | undefined
+  for (let attempt = 1; !response; attempt += 1) {
+    try {
+      response = await completeGemini({ ...request, apiKey, model })
+    } catch (error) {
+      const retryable = error instanceof AiRequestError && error.retryable
+      if (!retryable || attempt >= 4) throw error
+      usage.retries += 1
+      await new Promise((resolve) => setTimeout(resolve, 5_000 * attempt))
+    }
+  }
   usage.inputTokens += response.inputTokens ?? 0
   usage.outputTokens += response.outputTokens ?? 0
   if (response.modelUsed && response.modelUsed !== model) usage.fallbacks += 1
@@ -112,38 +134,78 @@ const RESUME_TEXT = [
   "Go, PostgreSQL, TypeScript",
 ].join("\n")
 
-async function m3Extraction() {
-  let keptTotal = 0
-  let droppedTotal = 0
-  let matchedKept = 0
-  let expectedTotal = 0
-  let expectedFound = 0
-  for (const fixture of JOB_FIXTURES.filter((item) => !item.rejected)) {
+type ExtractionScore = { kept: number; dropped: number; truePositives: number; expected: number; found: number }
+
+/**
+ * Scores one fixture set. Matching is one-to-one: each expected requirement can be claimed by at
+ * most one kept requirement, so a requirement extracted twice counts once as correct and once as
+ * a false positive. A kept requirement that covers two expected ones counts once.
+ */
+async function scoreExtraction(setName: string, fixtures: JobFixture[]): Promise<ExtractionScore> {
+  const score: ExtractionScore = { kept: 0, dropped: 0, truePositives: 0, expected: 0, found: 0 }
+  for (const fixture of fixtures.filter((item) => !item.rejected)) {
     const jd = normalizeJobText(fixture.jd)
     const text = await complete({ system: EXTRACTION_SYSTEM_PROMPT, user: extractionUserMessage(jd), schemaName: "job_requirement_extraction", jsonSchema: EXTRACTION_JSON_SCHEMA, thinking: "low" })
     const parsed = parseExtraction(text)
     const raw: RawRequirement[] = parsed?.requirements ?? []
     const grounded = groundRequirements(jd, raw)
-    keptTotal += grounded.kept.length
-    droppedTotal += grounded.dropped
+    const kept = grounded.kept
+    score.kept += kept.length
+    score.dropped += grounded.dropped
     const matches = (needle: string, requirement: { text: string; evidenceQuote: string }) =>
       requirement.text.toLowerCase().includes(needle.toLowerCase()) || requirement.evidenceQuote.toLowerCase().includes(needle.toLowerCase())
-    matchedKept += grounded.kept.filter((requirement) => fixture.expected.some((expected) => matches(expected.textIncludes, requirement))).length
-    expectedTotal += fixture.expected.length
-    expectedFound += fixture.expected.filter((expected) => grounded.kept.some((requirement) => matches(expected.textIncludes, requirement))).length
+    const claimed = new Set<number>()
+    for (const requirement of kept) {
+      const index = fixture.expected.findIndex((expected, position) => !claimed.has(position) && matches(expected.textIncludes, requirement))
+      if (index >= 0) {
+        claimed.add(index)
+        score.truePositives += 1
+        // A merged requirement may also cover other expected items; they count as found, not as extra hits.
+        fixture.expected.forEach((expected, position) => {
+          if (!claimed.has(position) && matches(expected.textIncludes, requirement)) claimed.add(position)
+        })
+      } else if (verbose) {
+        console.warn(`[unmatched] ${setName}/${fixture.id}: ${requirement.kind}/${requirement.category} "${requirement.text}" <- "${requirement.evidenceQuote}"`)
+      }
+    }
+    score.expected += fixture.expected.length
+    score.found += fixture.expected.filter((expected) => kept.some((requirement) => matches(expected.textIncludes, requirement))).length
+    if (verbose) {
+      for (const expected of fixture.expected.filter((item) => !kept.some((requirement) => matches(item.textIncludes, requirement)))) {
+        console.warn(`[missed] ${setName}/${fixture.id}: ${expected.textIncludes}`)
+      }
+    }
 
     // Adversarial: requirements whose quotes are not in the job text must be dropped.
     const fabricated: RawRequirement[] = [
       { text: "A PhD from MIT is required.", kind: "required", category: "education", normalizedSkills: [], minYears: null, evidenceQuote: "A PhD from MIT is required for this role." },
       { text: "15 years at Google.", kind: "required", category: "experience_years", normalizedSkills: [], minYears: 15, evidenceQuote: "You have 15 years of experience at Google." },
     ]
-    const adversarial = groundRequirements(jd, fabricated)
-    catches(fabrication, fabricated.length, adversarial.kept.length)
+    const adversarial = groundRequirements(jd, fabricated).kept
+    catches(fabrication, fabricated.length, adversarial.length)
   }
-  record("M3 extraction", "precision (kept that match an expected requirement)", pct(rate(matchedKept, keptTotal)))
-  record("M3 extraction", "recall (expected requirements found)", pct(rate(expectedFound, expectedTotal)))
-  record("M3 extraction", "grounding drop rate", pct(rate(droppedTotal, keptTotal + droppedTotal)))
-  return { precision: rate(matchedKept, keptTotal), recall: rate(expectedFound, expectedTotal) }
+  record("M3 extraction", `${setName}: precision`, pct(rate(score.truePositives, score.kept)))
+  record("M3 extraction", `${setName}: recall`, pct(rate(score.found, score.expected)))
+  return score
+}
+
+async function m3Extraction() {
+  const sets: Array<[string, JobFixture[]]> = [
+    ["short fixtures", JOB_FIXTURES],
+    ["realistic (tuning)", [...TUNING_FIXTURES, ...TUNING_FIXTURES_ROUND_TWO]],
+    ["realistic (held out)", HELD_OUT_FIXTURES],
+  ]
+  const total: ExtractionScore = { kept: 0, dropped: 0, truePositives: 0, expected: 0, found: 0 }
+  const bySet: Record<string, { precision: number; recall: number }> = {}
+  for (const [name, fixtures] of sets) {
+    const score = await scoreExtraction(name, fixtures)
+    bySet[name] = { precision: rate(score.truePositives, score.kept), recall: rate(score.found, score.expected) }
+    for (const key of Object.keys(total) as Array<keyof ExtractionScore>) total[key] += score[key]
+  }
+  record("M3 extraction", "all sets: precision", pct(rate(total.truePositives, total.kept)))
+  record("M3 extraction", "all sets: recall", pct(rate(total.found, total.expected)))
+  record("M3 extraction", "drop rate (grounding, boilerplate, repeats)", pct(rate(total.dropped, total.kept + total.dropped)))
+  return { precision: rate(total.truePositives, total.kept), recall: rate(total.found, total.expected), bySet }
 }
 
 async function m4Resume() {
@@ -263,8 +325,10 @@ async function m5Coach() {
 async function main() {
   console.warn(live ? `LIVE: real Gemini calls (${model}). No database writes.` : "MOCK: deterministic, no network.")
   const quality = await m3Extraction()
-  await m4Resume()
-  await m5Coach()
+  if (!onlyExtraction) {
+    await m4Resume()
+    await m5Coach()
+  }
 
   const safety = {
     fabricationCatch: rate(fabrication.caught, fabrication.planted),
@@ -306,7 +370,7 @@ async function main() {
   }
 }
 
-type Result = { mode: string; model: string; at: string; safety: Record<string, number>; planted: Record<string, number>; quality: Record<string, number>; usage: Record<string, number>; rows: Array<{ suite: string; metric: string; value: string }> }
+type Result = { mode: string; model: string; at: string; safety: Record<string, number>; planted: Record<string, number>; quality: { precision?: number; recall?: number; bySet?: Record<string, { precision: number; recall: number }> }; usage: Record<string, number>; rows: Array<{ suite: string; metric: string; value: string }> }
 
 function writeLatest(dir: string) {
   const load = (name: string): Result | null => (existsSync(path.join(dir, `${name}.json`)) ? (JSON.parse(readFileSync(path.join(dir, `${name}.json`), "utf8")) as Result) : null)
@@ -331,6 +395,9 @@ function writeLatest(dir: string) {
             "|---|---|---|---|",
             `| Extraction precision | ${pct(result.quality.precision!)} | ${pct(THRESHOLDS.quality.extractionPrecision)} | ${result.quality.precision! >= THRESHOLDS.quality.extractionPrecision ? "met" : "**below**"} |`,
             `| Extraction recall | ${pct(result.quality.recall!)} | ${pct(THRESHOLDS.quality.extractionRecall)} | ${result.quality.recall! >= THRESHOLDS.quality.extractionRecall ? "met" : "**below**"} |`,
+            ...Object.entries(result.quality.bySet ?? {}).map(
+              ([name, set]) => `| ${name}: precision / recall | ${pct(set.precision)} / ${pct(set.recall)} | ${pct(THRESHOLDS.quality.extractionPrecision)} / ${pct(THRESHOLDS.quality.extractionRecall)} | ${set.precision >= THRESHOLDS.quality.extractionPrecision && set.recall >= THRESHOLDS.quality.extractionRecall ? "met" : "**below**"} |`,
+            ),
             "",
           ]
         : []),
@@ -344,6 +411,8 @@ function writeLatest(dir: string) {
     "# AI evaluation results",
     "",
     "Generated by `scripts/eval/run.ts`. Each case runs the app's prompts and validators on fictional fixtures. Planted fabrications and injections are added to the model's output and must all be dropped. `npm run test:eval` (mock) runs in CI and fails on any safety regression. Quality thresholds (extraction precision and recall of at least 70%) apply to live runs; mock output is a deterministic stand-in, so its quality numbers only show that the pipeline runs.",
+    "",
+    "Extraction is scored on three fictional sets: the short M3 fixtures, three realistic postings used while tuning the prompt and filters, and four realistic postings held out from tuning (`src/lib/analyze/fixtures-realistic.ts`). Each expected list names every requirement a candidate is judged on (required and preferred qualifications, plus location, work authorization, and schedule conditions). Matching is one-to-one, so a requirement extracted twice counts once as correct and once as a false positive.",
     "",
     section(load("mock"), "Mock (deterministic, CI)"),
     section(load("live"), "Live (Gemini)"),

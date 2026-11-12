@@ -1,3 +1,8 @@
+/**
+ * Short M3 fixtures. In the V2 wrap-up, each `expected` list was completed to name every explicit
+ * `Required:`/`Preferred:` line and location rule; before, only a subset was listed, which made
+ * correct extractions count as false positives (the 60% precision reported in M6c).
+ */
 export type FixtureRequirement = {
   textIncludes: string
   kind: "required" | "preferred"
@@ -88,6 +93,7 @@ export const JOB_FIXTURES: JobFixture[] = [
       { textIncludes: "typescript", kind: "required", category: "skill" },
       { textIncludes: "postgresql", kind: "required", category: "skill" },
       { textIncludes: "kubernetes", kind: "preferred", category: "skill" },
+      { textIncludes: "remote inside canada", kind: "required", category: "work_authorization_location" },
     ],
   },
   {
@@ -98,6 +104,7 @@ export const JOB_FIXTURES: JobFixture[] = [
     expected: [
       { textIncludes: "figma", kind: "required", category: "skill" },
       { textIncludes: "portfolio", kind: "required", category: "other" },
+      { textIncludes: "workshops", kind: "preferred", category: "other" },
     ],
   },
   {
@@ -108,6 +115,8 @@ export const JOB_FIXTURES: JobFixture[] = [
     expected: [
       { textIncludes: "junior", kind: "required", category: "other" },
       { textIncludes: "principal", kind: "required", category: "other" },
+      { textIncludes: "python", kind: "required", category: "skill" },
+      { textIncludes: "design notes", kind: "preferred", category: "other" },
     ],
   },
   {
@@ -115,7 +124,11 @@ export const JOB_FIXTURES: JobFixture[] = [
     title: "Platform Synergy Lead",
     company: "Pinnacle Verb",
     jd: pinnacle,
-    expected: [{ textIncludes: "synerg", kind: "required", category: "other" }],
+    expected: [
+      { textIncludes: "synerg", kind: "required", category: "other" },
+      { textIncludes: "thought leadership", kind: "required", category: "other" },
+      { textIncludes: "actionable insights", kind: "preferred", category: "other" },
+    ],
   },
   {
     id: "kip-short",
@@ -133,6 +146,8 @@ export const JOB_FIXTURES: JobFixture[] = [
     expected: [
       { textIncludes: "cafe", kind: "required", category: "experience_years" },
       { textIncludes: "inventory", kind: "required", category: "other" },
+      { textIncludes: "food-handler", kind: "preferred", category: "certification" },
+      { textIncludes: "onsite", kind: "required", category: "work_authorization_location" },
     ],
   },
   {
@@ -143,6 +158,7 @@ export const JOB_FIXTURES: JobFixture[] = [
     expected: [
       { textIncludes: "sql", kind: "required", category: "skill" },
       { textIncludes: "written summaries", kind: "required", category: "other" },
+      { textIncludes: "dashboard", kind: "preferred", category: "other" },
     ],
   },
   {
@@ -153,6 +169,7 @@ export const JOB_FIXTURES: JobFixture[] = [
     expected: [
       { textIncludes: "bachelor", kind: "required", category: "education" },
       { textIncludes: "certification", kind: "required", category: "certification" },
+      { textIncludes: "workshops", kind: "preferred", category: "other" },
     ],
   },
   {
@@ -163,6 +180,7 @@ export const JOB_FIXTURES: JobFixture[] = [
     expected: [
       { textIncludes: "canada", kind: "required", category: "work_authorization_location" },
       { textIncludes: "onsite", kind: "required", category: "work_authorization_location" },
+      { textIncludes: "dispatching freight", kind: "preferred", category: "experience_years" },
     ],
   },
   {
@@ -173,6 +191,7 @@ export const JOB_FIXTURES: JobFixture[] = [
     expected: [
       { textIncludes: "calendars", kind: "required", category: "other" },
       { textIncludes: "excel", kind: "preferred", category: "skill" },
+      { textIncludes: "phone manner", kind: "preferred", category: "other" },
     ],
   },
 ]

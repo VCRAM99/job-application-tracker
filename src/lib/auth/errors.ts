@@ -11,6 +11,10 @@ export function mapAuthError(error: AuthErrorInput): string {
   const code = error.code ?? ""
   const message = error.message.toLowerCase()
 
+  if (code === "captcha_failed" || message.includes("captcha")) {
+    return "The security check did not pass. Wait for it to finish, then try again."
+  }
+
   if (
     code === "email_not_confirmed" ||
     message.includes("email not confirmed")

@@ -46,14 +46,14 @@ export default function config(phase: string): NextConfig {
     if (error) throw new Error(error);
   }
   if (!process.env.SENTRY_DSN?.trim()) return nextConfig;
-  // Sentry's build step only with a DSN: the /monitoring tunnel, and source maps uploaded only
-  // when SENTRY_AUTH_TOKEN (plus SENTRY_ORG and SENTRY_PROJECT) is present at build.
+  // Sentry's build step only with a DSN: source maps uploaded only when SENTRY_AUTH_TOKEN (plus
+  // SENTRY_ORG and SENTRY_PROJECT) is present at build. The /monitoring tunnel is our own route
+  // handler (src/app/monitoring/route.ts), which relays only to the configured DSN.
   const token = process.env.SENTRY_AUTH_TOKEN?.trim();
   return withSentryConfig(nextConfig, {
     org: process.env.SENTRY_ORG,
     project: process.env.SENTRY_PROJECT,
     authToken: token,
-    tunnelRoute: "/monitoring",
     silent: true,
     telemetry: false,
     sourcemaps: { disable: !token, deleteSourcemapsAfterUpload: true },

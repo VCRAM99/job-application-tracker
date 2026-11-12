@@ -6,6 +6,10 @@ export const EXTRACTION_SYSTEM_PROMPT = [
   "Do not use tools. Return only JSON that matches the schema.",
   "Copy each evidenceQuote as a contiguous span of the job description.",
   "Do not invent requirements that the job description does not state.",
+  "A requirement is something the candidate is judged on: required or preferred qualifications (skills, years of experience, education, certifications, domain knowledge, languages, physical demands), and conditions of the job (location, onsite/hybrid/remote rules, work authorization or sponsorship, schedule or shift, background checks).",
+  "Include location and work-arrangement rules as category work_authorization_location, even when they appear outside a requirements list.",
+  "Do not extract duties or responsibilities (what the person will do), company descriptions, mission or values, benefits or perks, pay or salary, equal-opportunity or accommodation statements, application instructions, or statements that the posting is fictional.",
+  "Extract each requirement once, even if the posting repeats it. Split a line that lists separate requirements only when each part is a distinct qualification.",
   "Do not score the candidate and do not mark requirements as met.",
 ].join(" ")
 

@@ -1,3 +1,6 @@
+// Relative: next.config.ts loads this file, where the @/ alias does not resolve.
+import { TURNSTILE_ORIGIN, turnstileSiteKey } from "./auth/captcha"
+
 type Env = Record<string, string | undefined>
 
 /**
@@ -20,19 +23,23 @@ export function supabaseConnectSources(env: Env = process.env): string[] {
  * Production CSP. Next.js App Router inlines its bootstrap scripts, so script-src keeps
  * 'unsafe-inline' (a nonce would make every page dynamic); everything else is same-origin.
  * Sentry reports through the same-origin /monitoring tunnel, so it needs no extra source.
+ * Turnstile's origin is added to script-src and frame-src only when its site key is set.
  */
 export function contentSecurityPolicy(env: Env = process.env): string {
   const supabase = supabaseConnectSources(env)
   const https = supabase[0]?.startsWith("https:") ?? false
+  // Cloudflare Turnstile (auth forms) loads a script and renders an iframe from its own origin,
+  // allowed only when a valid site key turns the widget on.
+  const turnstile = turnstileSiteKey(env) ? [TURNSTILE_ORIGIN] : []
   return [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline'",
+    `script-src ${["'self'", "'unsafe-inline'", ...turnstile].join(" ")}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     `connect-src ${["'self'", ...supabase].join(" ")}`,
     "worker-src 'self' blob:",
-    "frame-src 'none'",
+    `frame-src ${turnstile.length ? turnstile.join(" ") : "'none'"}`,
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

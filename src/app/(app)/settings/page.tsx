@@ -1,3 +1,4 @@
+import Link from "next/link"
 import type { Metadata } from "next"
 
 import { ChangePasswordForm } from "@/components/auth/change-password-form"
@@ -5,7 +6,7 @@ import { AiSettingsSection } from "@/components/settings/ai-settings"
 import { DeveloperNote } from "@/components/settings/developer-note"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { PageHeader } from "@/components/records/fields"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -43,6 +44,29 @@ export default async function SettingsPage() {
               Sign out
             </Button>
           </form>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle help="The download holds every record your account owns: applications, companies, contacts, tasks, career facts, analyses, resumes, drafts, and settings. Saved provider keys are listed by provider and last four characters only.">Your data</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 text-sm">
+          <p className="text-muted-foreground">
+            Download everything this account stores as one JSON file, including the text read from each uploaded resume. The original files are listed by name.
+          </p>
+          <div>
+            {/* A plain link: the browser downloads the file. */}
+            <a href="/export/account" download className={buttonVariants({ variant: "outline" })}>
+              Download my data (JSON)
+            </a>
+          </div>
+          <p className="text-muted-foreground">
+            To delete your account and all of its data, see{" "}
+            <Link href="/privacy#delete" className="text-foreground underline underline-offset-4">
+              Privacy
+            </Link>
+            .
+          </p>
         </CardContent>
       </Card>
       <Card>

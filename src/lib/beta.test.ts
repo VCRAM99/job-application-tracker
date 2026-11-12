@@ -55,6 +55,46 @@ describe("BETA_USER_IDS", () => {
   })
 })
 
+describe('BETA_USER_IDS="*" (public launch)', () => {
+  const prod = { ...ALL_ON, VERCEL_ENV: "production", BETA_USER_IDS: "*" }
+
+  it("opens every V2 feature, including jobs, to every signed-in user", () => {
+    expect(betaAllowlist(prod).mode).toBe("all-signed-in")
+    expect(betaAllowlist({ ...prod, BETA_USER_IDS: "  *  " }).mode).toBe("all-signed-in")
+    for (const user of [A, B]) {
+      for (const feature of FEATURES) expect(v2AllowedFor(feature, user, prod)).toBe(true)
+    }
+  })
+
+  it("never opens V2 to a signed-out request", () => {
+    expect(betaAllowedFor(null, prod)).toBe(false)
+    for (const feature of FEATURES) expect(v2AllowedFor(feature, null, prod)).toBe(false)
+  })
+
+  it("treats * mixed with ids as malformed, which closes V2", () => {
+    for (const raw of [`*,${A}`, `${A},*`, "*,*", "**", "* ,", "all"]) {
+      expect(betaAllowlist({ ...prod, BETA_USER_IDS: raw }).mode).toBe("nobody")
+      expect(v2AllowedFor("career", A, { ...prod, BETA_USER_IDS: raw })).toBe(false)
+      expect(jobsAllowedFor(A, { ...prod, BETA_USER_IDS: raw })).toBe(false)
+    }
+  })
+
+  it("keeps unset closed on Vercel and still needs each feature's flag", () => {
+    expect(v2AllowedFor("career", A, { ...prod, BETA_USER_IDS: "" })).toBe(false)
+    expect(v2AllowedFor("coach", A, { ...prod, CAREER_COACH_ENABLED: "false" })).toBe(false)
+    expect(jobsAllowedFor(A, { ...prod, JOB_RECOMMENDATIONS_ENABLED: "false" })).toBe(false)
+  })
+
+  it("lets JOB_RECOMMENDATIONS_ALLOWED_USER_IDS only narrow jobs", () => {
+    const narrowed = { ...prod, JOB_RECOMMENDATIONS_ALLOWED_USER_IDS: A }
+    expect(jobsAllowedFor(A, narrowed)).toBe(true)
+    expect(jobsAllowedFor(B, narrowed)).toBe(false)
+    // The alias narrows jobs only; the AI features stay open to everyone signed in.
+    expect(v2AllowedFor("analyze", B, narrowed)).toBe(true)
+    expect(jobsAllowedFor(B, { ...prod, JOB_RECOMMENDATIONS_ALLOWED_USER_IDS: "nope" })).toBe(false)
+  })
+})
+
 describe("jobs access and the JOB_RECOMMENDATIONS_ALLOWED_USER_IDS alias", () => {
   const prod = { JOB_RECOMMENDATIONS_ENABLED: "true", VERCEL_ENV: "production" }
 

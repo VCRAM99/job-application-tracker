@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
 
-import type { Locator, Page } from "@playwright/test"
+import { expect, type Locator, type Page } from "@playwright/test"
 
 import { STATE_DIR } from "./local-env"
 
@@ -12,7 +12,7 @@ export function e2eUser(): E2eUser {
 }
 
 export async function signIn(page: Page, email: string, password: string) {
-  await page.goto("/login")
+  await openAuth(page, "/login")
   await page.getByLabel("Email").fill(email)
   await page.getByLabel("Password").fill(password)
   await page.getByRole("button", { name: "Sign in" }).click()
@@ -23,6 +23,17 @@ export async function signIn(page: Page, email: string, password: string) {
 export async function open(page: Page, url: string) {
   await page.goto(url)
   await page.waitForLoadState("networkidle")
+}
+
+/**
+ * Signed-out auth pages. With Turnstile on, Cloudflare's widget keeps a connection open, so the
+ * network never goes idle. The widget renders (in a closed shadow root) only after hydration and
+ * then writes its token into the form, so wait for that token instead.
+ */
+export async function openAuth(page: Page, url: string) {
+  if (process.env.E2E_TURNSTILE !== "1") return open(page, url)
+  await page.goto(url)
+  await expect(page.locator('form input[name="cf-turnstile-response"]')).not.toHaveValue("", { timeout: 20_000 })
 }
 
 /** Selects the first option whose text matches. */

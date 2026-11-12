@@ -73,16 +73,17 @@ describe("job analysis pipeline", () => {
   })
 
   it("drops ungrounded requirements past the cap", () => {
-    const jd = validateJobDescription("Alpha requirement. ".repeat(20))
+    const words = Array.from({ length: 45 }, (_, index) => `topic${index}`)
+    const jd = validateJobDescription(words.map((word) => `Knowledge of ${word}.`).join(" "))
     expect(jd.ok).toBe(true)
     if (!jd.ok) return
-    const raw = Array.from({ length: 45 }, () => ({
-      text: "Alpha requirement.",
+    const raw = words.map((word) => ({
+      text: `Knowledge of ${word}`,
       kind: "required" as const,
       category: "other" as const,
       normalizedSkills: [],
       minYears: null,
-      evidenceQuote: "Alpha requirement.",
+      evidenceQuote: `Knowledge of ${word}.`,
     }))
     const groundedResult = groundRequirements(jd.text, raw)
     expect(groundedResult.kept).toHaveLength(40)
