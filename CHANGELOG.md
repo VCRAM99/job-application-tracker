@@ -8,12 +8,14 @@ V2 adds an AI layer on top of the original tracker. Every V2 feature is off by d
 
 - **Extraction quality.**
   - The precision reported in M6c (60%) came from incomplete gold labels: every "false positive" was a real requirement. The labels are complete now.
-  - Added three realistic tuning postings and four held-out postings (about-us copy, duties, benefits, pay, equal-opportunity text, repeated requirements).
+  - Added seven realistic tuning postings (about-us copy, duties, benefits, pay, equal-opportunity text, repeated requirements) and four held-out postings, written after the filters were final and scored once.
   - Clearer prompt guidance; boilerplate and duplicate filters in grounding; prompt version `job-fit-2026-11-11`.
-  - Live, all sets: precision 97.4%, recall 96.2%. Held out: 96.4% / 100%, up from 100% / 85.2%.
+  - Live, all sets: precision 97.2%, recall 96.4%. Held out: 100% / 96.8%, up from 100% / 83.9%.
 - **CAPTCHA.** Cloudflare Turnstile on sign-up, sign-in, and the reset request. It is active only with `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, with no app-side enforcement, so a missing or broken widget never locks anyone out before Supabase CAPTCHA is turned on. The CSP allows Cloudflare only when enabled.
 - **Sentry tunnel.** `/monitoring` is now a route handler that forwards only envelopes for the configured DSN (host, project id, and key), caps bodies at 256 KB, and logs nothing. This replaces the SDK rewrite tunnel, which could relay to any project.
 - **Dependencies.** Patch and minor upgrades (Next 16.4.6, React 19.3.1, Sentry 11.12, and others). Production advisories went from 12 to 8, all low or moderate and documented in [docs/dependencies.md](docs/dependencies.md).
+- **Review.** An independent reviewer agent found 12 issues (7 medium, 5 low, none critical or high), all fixed with regression tests. It also found that the first "held-out" set had leaked into tuning; that set now counts as tuning, and new held-out postings replace it.
+- **Verification.** 645 Vitest tests in 85 files, 41 Playwright tests, and evals at 100% safety. First-load JS changed by at most +0.3 KB, with no accessibility drop ([docs/perf/v2.md](docs/perf/v2.md)).
 - **Paste a job posting.** Paste the text of any posting (Workday, LinkedIn, a company site). AI proposes company, title, location, arrangement, employment type, salary, and requisition ID; only values grounded in the pasted text are filled in. The user reviews before saving, the existing duplicate check applies, fit analysis is one click away, and the link is never fetched.
 - **Docs.** [Roadmap](docs/roadmap.md), [case study](docs/case-study.md), and an updated README.
 
