@@ -85,8 +85,8 @@ More detail: [architecture](docs/architecture.md) · [AI](docs/ai.md) · [fit an
 
 | Layer | Command | Count / gate |
 |---|---|---|
-| Unit, component, in-memory DB (PGlite), local Supabase RLS | `npm test` | 645 tests in 85 files |
-| End to end (Playwright, `next start`, fake provider, Turnstile test key) | `npm run test:e2e` | 41 tests: core flows on every feature, with the production CSP enforced |
+| Unit, component, in-memory DB (PGlite), local Supabase RLS | `npm test` | 652 tests in 86 files |
+| End to end (Playwright, `next start`, fake provider, Turnstile test key) | `npm run test:e2e` | 43 tests: core flows on every feature, with the production CSP enforced |
 | AI evals (prompts + validators, planted fabrications/injections) | `npm run test:eval` | CI fails below 100% safety |
 | Lint, types, build | `npm run lint`, `npm run typecheck`, `npm run build` | CI |
 

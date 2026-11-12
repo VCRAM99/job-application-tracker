@@ -47,8 +47,8 @@ The constraint was to do this without the product inventing anything about the c
 
 ## Testing and evals
 
-- **Vitest:** 645 tests in 85 files: unit, component, in-memory Postgres (PGlite), and RLS tests against local Supabase.
-- **Playwright:** 41 end-to-end tests against a production build, with the production CSP enforced, a fake AI provider, and Cloudflare's Turnstile test key.
+- **Vitest:** 652 tests in 86 files: unit, component, in-memory Postgres (PGlite), and RLS tests against local Supabase.
+- **Playwright:** 43 end-to-end tests against a production build, with the production CSP enforced, a fake AI provider, and Cloudflare's Turnstile test key.
 - **Live Gemini evals** (`gemini-3.5-flash-lite`, [docs/evals/latest.md](evals/latest.md)):
   - 100% of 56 planted fabrications and 3 injections dropped; 100% citation validity.
   - Requirement extraction: 97.2% precision, 96.4% recall across 20 postings. On four held-out postings, recall rose from 83.9% with the previous prompt to 96.8%, at 100% precision.
@@ -81,4 +81,4 @@ The full list is in [roadmap.md](roadmap.md).
 - Designed a "model proposes, code verifies" pipeline: every AI claim must quote the posting or the user's verified facts. Live evals drop 100% of 56 planted fabrications and 3 prompt injections, and CI fails on any safety regression.
 - Raised requirement-extraction recall on held-out postings from 83.9% to 96.8% at 100% precision. On the way, traced a reported 60% precision to incomplete eval labels rather than model errors.
 - Cut auth round trips per signed-in render from up to 12 to 2, and Supabase calls on the heaviest page from 27 to 16. Reduced first-load JS on two routes by about 100 KB each (291 → 191 KB, 278 → 184 KB) while keeping Lighthouse accessibility at 100 on 9 of 10 measured pages.
-- Hardened the launch with Row Level Security and no service-role key; HMAC-gated database functions; encrypted BYOK keys; a strict CSP and HSTS; opt-in Turnstile CAPTCHA; and a DSN-pinned Sentry tunnel. Verified with 645 unit and integration tests, 41 Playwright tests, and independent agent reviews.
+- Hardened the launch with Row Level Security and no service-role key; HMAC-gated database functions; encrypted BYOK keys; a strict CSP and HSTS; opt-in Turnstile CAPTCHA; and a DSN-pinned Sentry tunnel. Verified with 652 unit and integration tests, 43 Playwright tests, and independent agent reviews.

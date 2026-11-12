@@ -15,8 +15,9 @@ V2 adds an AI layer on top of the original tracker. Every V2 feature is off by d
 - **Sentry tunnel.** `/monitoring` is now a route handler that forwards only envelopes for the configured DSN (host, project id, and key), caps bodies at 256 KB, and logs nothing. This replaces the SDK rewrite tunnel, which could relay to any project.
 - **Dependencies.** Patch and minor upgrades (Next 16.4.6, React 19.3.1, Sentry 11.12, and others). Production advisories went from 12 to 8, all low or moderate and documented in [docs/dependencies.md](docs/dependencies.md).
 - **Review.** An independent reviewer agent found 12 issues (7 medium, 5 low, none critical or high), all fixed with regression tests. It also found that the first "held-out" set had leaked into tuning; that set now counts as tuning, and new held-out postings replace it.
-- **Verification.** 645 Vitest tests in 85 files, 41 Playwright tests, and evals at 100% safety. First-load JS changed by at most +0.3 KB, with no accessibility drop ([docs/perf/v2.md](docs/perf/v2.md)).
+- **Verification.** 652 Vitest tests in 86 files, 43 Playwright tests, and evals at 100% safety. First-load JS changed by at most +0.3 KB, with no accessibility drop ([docs/perf/v2.md](docs/perf/v2.md)).
 - **Paste a job posting.** Paste the text of any posting (Workday, LinkedIn, a company site). AI proposes company, title, location, arrangement, employment type, salary, and requisition ID; only values grounded in the pasted text are filled in. The user reviews before saving, the existing duplicate check applies, fit analysis is one click away, and the link is never fetched.
+- **Open to everyone.** `BETA_USER_IDS=*` opens every V2 feature to every signed-in user (unset or malformed stays closed). Privacy and terms pages (plain-language templates) are linked from every footer and from sign-up. Settings → Your data downloads everything an account owns as JSON. A runbook step covers account deletion requests.
 - **Docs.** [Roadmap](docs/roadmap.md), [case study](docs/case-study.md), and an updated README.
 
 ### M6c — Hardening and launch (PR #10)
